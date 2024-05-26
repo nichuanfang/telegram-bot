@@ -5,7 +5,7 @@ import threading
 import dotenv
 from telegram.ext import ApplicationBuilder
 
-from utils import my_logging
+from utils import my_logging, bot_util
 
 dotenv.load_dotenv()
 
@@ -15,7 +15,7 @@ logger = my_logging.get_logger('app')
 bot_directories = [d for d in os.listdir('bots') if os.path.isdir(os.path.join('bots', d))]
 
 
-def start_bot(bot_name, token, handlers=None):
+def start_bot(bot_name, token, command_handlers=None):
 	logger.info(f"Starting  {bot_name} ...")
 	
 	if token is None:
@@ -23,10 +23,11 @@ def start_bot(bot_name, token, handlers=None):
 	
 	application = ApplicationBuilder() \
 		.token(token) \
+		.concurrent_updates(True) \
 		.build()
-	# application.add_handler(CommandHandler('reset', ))
 	# application.add_handler(CommandHandler('help', ))
-	# application.add_error_handler(error_handler)
+	application.add_handlers(command_handlers)
+	application.add_error_handler(bot_util.error_handler)
 	
 	loop = asyncio.new_event_loop()
 	asyncio.set_event_loop(loop)
@@ -39,7 +40,9 @@ threads = []
 for bot_directory in bot_directories:
 	try:
 		# 动态导入每个机器人的处理器 同时指明了需要导入的属性(函数,子模块等)
-		bot_module = __import__(f'bots.{bot_directory}.bot', fromlist=['start_bot'])
+		bot_module = __import__(f'bots.{bot_directory}.bot', fromlist=['handlers'])
+		
+		handlers = getattr(bot_module, 'handlers')
 		
 		# todo 如果模块是dogyun 则还要添加定时任务
 		if bot_directory == 'dogyun_bot':
@@ -49,8 +52,11 @@ for bot_directory in bot_directories:
 		if token is None:
 			logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
 		
+		command_handlers = handlers()
+		
 		threads.append(
-			threading.Thread(target=start_bot, kwargs={'bot_name': bot_directory, 'token': token, 'handlers': None}))
+			threading.Thread(target=start_bot,
+			                 kwargs={'bot_name': bot_directory, 'token': token, 'command_handlers': command_handlers}))
 	except ImportError as e:
 		print(f"Failed to import bot {bot_directory}: {e}")
 

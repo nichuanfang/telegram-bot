@@ -14,9 +14,9 @@ def trigger_github_workflow(repo: str, event_type: str, client_payload=None):
 	"""
 	if client_payload is None:
 		client_payload = {}
-	GH_TOKEN = os.environ["GITHUB_TOKEN"]
+	GH_TOKEN = os.environ["BOT_GITHUB_TOKEN"]
 	if not GH_TOKEN:
-		raise Exception("GITHUB_TOKEN未设置!")
+		raise Exception("BOT_GITHUB_TOKEN未设置!")
 	header = {
 		'Accept': 'application/vnd.github.everest-preview+json',
 		'Authorization': f'token {GH_TOKEN}'
