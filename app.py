@@ -1,6 +1,5 @@
-import asyncio
+import multiprocessing
 import os
-import threading
 
 import dotenv
 from telegram.ext import ApplicationBuilder
@@ -14,9 +13,8 @@ logger = my_logging.get_logger('app')
 # 获取 bots 目录下的所有子目录
 bot_directories = [d for d in os.listdir('bots') if os.path.isdir(os.path.join('bots', d))]
 
-
 def start_bot(bot_name, token, command_handlers=None):
-	logger.info(f"Starting  {bot_name} ...")
+	logger.info(f"Starting {bot_name} ...")
 	
 	if token is None:
 		logger.error("请先设置BOT TOKEN!")
@@ -28,18 +26,10 @@ def start_bot(bot_name, token, command_handlers=None):
 	application.add_handlers(command_handlers)
 	application.add_error_handler(bot_util.error_handler)
 	
-	loop = asyncio.new_event_loop()
-	
-	try:
-		asyncio.set_event_loop(loop)
-		logger.info(f"{bot_name} is started!!")
-		application.run_polling()
-		# loop.run_until_complete(application.run_polling())
-	finally:
-		loop.close()
+	logger.info(f"{bot_name} is started!!")
+	application.run_polling()
 
-
-threads = []
+processes = []
 # 动态加载每个机器人
 for bot_directory in bot_directories:
 	try:
@@ -58,14 +48,13 @@ for bot_directory in bot_directories:
 		
 		command_handlers = handlers()
 		
-		threads.append(
-			threading.Thread(target=start_bot,
-			                 kwargs={'bot_name': bot_directory, 'token': token, 'command_handlers': command_handlers}))
+		p = multiprocessing.Process(target=start_bot, args=(bot_directory, token, command_handlers))
+		processes.append(p)
 	except ImportError as e:
 		print(f"Failed to import bot {bot_directory}: {e}")
 
 if __name__ == '__main__':
-	for thread in threads:
-		thread.start()
-	for thread in threads:
-		thread.join()
+	for p in processes:
+		p.start()
+	for p in processes:
+		p.join()
