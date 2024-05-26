@@ -21,4 +21,4 @@ dnspython
 Requests==2.31.0
 rich==13.6.0
 tmdbv3api==1.9.0
-aligo==6.1.9
+aligo==6.2.2
