@@ -14,8 +14,6 @@ logger = my_logging.get_logger('app')
 bot_directories = [d for d in os.listdir('bots') if os.path.isdir(os.path.join('bots', d))]
 
 def start_bot(bot_name, token, command_handlers=None):
-	logger.info(f"Starting {bot_name} ...")
-	
 	if token is None:
 		logger.error("请先设置BOT TOKEN!")
 	
