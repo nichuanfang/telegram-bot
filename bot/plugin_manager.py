@@ -1,21 +1,21 @@
 import json
 
-from plugins.gtts_text_to_speech import GTTSTextToSpeech
 from plugins.auto_tts import AutoTextToSpeech
-from plugins.dice import DicePlugin
-from plugins.youtube_audio_extractor import YouTubeAudioExtractorPlugin
+from plugins.crypto import CryptoPlugin
 from plugins.ddg_image_search import DDGImageSearchPlugin
 from plugins.ddg_translate import DDGTranslatePlugin
-from plugins.spotify import SpotifyPlugin
-from plugins.crypto import CryptoPlugin
-from plugins.weather import WeatherPlugin
 from plugins.ddg_web_search import DDGWebSearchPlugin
-from plugins.wolfram_alpha import WolframAlphaPlugin
 from plugins.deepl import DeeplTranslatePlugin
-from plugins.worldtimeapi import WorldTimeApiPlugin
-from plugins.whois_ import WhoisPlugin
-from plugins.webshot import WebshotPlugin
+from plugins.dice import DicePlugin
+from plugins.gtts_text_to_speech import GTTSTextToSpeech
 from plugins.iplocation import IpLocationPlugin
+from plugins.spotify import SpotifyPlugin
+from plugins.weather import WeatherPlugin
+from plugins.webshot import WebshotPlugin
+from plugins.whois_ import WhoisPlugin
+from plugins.wolfram_alpha import WolframAlphaPlugin
+from plugins.worldtimeapi import WorldTimeApiPlugin
+from plugins.youtube_audio_extractor import YouTubeAudioExtractorPlugin
 
 
 class PluginManager:
