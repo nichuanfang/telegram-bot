@@ -12,3 +12,4 @@ updates:
     allow:
       - dependency-name: "openai"
       - dependency-name: "python-telegram-bot"
+      - dependency-name: "aligo"
