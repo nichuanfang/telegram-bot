@@ -2,6 +2,9 @@ version: '3'
 services:
   telegram-bot:
     container_name: telegram-bot
+    pid: host
+    privileged: true
+    network_mode: host
     build:
       context: .
       dockerfile: Dockerfile
