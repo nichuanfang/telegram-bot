@@ -25,14 +25,18 @@ def start_bot(bot_name, token, command_handlers=None):
 		.token(token) \
 		.concurrent_updates(True) \
 		.build()
-	# application.add_handler(CommandHandler('help', ))
 	application.add_handlers(command_handlers)
 	application.add_error_handler(bot_util.error_handler)
 	
 	loop = asyncio.new_event_loop()
-	asyncio.set_event_loop(loop)
-	logger.info(f"{bot_name} is started!!")
-	loop.run_until_complete(application.run_polling())
+	
+	try:
+		asyncio.set_event_loop(loop)
+		logger.info(f"{bot_name} is started!!")
+		application.run_polling()
+		# loop.run_until_complete(application.run_polling())
+	finally:
+		loop.close()
 
 
 threads = []
