@@ -21,18 +21,16 @@ def start_bot(bot_name, token, command_handlers=None):
 	application = ApplicationBuilder() \
 		.token(token) \
 		.concurrent_updates(True) \
+		.get_updates_read_timeout(60) \
+		.get_updates_write_timeout(60) \
+		.get_updates_connect_timeout(60) \
 		.build()
+	
 	application.add_handlers(command_handlers)
 	application.add_error_handler(bot_util.error_handler)
 	
 	logger.info(f"{bot_name} is started!!")
-	application.run_polling(
-		timeout=20,  # 增加长轮询超时时间
-		read_timeout=60,  # 增加读取超时时间
-		write_timeout=60,  # 增加写入超时时间
-		connect_timeout=60,  # 增加连接超时时间
-		drop_pending_updates=True  # 丢弃未处理的更新
-	)
+	application.run_polling(drop_pending_updates=True)
 
 
 processes = []
