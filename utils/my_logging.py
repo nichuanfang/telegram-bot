@@ -2,7 +2,11 @@ import logging
 
 LOG_LEVEL = "INFO"
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
-
+logging.basicConfig(
+	format=LOG_FORMAT,
+	datefmt='%Y-%m-%d %H:%M:%S',
+	level=logging.ERROR
+)
 
 def get_logger(name, level=LOG_LEVEL, log_format=LOG_FORMAT):
 	"""
@@ -11,11 +15,6 @@ def get_logger(name, level=LOG_LEVEL, log_format=LOG_FORMAT):
 	:param log_format: logger 的输出`格式
 	:return:
 	"""
-	logging.basicConfig(
-		format=LOG_FORMAT,
-		datefmt='%Y-%m-%d %H:%M:%S',
-		level=LOG_LEVEL
-	)
 	# 强制要求传入 name
 	logger = logging.getLogger(name)
 	# 如果已经实例过一个相同名字的 logger，则不用再追加 handler
