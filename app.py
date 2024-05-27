@@ -31,7 +31,6 @@ def start_bot(bot_name, token, command_handlers=None):
 	
 	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
-	application.run_webhook()
 
 
 processes = []
