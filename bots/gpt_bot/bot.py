@@ -1,4 +1,5 @@
 import os
+import re
 
 from openai2 import Chat
 from telegram import Update
@@ -29,6 +30,18 @@ def auth(user_id: str) -> bool:
 	return str(user_id) in ALLOWED_TELEGRAM_USER_IDS
 
 
+def compress_question(question):
+	# 去除多余的空格和换行符
+	question = re.sub(r'\s+', ' ', question).strip()
+	
+	# 删除停用词（这里只是一个简单示例，可以根据需要扩展）
+	stop_words = {'的', '是', '在', '和', '了', '有', '我', '也', '不', '就', '与', '他', '她', '它'}
+	question_words = question.split()
+	compressed_question = ' '.join([word for word in question_words if word not in stop_words])
+	
+	return compressed_question
+
+
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	user_id = update.effective_user.id
 	if not auth(user_id):
@@ -43,12 +56,15 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		await update.message.reply_text(f'Your question is too long. Please limit it to {max_length} characters.')
 		return
 	
+	# 压缩问题内容
+	compressed_question = compress_question(question)
+	
 	try:
 		# 设置“正在输入...”状态
 		await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 		
 		# 异步请求答案
-		answer = await chat.async_request(question)
+		answer = await chat.async_request(compressed_question)
 		
 		await update.message.reply_text(answer)
 	except Exception as e:
