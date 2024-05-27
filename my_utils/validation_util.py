@@ -1,6 +1,6 @@
 import os
 
-from utils.my_logging import get_logger
+from my_utils.my_logging import get_logger
 
 logger = get_logger('validation_util')
 

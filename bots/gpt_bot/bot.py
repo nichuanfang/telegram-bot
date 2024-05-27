@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import MessageHandler, filters, ContextTypes
 
-from utils import my_logging, validation_util
+from my_utils import my_logging, validation_util
 
 # 获取日志
 logger = my_logging.get_logger('tmdb_bot')

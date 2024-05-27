@@ -1,8 +1,8 @@
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-from utils import my_logging
-from utils.github_util import trigger_github_workflow
+from my_utils import my_logging
+from my_utils.github_util import trigger_github_workflow
 
 # 获取日志
 logger = my_logging.get_logger('github_workflow_bot')

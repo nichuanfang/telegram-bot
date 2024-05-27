@@ -5,7 +5,7 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, CallbackContext
 from tmdbv3api import TMDb, Search, Movie, TV
 
-from utils import my_logging
+from my_utils import my_logging
 
 # 获取日志
 logger = my_logging.get_logger('tmdb_bot')

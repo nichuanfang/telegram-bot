@@ -5,8 +5,8 @@ import requests
 from bs4 import BeautifulSoup
 from telegram import Bot
 
-from utils import my_logging
-from utils.validation_util import validate
+from my_utils import my_logging
+from my_utils.validation_util import validate
 
 # 获取日志
 logger = my_logging.get_logger('dogyun_bot')

@@ -7,11 +7,11 @@ import dotenv
 
 dotenv.load_dotenv(override=True)
 from telegram import Bot
-from telegram.ext import ApplicationBuilder
+from telegram.ext import ApplicationBuilder, ContextTypes
 
 from bots.dogyun_bot.scheduled_task import lucky_draw_notice, balance_lack_notice
 
-from utils import my_logging
+from my_utils import my_logging
 
 logger = my_logging.get_logger('app')
 
@@ -32,6 +32,11 @@ async def add_scheduled_tasks(bot):
 	async def balance_lack_task():
 		await balance_lack_notice(bot)
 
+async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+	"""
+	Handles errors in the telegram-python-bot library.
+	"""
+	logger.error(f'Exception while handling an update: {context.error}')
 
 def start_bot(bot_name, token, command_handlers=None):
 	if token is None:
@@ -47,7 +52,7 @@ def start_bot(bot_name, token, command_handlers=None):
 		.build()
 	
 	application.add_handlers(command_handlers)
-	# application.add_error_handler(bot_util.error_handler)
+	application.add_error_handler(error_handler)
 	
 	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
