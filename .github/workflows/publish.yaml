@@ -53,21 +53,21 @@ jobs:
       packages: write
       contents: read
     steps:
-    - name: 更新telegram bots
-      uses: cross-the-world/ssh-scp-ssh-pipelines@latest
-      continue-on-error: true
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        user: ${{ secrets.VPS_USER }}
-        pass: ${{ secrets.VPS_PASS }}
-        port: ${{ secrets.VPS_PORT }}
-        connect_timeout: 10s
-        first_ssh: |
-          cd /root/code/telegram-bot
-          git checkout .
-          git checkout main
-          git pull --allow-unrelated-histories
-          docker-compose down
-          docker rmi -f telegram-bot_telegram-bot:latest
-          docker-compose up -d
-          docker image prune -f
+      - name: 更新telegram bots
+        uses: cross-the-world/ssh-scp-ssh-pipelines@latest
+        continue-on-error: true
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          user: ${{ secrets.VPS_USER }}
+          pass: ${{ secrets.VPS_PASS }}
+          port: ${{ secrets.VPS_PORT }}
+          connect_timeout: 10s
+          first_ssh: |
+            cd /root/code/telegram-bot
+            git checkout .
+            git checkout main
+            git pull --allow-unrelated-histories
+            docker-compose -f  docker-compose.local.yml down
+            docker rmi -f telegram-bot_telegram-bot:latest
+            docker-compose -f  docker-compose.local.yml  up -d
+            docker image prune -f
