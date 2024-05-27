@@ -51,9 +51,8 @@ for bot_directory in bot_directories:
 			logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
 		
 		command_handlers = handlers()
-		if bot_directory == 'tmdb_bot':
-			p = multiprocessing.Process(target=start_bot, args=(bot_directory, token, command_handlers))
-			processes.append(p)
+		p = multiprocessing.Process(target=start_bot, args=(bot_directory, token, command_handlers))
+		processes.append(p)
 	except ImportError as e:
 		print(f"Failed to import bot {bot_directory}: {e}")
 
