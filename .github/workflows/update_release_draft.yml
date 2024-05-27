@@ -48,5 +48,6 @@ jobs:
             git checkout .
             git pull --allow-unrelated-histories
             docker-compose down
+            docker rmi -f telegram-bot_telegram-bot:latest
             docker-compose up -d
 #            docker images  | grep telegram-bot_telegram-bot | awk '{print $3}' | xargs docker rmi
