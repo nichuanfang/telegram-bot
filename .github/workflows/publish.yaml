@@ -67,7 +67,7 @@ jobs:
             git checkout .
             git checkout main
             git pull --allow-unrelated-histories
-            docker-compose down
+            docker-compose -f  docker-compose.local.yml down
             docker rmi -f telegram-bot_telegram-bot:latest
             docker-compose -f  docker-compose.local.yml  up -d
             docker image prune -f
