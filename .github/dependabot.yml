@@ -11,5 +11,5 @@ updates:
       interval: "weekly"
     allow:
       - dependency-name: "openai"
-      - dependency-name: "python-telegram-bot"
+      - dependency-name: "python-telegram-gpt_bot"
       - dependency-name: "aligo"

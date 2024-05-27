@@ -41,7 +41,7 @@ class DeeplTranslatePlugin(Plugin):
              
         headers = {
             "Authorization": f"DeepL-Auth-Key {self.api_key}",
-            "User-Agent": "chatgpt-telegram-bot",
+            "User-Agent": "chatgpt-telegram-gpt_bot",
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept-Encoding": "utf-8"
         }
