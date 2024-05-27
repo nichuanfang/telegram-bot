@@ -12,7 +12,7 @@ pytube~=15.0.0
 gtts~=2.5.1
 whois~=0.9.27
 Pillow~=10.3.0
-APScheduler==3.10.4
+aiocron==1.8
 beautifulsoup4==4.12.2
 fake_useragent==1.3.0
 lxml==4.9.3
