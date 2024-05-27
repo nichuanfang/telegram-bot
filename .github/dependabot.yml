@@ -10,6 +10,6 @@ updates:
     schedule:
       interval: "weekly"
     allow:
-      - dependency-name: "openai"
+      - dependency-name: "openai2"
       - dependency-name: "python-telegram-bot"
       - dependency-name: "aligo"
