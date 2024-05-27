@@ -6,7 +6,7 @@ from telegram.ext import ApplicationBuilder
 
 from utils import my_logging, bot_util
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(override=True)
 
 logger = my_logging.get_logger('app')
 
@@ -31,6 +31,7 @@ def start_bot(bot_name, token, command_handlers=None):
 	
 	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
+	application.run_webhook()
 
 
 processes = []
@@ -51,9 +52,9 @@ for bot_directory in bot_directories:
 			logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
 		
 		command_handlers = handlers()
-		
-		p = multiprocessing.Process(target=start_bot, args=(bot_directory, token, command_handlers))
-		processes.append(p)
+		if bot_directory == 'tmdb_bot':
+			p = multiprocessing.Process(target=start_bot, args=(bot_directory, token, command_handlers))
+			processes.append(p)
 	except ImportError as e:
 		print(f"Failed to import bot {bot_directory}: {e}")
 
