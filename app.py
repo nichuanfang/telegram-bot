@@ -11,7 +11,7 @@ from telegram.ext import ApplicationBuilder
 
 from bots.dogyun_bot.scheduled_task import lucky_draw_notice, balance_lack_notice
 
-from utils import my_logging, bot_util
+from utils import my_logging
 
 logger = my_logging.get_logger('app')
 
@@ -47,7 +47,7 @@ def start_bot(bot_name, token, command_handlers=None):
 		.build()
 	
 	application.add_handlers(command_handlers)
-	application.add_error_handler(bot_util.error_handler)
+	# application.add_error_handler(bot_util.error_handler)
 	
 	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
