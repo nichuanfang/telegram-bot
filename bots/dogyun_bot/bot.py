@@ -64,7 +64,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 		await update.message.reply_text(f'获取服务器状态失败: {e}')
 
 
-# @bot.message_handler(commands=['draw_lottery'])
+# @gpt_bot.message_handler(commands=['draw_lottery'])
 async def draw_lottery(update: Update, context: CallbackContext):
 	"""抽奖
 
@@ -144,7 +144,7 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
 	#                          vps_config["VPS_USER"], vps_config["VPS_PASS"])
 	# except:
-	#     bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
+	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
 	try:
 		subprocess.call(
@@ -172,7 +172,7 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
 	#                          vps_config["VPS_USER"], vps_config["VPS_PASS"])
 	# except:
-	#     bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
+	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
 	try:
 		subprocess.call(

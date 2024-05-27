@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import itertools
 import json
 import logging
 import os
-import base64
 
 import telegram
 from telegram import Message, MessageEntity, Update, ChatMember, constants
@@ -16,7 +16,7 @@ from usage_tracker import UsageTracker
 
 def message_text(message: Message) -> str:
     """
-    Returns the text of a message, excluding any bot commands.
+    Returns the text of a message, excluding any gpt_bot commands.
     """
     message_txt = message.text
     if message_txt is None:
@@ -143,14 +143,14 @@ async def edit_message_with_retry(context: ContextTypes.DEFAULT_TYPE, chat_id: i
 
 async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handles errors in the telegram-python-bot library.
+    Handles errors in the telegram-python-gpt_bot library.
     """
     logging.error(f'Exception while handling an update: {context.error}')
 
 
 async def is_allowed(config, update: Update, context: CallbackContext, is_inline=False) -> bool:
     """
-    Checks if the user is allowed to use the bot.
+    Checks if the user is allowed to use the gpt_bot.
     """
     if config['allowed_user_ids'] == '*':
         return True
@@ -179,7 +179,7 @@ async def is_allowed(config, update: Update, context: CallbackContext, is_inline
 
 def is_admin(config, user_id: int, log_no_admin=False) -> bool:
     """
-    Checks if the user is the admin of the bot.
+    Checks if the user is the admin of the gpt_bot.
     The first user in the user list is the admin.
     """
     if config['admin_user_ids'] == '-':
@@ -198,8 +198,8 @@ def is_admin(config, user_id: int, log_no_admin=False) -> bool:
 
 def get_user_budget(config, user_id) -> float | None:
     """
-    Get the user's budget based on their user ID and the bot configuration.
-    :param config: The bot configuration object
+    Get the user's budget based on their user ID and the gpt_bot configuration.
+    :param config: The gpt_bot configuration object
     :param user_id: User id
     :return: The user's budget as a float, or None if the user is not found in the allowed user list
     """
@@ -229,7 +229,7 @@ def get_user_budget(config, user_id) -> float | None:
 def get_remaining_budget(config, usage, update: Update, is_inline=False) -> float:
     """
     Calculate the remaining budget for a user based on their current usage.
-    :param config: The bot configuration object
+    :param config: The gpt_bot configuration object
     :param usage: The usage tracker object
     :param update: Telegram update object
     :param is_inline: Boolean flag for inline queries
@@ -265,7 +265,7 @@ def is_within_budget(config, usage, update: Update, is_inline=False) -> bool:
     """
     Checks if the user reached their usage limit.
     Initializes UsageTracker for user and guest when needed.
-    :param config: The bot configuration object
+    :param config: The gpt_bot configuration object
     :param usage: The usage tracker object
     :param update: Telegram update object
     :param is_inline: Boolean flag for inline queries
@@ -283,7 +283,7 @@ def add_chat_request_to_usage_tracker(usage, config, user_id, used_tokens):
     """
     Add chat request to usage tracker
     :param usage: The usage tracker object
-    :param config: The bot configuration object
+    :param config: The gpt_bot configuration object
     :param user_id: The user id
     :param used_tokens: The number of tokens used
     """

@@ -1,27 +1,26 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import os
-import io
-
 from uuid import uuid4
+
+from PIL import Image
+from pydub import AudioSegment
 from telegram import BotCommandScopeAllGroupChats, Update, constants
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle
 from telegram import InputTextMessageContent, BotCommand
 from telegram.error import RetryAfter, TimedOut, BadRequest
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, \
-    filters, InlineQueryHandler, CallbackQueryHandler, Application, ContextTypes, CallbackContext
+	filters, InlineQueryHandler, CallbackQueryHandler, Application, ContextTypes, CallbackContext
 
-from pydub import AudioSegment
-from PIL import Image
-
-from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
-    edit_message_with_retry, get_stream_cutoff_values, is_allowed, get_remaining_budget, is_admin, is_within_budget, \
-    get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result, \
-    cleanup_intermediate_files
 from openai_helper import OpenAIHelper, localized_text
 from usage_tracker import UsageTracker
+from utils import is_group_chat, get_thread_id, message_text, wrap_with_indicator, split_into_chunks, \
+	edit_message_with_retry, get_stream_cutoff_values, is_allowed, get_remaining_budget, is_within_budget, \
+	get_reply_to_message_id, add_chat_request_to_usage_tracker, error_handler, is_direct_result, handle_direct_result, \
+	cleanup_intermediate_files
 
 
 class ChatGPTTelegramBot:
@@ -31,8 +30,8 @@ class ChatGPTTelegramBot:
 
     def __init__(self, config: dict, openai: OpenAIHelper):
         """
-        Initializes the bot with the given configuration and GPT bot object.
-        :param config: A dictionary containing the bot configuration
+        Initializes the gpt_bot with the given configuration and GPT gpt_bot object.
+        :param config: A dictionary containing the gpt_bot configuration
         :param openai: OpenAIHelper object
         """
         self.config = config
@@ -673,7 +672,7 @@ class ChatGPTTelegramBot:
                     prompt = f'"{update.message.reply_to_message.text}" {prompt}'
             else:
                 if update.message.reply_to_message and update.message.reply_to_message.from_user.id == context.bot.id:
-                    logging.info('Message is a reply to the bot, allowing...')
+                    logging.info('Message is a reply to the gpt_bot, allowing...')
                 else:
                     logging.warning('Message does not start with trigger keyword, ignoring...')
                     return
@@ -990,17 +989,17 @@ class ChatGPTTelegramBot:
     async def check_allowed_and_within_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                               is_inline=False) -> bool:
         """
-        Checks if the user is allowed to use the bot and if they are within their budget
+        Checks if the user is allowed to use the gpt_bot and if they are within their budget
         :param update: Telegram update object
         :param context: Telegram context object
         :param is_inline: Boolean flag for inline queries
-        :return: Boolean indicating if the user is allowed to use the bot
+        :return: Boolean indicating if the user is allowed to use the gpt_bot
         """
         name = update.inline_query.from_user.name if is_inline else update.message.from_user.name
         user_id = update.inline_query.from_user.id if is_inline else update.message.from_user.id
 
         if not await is_allowed(self.config, update, context, is_inline=is_inline):
-            logging.warning(f'User {name} (id: {user_id}) is not allowed to use the bot')
+            logging.warning(f'User {name} (id: {user_id}) is not allowed to use the gpt_bot')
             await self.send_disallowed_message(update, context, is_inline)
             return False
         if not is_within_budget(self.config, self.usage, update, is_inline=is_inline):
@@ -1039,14 +1038,14 @@ class ChatGPTTelegramBot:
 
     async def post_init(self, application: Application) -> None:
         """
-        Post initialization hook for the bot.
+        Post initialization hook for the gpt_bot.
         """
         await application.bot.set_my_commands(self.group_commands, scope=BotCommandScopeAllGroupChats())
         await application.bot.set_my_commands(self.commands)
 
     def run(self):
         """
-        Runs the bot indefinitely until the user presses Ctrl+C
+        Runs the gpt_bot indefinitely until the user presses Ctrl+C
         """
         application = ApplicationBuilder() \
             .token(self.config['token']) \
