@@ -29,7 +29,6 @@ def start_bot(bot_name, token, command_handlers=None):
 	application.add_handlers(command_handlers)
 	application.add_error_handler(bot_util.error_handler)
 	
-	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
 
 
