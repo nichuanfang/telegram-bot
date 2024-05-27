@@ -5,6 +5,8 @@ services:
     pid: host
     privileged: true
     network_mode: host
+    environment:
+      TZ: Asia/Shanghai
     build:
       context: .
       dockerfile: Dockerfile
