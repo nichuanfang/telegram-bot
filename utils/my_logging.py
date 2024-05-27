@@ -2,11 +2,11 @@ import logging
 
 LOG_LEVEL = "INFO"
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s %(message)s"
-logging.basicConfig(
-	format=LOG_FORMAT,
-	datefmt='%Y-%m-%d %H:%M:%S',
-	level=logging.ERROR
-)
+# logging.basicConfig(
+# 	format=LOG_FORMAT,
+# 	datefmt='%Y-%m-%d %H:%M:%S',
+# 	level=logging.ERROR
+# )
 
 def get_logger(name, level=LOG_LEVEL, log_format=LOG_FORMAT):
 	"""
