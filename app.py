@@ -13,6 +13,7 @@ logger = my_logging.get_logger('app')
 # 获取 bots 目录下的所有子目录
 bot_directories = [d for d in os.listdir('bots') if os.path.isdir(os.path.join('bots', d))]
 
+
 def start_bot(bot_name, token, command_handlers=None):
 	if token is None:
 		logger.error("请先设置BOT TOKEN!")
@@ -25,7 +26,14 @@ def start_bot(bot_name, token, command_handlers=None):
 	application.add_error_handler(bot_util.error_handler)
 	
 	logger.info(f"{bot_name} is started!!")
-	application.run_polling()
+	application.run_polling(
+		timeout=20,  # 增加长轮询超时时间
+		read_timeout=60,  # 增加读取超时时间
+		write_timeout=60,  # 增加写入超时时间
+		connect_timeout=60,  # 增加连接超时时间
+		drop_pending_updates=True  # 丢弃未处理的更新
+	)
+
 
 processes = []
 # 动态加载每个机器人

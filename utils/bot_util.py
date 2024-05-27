@@ -4,15 +4,16 @@ import asyncio
 import base64
 import itertools
 import json
-import logging
 import os
 
 import telegram
 from telegram import Message, MessageEntity, Update, ChatMember, constants
 from telegram.ext import CallbackContext, ContextTypes
 
+from utils.my_logging import get_logger
 from utils.usage_tracker import UsageTracker
 
+logging = get_logger(__name__)
 
 def message_text(message: Message) -> str:
 	"""
