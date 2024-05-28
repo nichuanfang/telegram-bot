@@ -1,11 +1,15 @@
+import asyncio
+import json
 import os
 import re
 
+import telegram
 from openai2 import Chat
 from telegram import Update
 from telegram.constants import ChatAction
-from telegram.ext import MessageHandler, filters, ContextTypes
+from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler
 
+from bots.gpt_bot.gpt_http_request import BotHttpRequest
 from my_utils import my_logging, validation_util
 
 # 获取日志
@@ -42,6 +46,12 @@ def compress_question(question):
 	return compressed_question
 
 
+async def send_typing_action(update):
+	while True:
+		await update.message.reply_chat_action(action=ChatAction.TYPING)
+		await asyncio.sleep(4)  # 每隔4秒发送一次“正在输入...”状态
+
+
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	user_id = update.effective_user.id
 	if not auth(user_id):
@@ -60,19 +70,43 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	compressed_question = compress_question(question)
 	
 	try:
-		# 设置“正在输入...”状态
-		await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+		# 开始发送“正在输入...”状态
+		typing_task = asyncio.create_task(send_typing_action(update))
+		
+		request_options = {
+			"temperature": 0.5,
+			"presence_penalty": 0,
+			"frequency_penalty": 0,
+			"top_p": 1
+		}
 		
 		# 异步请求答案
-		answer = await chat.async_request(compressed_question)
+		answer = await chat.async_request(compressed_question, **request_options)
 		
-		await update.message.reply_text(answer)
+		# 停止发送“正在输入...”状态
+		typing_task.cancel()
+		
+		await update.message.reply_text(telegram.helpers.escape_markdown(answer, version=2), parse_mode='MarkdownV2')
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
 
 
+async def balance_handler(update: Update, context: CallbackContext):
+	request = BotHttpRequest()
+	try:
+		responses = await asyncio.gather(request.get_subscription(),request.get_usage())
+		subscription = responses[0]
+		usage = responses[1]
+		total = json.loads(subscription.text)['soft_limit_usd']
+		used = json.loads(usage.text)['total_usage']/100
+		await update.message.reply_text(f'已使用 ${round(used, 2) } , 订阅总额 ${round(total,2)}')
+	except Exception as e:
+		await update.message.reply_text(f'获取余额失败: {e}')
+
+
 def handlers():
 	return [
-		MessageHandler(filters.TEXT & ~filters.COMMAND, answer)
+		CommandHandler('balance', balance_handler),
+		MessageHandler(filters.TEXT & ~filters.COMMAND, answer),
 	]
