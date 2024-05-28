@@ -26,7 +26,7 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
 
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL)
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=2)
 
 
 # 授权
@@ -95,12 +95,12 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def balance_handler(update: Update, context: CallbackContext):
 	request = BotHttpRequest()
 	try:
-		responses = await asyncio.gather(request.get_subscription(),request.get_usage())
+		responses = await asyncio.gather(request.get_subscription(), request.get_usage())
 		subscription = responses[0]
 		usage = responses[1]
 		total = json.loads(subscription.text)['soft_limit_usd']
-		used = json.loads(usage.text)['total_usage']/100
-		await update.message.reply_text(f'已使用 ${round(used, 2) } , 订阅总额 ${round(total,2)}')
+		used = json.loads(usage.text)['total_usage'] / 100
+		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}')
 	except Exception as e:
 		await update.message.reply_text(f'获取余额失败: {e}')
 
