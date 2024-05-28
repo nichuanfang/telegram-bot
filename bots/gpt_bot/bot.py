@@ -26,8 +26,7 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
 
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=2)
-
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=3)
 
 # 授权
 def auth(user_id: str) -> bool:
@@ -79,7 +78,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			"frequency_penalty": 0,
 			"top_p": 1
 		}
-		
+		chat.add_dialogs({"role": "system", "content": '你是一个全能的回复专家.能自动判断用户提问涉及的领域,在保证回答质量的情况下精简回复的内容'})
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
 		
