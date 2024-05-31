@@ -69,9 +69,10 @@ def start_bot(bot_name, token, command_handlers=None):
 		application.run_webhook(
 			listen="0.0.0.0",
 			port=webhook_port,
-			url_path=f'webhook/{webhook_url.rsplit("/",1)[-1]}',
-			webhook_url=webhook_url,
+			url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
+			webhook_url=webhook_url, drop_pending_updates=True
 		)
+
 
 async def start_scheduler(token):
 	bot = Bot(token=token)
