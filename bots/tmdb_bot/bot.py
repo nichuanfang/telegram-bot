@@ -2,7 +2,7 @@ import os
 
 from telegram import Update
 from telegram.constants import ParseMode
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
 from tmdbv3api import TMDb, Search, Movie, TV
 
 from my_utils import my_logging
@@ -18,7 +18,57 @@ movie = Movie()
 tv = TV()
 
 
+async def default_search(update: Update, context: CallbackContext):
+	"""
+	默认搜索
+	Args:
+		update: 可以获取消息对象
+		context:  可以获取机器人对象
+	"""
+	query = update.message.text
+	movie_text = '*电影结果:*\n'
+	movie_search = search.movies(query)
+	tv_text = '*剧集结果:*\n'
+	tv_search = search.tv_shows(query)
+	for movie_res in movie_search.results:
+		try:
+			if movie_res["release_date"] == None or movie_res["release_date"] == '':
+				release_date = ''
+			else:
+				release_date = '(' + movie_res["release_date"].split("-")[0] + ')'
+		except:
+			release_date = ''
+		movie_name = f'{movie_res.title} {release_date}'
+		movie_tmdb_url = f'https://www.themoviedb.org/movie/{movie_res.id}?language=zh-CN'
+		movie_text = movie_text + \
+		             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
+	for tv_res in tv_search.results:
+		try:
+			if tv_res["first_air_date"] == None or tv_res["first_air_date"] == '':
+				first_air_date = ''
+			else:
+				first_air_date = '(' + tv_res["first_air_date"].split("-")[0] + ')'
+		except:
+			first_air_date = ''
+		tv_name = f'{tv_res.name} {first_air_date}'
+		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
+		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
+	if len(movie_search.results) > 0 and len(tv_search.results) > 0:
+		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
+		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
+	elif len(movie_search.results) > 0 and len(tv_search.results) == 0:
+		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
+	elif len(movie_search.results) == 0 and len(tv_search.results) > 0:
+		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
+
+
 async def movie_popular(update: Update, context: CallbackContext):
+	"""
+	推荐电影
+	Args:
+		update: 可以获取消息对象
+		context:  可以获取机器人对象
+	"""
 	res = movie.popular()
 	movie_text = '*电影推荐:*\n'
 	for movie_res in res.results:
@@ -37,6 +87,12 @@ async def movie_popular(update: Update, context: CallbackContext):
 
 
 async def tv_popular(update: Update, context: CallbackContext):
+	"""
+	推荐剧集
+	Args:
+		update: 可以获取消息对象
+		context:  可以获取机器人对象
+	"""
 	res = tv.popular()
 	tv_text = '*剧集推荐:*\n'
 	for tv_res in res.results:
@@ -326,4 +382,5 @@ def handlers():
 	return [CommandHandler('movie_popular', movie_popular),
 	        CommandHandler('tv_popular', tv_popular),
 	        CommandHandler('movie_search', search_movie),
-	        CommandHandler('tv_search', search_tv)]
+	        CommandHandler('tv_search', search_tv),
+	        MessageHandler(filters.TEXT, default_search)]
