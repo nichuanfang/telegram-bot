@@ -87,10 +87,12 @@ async def lucky_draw_notice(bot: Bot):
 			await bot.send_message(DOGYUN_BOT_CHAT_ID,f'抽奖活动通知: {soup.find("strong").text}')
 			logger.info(f'抽奖活动通知: {soup.find("strong").text}')
 		else:
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,f'暂无抽奖活动')
+			# await bot.send_message(DOGYUN_BOT_CHAT_ID,f'暂无抽奖活动')
+			pass
 	except:
 		# '暂无抽奖活动'
-		await bot.send_message(DOGYUN_BOT_CHAT_ID,f'暂无抽奖活动')
+		# await bot.send_message(DOGYUN_BOT_CHAT_ID,f'暂无抽奖活动')
+		pass
 
 
 # 余额不足提醒

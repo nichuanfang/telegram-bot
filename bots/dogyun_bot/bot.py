@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 from datetime import date
 
@@ -6,7 +7,7 @@ from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-from my_utils import my_logging
+from my_utils import my_logging, bot_util
 from my_utils.validation_util import validate
 
 # 获取日志
@@ -25,6 +26,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	url = f'https://cvm.dogyun.com/server/{DOGYUN_BOT_SERVER_ID}'
 	headers = {
 		'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
@@ -57,8 +59,8 @@ async def get_server_status(update: Update, context: CallbackContext):
 		# rest_throughput = str(float(soup.find_all('div', class_='d-flex justify-content-between')[2].contents[3].next.split('/')[1].split(' ')[1]) - float(soup.find_all('div', class_='d-flex justify-content-between')[2].contents[3].next.split('/')[0].split(' ')[0])) + ' GB'
 		# 重置时间
 		# reset_time = soup.find_all('div', class_='d-flex justify-content-between')[2].contents[1].contents[1].text.split(' ')[0]
-		
 		status_message = f'CPU: {cpu}\n内存: {mem}\n本日流量: {curr_day_throughput}\n本月流量: {curr_month_throughput}'
+		typing_task.cancel()
 		await update.message.reply_text(status_message)
 	except Exception as e:
 		await update.message.reply_text(f'获取服务器状态失败: {e}')
@@ -71,6 +73,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	url = f'https://console.dogyun.com/turntable/lottery'
 	headers = {
 		'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
@@ -92,6 +95,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	try:
 		result = data['success']
 	except:
+		typing_task.cancel()
 		await update.message.reply_text('目前没有抽奖活动')
 		return
 	if result:
@@ -114,12 +118,14 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			prize_response = requests.post(
 				prize_url, json=prize_body, headers=headers, verify=True)
 		except Exception as e:
+			typing_task.cancel()
 			await update.message.reply_text(f'查看奖品失败: {e.args[0]}')
 			return
 		# 获取返回的json数据
 		try:
 			prize_data = prize_response.json()
 		except:
+			typing_task.cancel()
 			# tg通知dogyun cookie已过期
 			await update.message.reply_text('dogyun cookie已过期,请更新cookie')
 			return
@@ -127,9 +133,11 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		prize_infos: list = prize_data['data']
 		
 		if len(prize_infos) > 0 and prize_infos[0]['createTime'].split(' ')[0] == date.today().strftime("%Y-%m-%d"):
+			typing_task.cancel()
 			await update.message.reply_text(
 				f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}')
 	else:
+		typing_task.cancel()
 		await update.message.reply_text(f'抽奖失败: {data["message"]}')
 
 
@@ -146,12 +154,14 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	# except:
 	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	try:
 		subprocess.call(
 			f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
 	except:
 		await update.message.reply_text('执行脚本报错')
 		return
+	typing_task.cancel()
 	await update.message.reply_text('备份bitwarden成功')
 
 async def exec_cmd(update: Update, context: CallbackContext):
@@ -160,6 +170,7 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/exec_cmd':
 		await update.message.reply_text('请输入命令!')
@@ -178,8 +189,10 @@ async def exec_cmd(update: Update, context: CallbackContext):
 		subprocess.call(
 			f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
 	except:
+		typing_task.cancel()
 		await update.message.reply_text('执行命令报错')
 		return
+	typing_task.cancel()
 	await update.message.reply_text('执行命令成功')
 	
 
