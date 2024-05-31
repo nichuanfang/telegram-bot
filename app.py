@@ -1,6 +1,7 @@
 import asyncio
 import multiprocessing
 import os
+import platform
 
 import aiocron
 import dotenv
@@ -11,7 +12,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes
 
 from bots.dogyun_bot.scheduled_task import lucky_draw_notice, balance_lack_notice
 
-from my_utils import my_logging
+from my_utils import my_logging, validation_util
 
 logger = my_logging.get_logger('app')
 
@@ -32,17 +33,21 @@ async def add_scheduled_tasks(bot):
 	async def balance_lack_task():
 		await balance_lack_notice(bot)
 
+
 async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 	"""
 	Handles errors in the telegram-python-bot library.
 	"""
-	logger.error(f'Exception while handling an update: {context.error}')
+	
+	# todo 暂时测试webhook效果 需要查看错误日志 测试通过需要关闭!
+	# if platform.system().lower() == 'windows':
+	# 	logger.error(f'Exception while handling an update: {context.error}')
+
 
 def start_bot(bot_name, token, command_handlers=None):
 	if token is None:
 		logger.error("请先设置BOT TOKEN!")
 		return
-	
 	application = ApplicationBuilder() \
 		.token(token) \
 		.concurrent_updates(True) \
@@ -55,7 +60,18 @@ def start_bot(bot_name, token, command_handlers=None):
 	application.add_error_handler(error_handler)
 	
 	logger.info(f"{bot_name} is started!!")
-	application.run_polling(drop_pending_updates=True)
+	if platform.system().lower() == 'windows':
+		application.run_polling(drop_pending_updates=True)
+	else:
+		validate_res = validation_util.validate(f'{bot_name.upper()}_WEBHOOK_URL', f'{bot_name.upper()}_WEBHOOK_PORT')
+		webhook_url = validate_res[0]
+		webhook_port = validate_res[1]
+		application.run_webhook(
+			listen="0.0.0.0",
+			port=webhook_port,
+			url_path=webhook_url,
+			webhook_url=webhook_url,
+		)
 
 
 async def start_scheduler(token):
