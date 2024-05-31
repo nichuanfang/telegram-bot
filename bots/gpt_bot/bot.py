@@ -3,7 +3,6 @@ import json
 import os
 import re
 
-import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler
@@ -105,8 +104,11 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		# chat.add_dialogs({"role": "system", "content": '你是一个全能的回复专家.能自动判断用户提问涉及的领域,在保证回答质量的情况下精简回复的内容'})
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
+	
+		# 转义MarkdownV2特殊字符
+		escaped_text = bot_util.escape_markdown_v2(answer)
 		
-		await update.message.reply_text(telegram.helpers.escape_markdown(answer, version=2), parse_mode='MarkdownV2')
+		await update.message.reply_text(escaped_text, parse_mode='MarkdownV2')
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
 	except Exception as e:
