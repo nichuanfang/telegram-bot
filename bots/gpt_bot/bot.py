@@ -85,6 +85,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def balance_handler(update: Update, context: CallbackContext):
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	request = BotHttpRequest()
 	try:
 		responses = await asyncio.gather(request.get_subscription(), request.get_usage())
@@ -92,6 +93,7 @@ async def balance_handler(update: Update, context: CallbackContext):
 		usage = responses[1]
 		total = json.loads(subscription.text)['soft_limit_usd']
 		used = json.loads(usage.text)['total_usage'] / 100
+		typing_task.cancel()
 		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}')
 	except Exception as e:
 		await update.message.reply_text(f'获取余额失败: {e}')
