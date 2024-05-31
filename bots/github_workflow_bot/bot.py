@@ -18,7 +18,12 @@ async def scrape_metadata(update: Update, context: CallbackContext):
 		_type_: _description_
 	"""
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-	trigger_github_workflow('movie-tvshow-spider', 'crawl movies and shows')
+	try:
+		await asyncio.gather(bot_util.async_func(trigger_github_workflow,'movie-tvshow-spider', 'crawl movies and shows'))
+	except Exception as e:
+		typing_task.cancel()
+		await update.message.reply_text(e)
+		return 
 	logger.info('Scraped!')
 	typing_task.cancel()
 	await update.message.reply_text('已触发工作流: 刮削影视元信息,查看刮削日志: https://github.com/nichuanfang/movie-tvshow-spider/actions')

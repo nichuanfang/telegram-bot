@@ -35,15 +35,18 @@ async def get_server_status(update: Update, context: CallbackContext):
 		'Cookie': DOGYUN_BOT_COOKIE
 	}
 	try:
+		res = await asyncio.gather(
+			bot_util.async_func(requests.get, **{'url': url, 'headers': headers, 'verify': True}))
 		# 发送post请求
-		response = requests.get(url, headers=headers, verify=True)
+		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
 			# tg通知dogyun cookie已过期
 			await update.message.reply_text(
 				'dogyun cookie已过期,请更新cookie!')
 			return
 	except Exception as e:
-		logger.error(e)
+		typing_task.cancel()
+		await update.message.reply_text(e)
 		return
 	try:
 		soup = BeautifulSoup(response.text, 'lxml')
@@ -83,13 +86,18 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	}
 	# 发送put请求
 	try:
-		response = requests.put(url, headers=headers, verify=True)
+		res = await asyncio.gather(
+			bot_util.async_func(requests.put, **{'url': url, 'headers': headers, 'verify': True}))
+		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
+			typing_task.cancel()
 			# tg通知dogyun cookie已过期
 			await update.message.reply_text('dogyun cookie已过期,请更新cookie!')
+			return
 		data = response.json()
 	except Exception as e:
-		logger.error(e)
+		typing_task.cancel()
+		await update.message.reply_text(e)
 		return
 	# 获取抽奖结果
 	try:
@@ -115,8 +123,13 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		              "search": {"value": "", "regex": False}}
 		# post请求
 		try:
-			prize_response = requests.post(
-				prize_url, json=prize_body, headers=headers, verify=True)
+			prize_res = await asyncio.gather(bot_util.async_func(requests.post, **{
+				'url': prize_url,
+				'json': prize_body,
+				'headers': headers,
+				'verify': True
+			}))
+			prize_response = prize_res[0]
 		except Exception as e:
 			typing_task.cancel()
 			await update.message.reply_text(f'查看奖品失败: {e.args[0]}')
@@ -156,13 +169,15 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	#     return
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	try:
-		subprocess.call(
-			f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
+		await asyncio.gather(
+			bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
 	except:
+		typing_task.cancel()
 		await update.message.reply_text('执行脚本报错')
 		return
 	typing_task.cancel()
 	await update.message.reply_text('备份bitwarden成功')
+
 
 async def exec_cmd(update: Update, context: CallbackContext):
 	"""执行bash脚本
@@ -173,10 +188,12 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/exec_cmd':
+		typing_task.cancel()
 		await update.message.reply_text('请输入命令!')
 		return
 	script = message_text[10:].strip()
 	if script in ['systemctl stop tgbot', 'systemctl restart tgbot', 'reboot']:
+		typing_task.cancel()
 		await update.message.reply_text('禁止执行该命令')
 		return
 	# try:
@@ -186,18 +203,18 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
 	try:
-		subprocess.call(
-			f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
+		await asyncio.gather(
+			bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
 	except:
 		typing_task.cancel()
 		await update.message.reply_text('执行命令报错')
 		return
 	typing_task.cancel()
 	await update.message.reply_text('执行命令成功')
-	
+
 
 def handlers():
 	return [CommandHandler('server_info', get_server_status),
 	        CommandHandler('draw_lottery', draw_lottery),
 	        CommandHandler('bitwarden_backup', bitwarden_backup),
-	        CommandHandler('exec_cmd',exec_cmd)]
+	        CommandHandler('exec_cmd', exec_cmd)]
