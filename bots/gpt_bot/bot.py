@@ -75,10 +75,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
 		
+		await update.message.reply_text(telegram.helpers.escape_markdown(answer, version=2), parse_mode='MarkdownV2')
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
-		
-		await update.message.reply_text(telegram.helpers.escape_markdown(answer, version=2), parse_mode='MarkdownV2')
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
@@ -93,10 +92,11 @@ async def balance_handler(update: Update, context: CallbackContext):
 		usage = responses[1]
 		total = json.loads(subscription.text)['soft_limit_usd']
 		used = json.loads(usage.text)['total_usage'] / 100
-		typing_task.cancel()
 		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}')
+		typing_task.cancel()
 	except Exception as e:
 		await update.message.reply_text(f'获取余额失败: {e}')
+		typing_task.cancel()
 
 
 def handlers():
