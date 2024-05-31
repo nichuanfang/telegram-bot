@@ -39,9 +39,8 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 	Handles errors in the telegram-python-bot library.
 	"""
 	
-	# todo 暂时测试webhook效果 需要查看错误日志 测试通过需要关闭!
-	# if platform.system().lower() == 'windows':
-	# 	logger.error(f'Exception while handling an update: {context.error}')
+	if platform.system().lower() == 'windows':
+		logger.error(f'Exception while handling an update: {context.error}')
 
 
 def start_bot(bot_name, token, command_handlers=None):
