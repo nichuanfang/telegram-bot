@@ -25,8 +25,8 @@ async def scrape_metadata(update: Update, context: CallbackContext):
 		await update.message.reply_text(e)
 		return 
 	logger.info('Scraped!')
-	typing_task.cancel()
 	await update.message.reply_text('已触发工作流: 刮削影视元信息,查看刮削日志: https://github.com/nichuanfang/movie-tvshow-spider/actions')
+	typing_task.cancel()
 
 def handlers():
 	return [CommandHandler('scrape_metadata', scrape_metadata)]
