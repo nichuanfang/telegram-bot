@@ -4,7 +4,7 @@ aiocron==1.8
 beautifulsoup4==4.12.2
 tmdbv3api==1.9.0
 aligo==6.2.2
-python-telegram-bot==21.2
+python-telegram-bot[webhooks]==21.2
 openai==1.30.5
 lxml==5.2.2
 fake-useragent==1.5.1
