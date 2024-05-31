@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from telegram import Update
@@ -5,7 +6,7 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
 from tmdbv3api import TMDb, Search, Movie, TV
 
-from my_utils import my_logging
+from my_utils import my_logging, bot_util
 
 # 获取日志
 logger = my_logging.get_logger('tmdb_bot')
@@ -25,6 +26,7 @@ async def default_search(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	query = update.message.text
 	movie_text = '*电影结果:*\n'
 	movie_search = search.movies(query)
@@ -53,6 +55,7 @@ async def default_search(update: Update, context: CallbackContext):
 		tv_name = f'{tv_res.name} {first_air_date}'
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
+	typing_task.cancel()
 	if len(movie_search.results) > 0 and len(tv_search.results) > 0:
 		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
 		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
@@ -69,6 +72,7 @@ async def movie_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	res = movie.popular()
 	movie_text = '*电影推荐:*\n'
 	for movie_res in res.results:
@@ -83,6 +87,7 @@ async def movie_popular(update: Update, context: CallbackContext):
 		movie_tmdb_url = f'https://www.themoviedb.org/movie/{movie_res.id}?language=zh-CN'
 		movie_text = movie_text + \
 		             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
+	typing_task.cancel()
 	await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
@@ -93,6 +98,7 @@ async def tv_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	res = tv.popular()
 	tv_text = '*剧集推荐:*\n'
 	for tv_res in res.results:
@@ -106,6 +112,7 @@ async def tv_popular(update: Update, context: CallbackContext):
 		tv_name = f'{tv_res.name} {first_air_date}'
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
+	typing_task.cancel()
 	await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
@@ -115,6 +122,7 @@ async def search_movie(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/movie_search':
 		await update.message.reply_text('请输入电影名称!')
@@ -132,6 +140,7 @@ async def search_movie(update: Update, context: CallbackContext):
 		movie_tmdb_url = f'https://www.themoviedb.org/movie/{movie_res.id}?language=zh-CN'
 		movie_text = movie_text + \
 		             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
+	typing_task.cancel()
 	if len(movie_search.results) != 0:
 		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
 	else:
@@ -158,6 +167,7 @@ async def search_tv(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/tv_search':
 		await update.message.reply_text('请输入剧集名称!')
@@ -174,6 +184,7 @@ async def search_tv(update: Update, context: CallbackContext):
 		tv_name = f'{tv_res.name} {first_air_date}'
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
+	typing_task.cancel()
 	if len(tv_search.results) != 0:
 		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
 	else:

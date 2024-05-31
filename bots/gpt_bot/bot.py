@@ -6,11 +6,10 @@ import re
 import telegram
 from openai2 import Chat
 from telegram import Update
-from telegram.constants import ChatAction
 from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
-from my_utils import my_logging, validation_util
+from my_utils import my_logging, validation_util, bot_util
 
 # 获取日志
 logger = my_logging.get_logger('tmdb_bot')
@@ -45,12 +44,6 @@ def compress_question(question):
 	return compressed_question
 
 
-async def send_typing_action(update):
-	while True:
-		await update.message.reply_chat_action(action=ChatAction.TYPING)
-		await asyncio.sleep(4)  # 每隔4秒发送一次“正在输入...”状态
-
-
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	user_id = update.effective_user.id
 	if not auth(user_id):
@@ -70,7 +63,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	
 	try:
 		# 开始发送“正在输入...”状态
-		typing_task = asyncio.create_task(send_typing_action(update))
+		typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 		
 		request_options = {
 			"temperature": 0.5,
