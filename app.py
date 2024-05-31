@@ -1,6 +1,7 @@
 import asyncio
 import multiprocessing
 import os
+import platform
 
 import aiocron
 import dotenv
@@ -32,11 +33,14 @@ async def add_scheduled_tasks(bot):
 	async def balance_lack_task():
 		await balance_lack_notice(bot)
 
+
 async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 	"""
 	Handles errors in the telegram-python-bot library.
 	"""
-	logger.error(f'Exception while handling an update: {context.error}')
+	if platform.system().lower() == 'windows':
+		logger.error(f'Exception while handling an update: {context.error}')
+
 
 def start_bot(bot_name, token, command_handlers=None):
 	if token is None:
@@ -56,6 +60,7 @@ def start_bot(bot_name, token, command_handlers=None):
 	
 	logger.info(f"{bot_name} is started!!")
 	application.run_polling(drop_pending_updates=True)
+
 
 async def start_scheduler(token):
 	bot = Bot(token=token)
