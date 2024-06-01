@@ -12,7 +12,7 @@ from bots.gpt_bot.gpt_http_request import BotHttpRequest
 from my_utils import my_logging, validation_util, bot_util
 
 # 获取日志
-logger = my_logging.get_logger('tmdb_bot')
+logger = my_logging.get_logger('gpt_bot')
 
 require_vars = validation_util.validate('OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ALLOWED_TELEGRAM_USER_IDS')
 # openai 的密钥
@@ -30,17 +30,18 @@ chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL
 masks = {
 	'common': {
 		'name': '通用',
-		'mask': [{"role": "system", "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量'}]
+		'mask': [{"role": "system",
+		          "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量,结果不用加粗'}]
 	},
 	'github_copilot': {
 		'name': '代码助手',
 		'mask': [{"role": "system",
-		          "content": '你是软件开发专家,精通java,go,python,javascript等常见开发语言.你可以为我解答任何软件开发方面的问题,包括功能设计,bug修复,代码优化等'}]
+		          "content": '你是软件开发专家,你可以为我解答任何关于功能设计,bug修复,代码优化等软件开发方面的问题,结果不用加粗'}]
 	},
 	'doctor': {
 		'name': '医生',
 		'mask': [{"role": "system",
-		          "content": '我想让你扮演一名人工智能辅助医生。我将为您提供患者的详细信息，您的任务是使用最新的人工智能工具，例如医学成像软件和其他机器学习程序，以诊断最可能导致其症状的原因。您还应该将体检、实验室测试等传统方法纳入您的评估过程，以确保准确性'}]
+		          "content": '我想让你扮演一名人工智能辅助医生.我将为您提供患者的详细信息,您的任务是使用最新的人工智能工具,例如医学成像软件和其他机器学习程序,以诊断最可能导致其症状的原因.您还应该将体检、实验室测试等传统方法纳入您的评估过程,以确保准确性,结果不用加粗'}]
 	}
 }
 
@@ -90,10 +91,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	# 压缩问题内容
 	compressed_question = compress_question(question)
 	
+	# 开始发送“正在输入...”状态
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	try:
-		# 开始发送“正在输入...”状态
-		typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-		
 		request_options = {
 			'messages': context.user_data.get('current_mask', masks['common']['mask']),
 			"temperature": 0.5,
@@ -101,19 +101,15 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			"frequency_penalty": 0,
 			"top_p": 1
 		}
-		# chat.add_dialogs({"role": "system", "content": '你是一个全能的回复专家.能自动判断用户提问涉及的领域,在保证回答质量的情况下精简回复的内容'})
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
-	
-		# 转义MarkdownV2特殊字符
-		escaped_text = bot_util.escape_markdown_v2(answer)
-		
-		await update.message.reply_text(escaped_text, parse_mode='MarkdownV2')
-		# 停止发送“正在输入...”状态
-		typing_task.cancel()
+		await update.message.reply_text(answer)
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+	finally:
+		# 停止发送“正在输入...”状态
+		typing_task.cancel()
 
 
 async def balance_handler(update: Update, context: CallbackContext):
