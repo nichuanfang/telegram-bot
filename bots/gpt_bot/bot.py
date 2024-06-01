@@ -31,17 +31,17 @@ masks = {
 	'common': {
 		'name': '通用',
 		'mask': [{"role": "system",
-		          "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量,结果不用加粗'}]
+		          "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量'}]
 	},
 	'github_copilot': {
 		'name': '代码助手',
 		'mask': [{"role": "system",
-		          "content": '你是软件开发专家,你可以为我解答任何关于功能设计,bug修复,代码优化等软件开发方面的问题,结果不用加粗'}]
+		          "content": '你是软件开发专家,你可以为我解答任何关于功能设计,bug修复,代码优化等软件开发方面的问题'}]
 	},
 	'doctor': {
 		'name': '医生',
 		'mask': [{"role": "system",
-		          "content": '我想让你扮演一名人工智能辅助医生.我将为您提供患者的详细信息,您的任务是使用最新的人工智能工具,例如医学成像软件和其他机器学习程序,以诊断最可能导致其症状的原因.您还应该将体检、实验室测试等传统方法纳入您的评估过程,以确保准确性,结果不用加粗'}]
+		          "content": '我想让你扮演一名人工智能辅助医生.我将为您提供患者的详细信息,您的任务是使用最新的人工智能工具,例如医学成像软件和其他机器学习程序,以诊断最可能导致其症状的原因.您还应该将体检、实验室测试等传统方法纳入您的评估过程,以确保准确性'}]
 	}
 }
 
@@ -103,7 +103,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		}
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
-		await update.message.reply_text(answer)
+		await update.message.reply_text(answer.replace('**','')
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
