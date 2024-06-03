@@ -113,7 +113,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	}
 	
 	buffer = ''
-	buffer_limit = 50  # 可以根据需要调整
+	buffer_limit = 100  # 可以根据需要调整
 	
 	try:
 		# 发送初始消息
@@ -122,7 +122,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		total_answer = ''
 		
 		async for answer in chat.async_stream_request(compressed_question, **request_options):
-			buffer += answer.replace('**', '')
+			buffer += answer
 			if len(buffer) >= buffer_limit:
 				total_answer += buffer
 				# 修改消息
@@ -208,14 +208,14 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	# 根据选择的面具进行相应的处理
 	await query.edit_message_text(
 		text=f'面具已切换至*{selected_mask["name"]}*',
-		parse_mode=ParseMode.HTML
+		parse_mode=ParseMode.MARKDOWN_V2
 	)
 	
 	# 切换面具后清除上下文
 	chat.clear_messages()
 	
 	# 应用选择的面具
-	context.user_data['current_mask'] = selected_mask['mask']
+	context.user_data['current_mask'] = selected_mask
 
 
 def handlers():
