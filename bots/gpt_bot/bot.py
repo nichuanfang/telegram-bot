@@ -103,7 +103,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		}
 		# 异步请求答案
 		answer = await chat.async_request(compressed_question, **request_options)
-		await update.message.reply_text(answer.replace('**','')
+		await update.message.reply_text(answer.replace('**', ''))
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
