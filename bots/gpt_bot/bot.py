@@ -29,7 +29,7 @@ chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL
 
 masks = {
 	'common': {
-		'name': '通用',
+		'name': '通用助手',
 		'mask': [{"role": "system",
 		          "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量'}]
 	},
@@ -37,6 +37,16 @@ masks = {
 		'name': '代码助手',
 		'mask': [{"role": "system",
 		          "content": '你是软件开发专家,你可以为我解答任何关于功能设计,bug修复,代码优化等软件开发方面的问题'}]
+	},
+	'travel_guide': {
+		'name': '旅游助手',
+		'mask': [{"role": "system",
+		          "content": '你是高级聊天机器人旅游指南。您的主要目标是为用户提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗'}]
+	},
+	'movie_expert': {
+		'name': '电影专家',
+		'mask': [{"role": "system",
+		          "content": '作为高级聊天机器人电影专家助理，您的主要目标是尽您所能为用户提供帮助。您可以回答有关电影、演员、导演等的问题。您可以根据用户的喜好向他们推荐电影。您可以与用户讨论电影，并提供有关电影的有用信息。为了有效地帮助用户，在回复中保持详细和彻底是很重要的。使用示例和证据来支持您的观点并证明您的建议或解决方案的合理性。请记住始终优先考虑用户的需求和满意度。您的最终目标是为用户提供有用且愉快的体验'}]
 	},
 	'doctor': {
 		'name': '医生',
@@ -93,17 +103,39 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	curr_mask = context.user_data.get('current_mask', masks['common'])
+	request_options = {
+		'messages': curr_mask['mask'],
+		"temperature": 0.5,
+		"presence_penalty": 0,
+		"frequency_penalty": 0,
+		"top_p": 1
+	}
+	
+	buffer = ''
+	buffer_limit = 50  # 可以根据需要调整
+	
 	try:
-		request_options = {
-			'messages': context.user_data.get('current_mask', masks['common']['mask']),
-			"temperature": 0.5,
-			"presence_penalty": 0,
-			"frequency_penalty": 0,
-			"top_p": 1
-		}
-		# 异步请求答案
-		answer = await chat.async_request(compressed_question, **request_options)
-		await update.message.reply_text(answer.replace('**', ''))
+		# 发送初始消息
+		sent_message = await update.message.reply_text('Loading...')
+		message_id = sent_message.message_id
+		total_answer = ''
+		
+		async for answer in chat.async_stream_request(compressed_question, **request_options):
+			buffer += answer.replace('**', '')
+			if len(buffer) >= buffer_limit:
+				total_answer += buffer
+				# 修改消息
+				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
+				                                    text=total_answer)
+				buffer = ''
+		
+		# 发送剩余的字符
+		if buffer:
+			total_answer += buffer
+			await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
+			                                    text=total_answer)
+	
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
@@ -176,7 +208,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	# 根据选择的面具进行相应的处理
 	await query.edit_message_text(
 		text=f'面具已切换至*{selected_mask["name"]}*',
-		parse_mode=ParseMode.MARKDOWN_V2
+		parse_mode=ParseMode.HTML
 	)
 	
 	# 切换面具后清除上下文
