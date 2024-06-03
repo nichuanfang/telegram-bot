@@ -23,7 +23,8 @@ OPENAI_BASE_URL = require_vars[1]
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].split(',')]
 # 模型
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
-
+# 是否启用流式传输 默认不采用
+ENABLE_STREAM = os.getenv('ENABLE_STREAM', False)
 # 初始化 Chat 实例
 chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=10)
 
@@ -112,30 +113,32 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		"top_p": 1
 	}
 	
-	buffer = ''
-	buffer_limit = 100  # 可以根据需要调整
-	
 	try:
-		# 发送初始消息
-		sent_message = await update.message.reply_text('Loading...')
-		message_id = sent_message.message_id
-		total_answer = ''
-		
-		async for answer in chat.async_stream_request(compressed_question, **request_options):
-			buffer += answer
-			if len(buffer) >= buffer_limit:
+		if ENABLE_STREAM:
+			buffer = ''
+			buffer_limit = 100
+			# 发送初始消息
+			sent_message = await update.message.reply_text('Loading...')
+			message_id = sent_message.message_id
+			total_answer = ''
+			
+			async for answer in chat.async_stream_request(compressed_question, **request_options):
+				buffer += answer
+				if len(buffer) >= buffer_limit:
+					total_answer += buffer
+					# 修改消息
+					await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
+					                                    text=total_answer)
+					buffer = ''
+			
+			# 发送剩余的字符
+			if buffer:
 				total_answer += buffer
-				# 修改消息
 				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
 				                                    text=total_answer)
-				buffer = ''
-		
-		# 发送剩余的字符
-		if buffer:
-			total_answer += buffer
-			await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-			                                    text=total_answer)
-	
+		else:
+			answer = await chat.async_request(compressed_question, **request_options)
+			await update.message.reply_text(answer[:4096])
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
