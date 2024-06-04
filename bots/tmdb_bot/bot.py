@@ -63,7 +63,7 @@ async def default_search(update: Update, context: CallbackContext):
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
 	if len(movie_search.results) > 0 and len(tv_search.results) > 0:
-		await update.message.reply_text(movie_text + tv_text, parse_mode=ParseMode.MARKDOWN_V2,
+		await update.message.reply_text(movie_text + '\n' + tv_text, parse_mode=ParseMode.MARKDOWN_V2,
 		                                reply_to_message_id=update.message.message_id)
 	elif len(movie_search.results) > 0 and len(tv_search.results) == 0:
 		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
