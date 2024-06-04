@@ -3,6 +3,7 @@ import json
 import os
 import re
 
+import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler
@@ -23,11 +24,22 @@ OPENAI_BASE_URL = require_vars[1]
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].split(',')]
 # 模型
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+# 可用的模型列表
+MODELS = ['gpt-3.5-turbo', 'gpt-4-turbo-preview', 'gpt-4o-2024-05-13', 'dall-e-3']
 # 是否启用流式传输 默认不采用
-ENABLE_STREAM = os.getenv('ENABLE_STREAM', False)
+ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
 chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=10)
 
+# 请求openai使用的选项
+OPENAI_COMPLETION_OPTIONS = {
+	"temperature": 0.7,
+	"max_tokens": 1000,
+	"top_p": 1,
+	"frequency_penalty": 0,
+	"presence_penalty": 0
+}
+# 面具列表
 masks = {
 	'common': {
 		'name': '通用助手',
@@ -43,6 +55,11 @@ masks = {
 		'name': '旅游助手',
 		'mask': [{"role": "system",
 		          "content": '你是高级聊天机器人旅游指南。您的主要目标是为用户提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗'}]
+	},
+	'song_recommender': {
+		'name': '歌曲推荐人',
+		'mask': [{"role": "system",
+		          'content': '我想让你担任歌曲推荐人。我将为您提供一首歌曲，您将创建一个包含 10 首与给定歌曲相似的歌曲的播放列表。您将为播放列表提供播放列表名称和描述。不要选择同名或同名歌手的歌曲。不要写任何解释或其他文字，只需回复播放列表名称、描述和歌曲'}]
 	},
 	'movie_expert': {
 		'name': '电影专家',
@@ -105,14 +122,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	curr_mask = context.user_data.get('current_mask', masks['common'])
-	request_options = {
-		'messages': curr_mask['mask'],
-		"temperature": 0.5,
-		"presence_penalty": 0,
-		"frequency_penalty": 0,
-		"top_p": 1
-	}
-	
+	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 	try:
 		if ENABLE_STREAM:
 			buffer = ''
@@ -122,7 +132,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			message_id = sent_message.message_id
 			total_answer = ''
 			
-			async for answer in chat.async_stream_request(compressed_question, **request_options):
+			async for answer in chat.async_stream_request(compressed_question, **OPENAI_COMPLETION_OPTIONS):
 				buffer += answer
 				if len(buffer) >= buffer_limit:
 					total_answer += buffer
@@ -137,7 +147,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
 				                                    text=total_answer)
 		else:
-			answer = await chat.async_request(compressed_question, **request_options)
+			answer = await chat.async_request(compressed_question, **OPENAI_COMPLETION_OPTIONS)
 			await update.message.reply_text(answer[:4096])
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
@@ -175,6 +185,23 @@ async def clear_handler(update: Update, context: CallbackContext):
 	await update.message.reply_text('上下文已清除')
 
 
+def generate_mask_keyboard(masks, current_mask_key):
+	keyboard = []
+	row = []
+	for i, (key, mask) in enumerate(masks.items()):
+		# 如果是当前选择的面具，添加标记
+		name = mask["name"]
+		if key == current_mask_key:
+			name += " *"
+		row.append(InlineKeyboardButton(name, callback_data=key))
+		if (i + 1) % 3 == 0:
+			keyboard.append(row)
+			row = []
+	if row:
+		keyboard.append(row)
+	return InlineKeyboardMarkup(keyboard)
+
+
 async def masks_handler(update: Update, context: CallbackContext):
 	"""
 	切换面具处理器
@@ -182,15 +209,15 @@ async def masks_handler(update: Update, context: CallbackContext):
 		update:  更新对象
 		context:  上下文对象
 	"""
-	# 创建内联键盘按钮
-	keyboard = [
-		[InlineKeyboardButton(masks[key]['name'], callback_data=key) for key in masks]
-	]
-	reply_markup = InlineKeyboardMarkup(keyboard)
+	# 获取当前选择的面具
+	current_mask = context.user_data.get('current_mask', masks['common'])
+	current_mask_key = next(key for key, value in masks.items() if value == current_mask)
+	# 生成内联键盘
+	keyboard = generate_mask_keyboard(masks, current_mask_key)
 	
 	await update.message.reply_text(
 		'请选择一个面具:',
-		reply_markup=reply_markup
+		reply_markup=keyboard
 	)
 
 
@@ -221,12 +248,77 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	context.user_data['current_mask'] = selected_mask
 
 
+# 生成模型选择键盘
+def generate_model_keyboard(models, current_model):
+	keyboard = []
+	row = []
+	for i, model in enumerate(models):
+		# 如果是当前选择的模型，添加标记
+		name = model
+		if model == current_model:
+			name += " *"
+		row.append(InlineKeyboardButton(name, callback_data=model))
+		if (i + 1) % 2 == 0:
+			keyboard.append(row)
+			row = []
+	if row:
+		keyboard.append(row)
+	return InlineKeyboardMarkup(keyboard)
+
+
+async def model_handler(update: Update, context: CallbackContext):
+	"""
+	切换模型处理器
+	Args:
+		update:  更新对象
+		context:  上下文对象
+	"""
+	# 获取当前选择的模型
+	current_model = chat._request_kwargs['model']
+	# 生成内联键盘
+	keyboard = generate_model_keyboard(MODELS, current_model)
+	
+	await update.message.reply_text(
+		'请选择一个模型:',
+		reply_markup=keyboard
+	)
+
+
+async def model_selection_handler(update: Update, context: CallbackContext):
+	"""
+	处理模型选择
+	Args:
+		update:  更新对象
+		context:  上下文对象
+	"""
+	query = update.callback_query
+	await query.answer()
+	
+	# 获取用户选择的模型
+	selected_model = query.data
+	
+	# 根据选择的模型进行相应的处理
+	await query.edit_message_text(
+		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
+		parse_mode=ParseMode.MARKDOWN_V2
+	)
+	
+	# 切换模型后清除上下文
+	chat.clear_messages()
+	
+	# 应用选择的模型
+	chat._request_kwargs['model'] = selected_model
+
+
 def handlers():
 	return [
 		CommandHandler('start', start),
 		CommandHandler('clear', clear_handler),
 		CommandHandler('masks', masks_handler),
-		CallbackQueryHandler(mask_selection_handler),
+		CommandHandler('model', model_handler),
+		CallbackQueryHandler(mask_selection_handler,
+		                     pattern='^(common|github_copilot|travel_guide|song_recommender|movie_expert|doctor)$'),
+		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
 		CommandHandler('balance', balance_handler),
 		MessageHandler(filters.TEXT & ~filters.COMMAND, answer),
 	]
