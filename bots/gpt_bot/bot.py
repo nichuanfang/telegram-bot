@@ -128,7 +128,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			buffer = ''
 			buffer_limit = 100
 			# 发送初始消息
-			sent_message = await update.message.reply_text('Loading...')
+			sent_message = await update.message.reply_text('Loading...', reply_to_message_id=update.message.message_id)
 			message_id = sent_message.message_id
 			total_answer = ''
 			
@@ -151,6 +151,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		else:
 			answer = await chat.async_request(compressed_question, **OPENAI_COMPLETION_OPTIONS)
 			await update.message.reply_text(bot_util.escape_markdown_v2(answer)[:4096],
+			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
@@ -170,7 +171,8 @@ async def balance_handler(update: Update, context: CallbackContext):
 		usage = responses[1]
 		total = json.loads(subscription.text)['soft_limit_usd']
 		used = json.loads(usage.text)['total_usage'] / 100
-		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}')
+		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}',
+		                                reply_to_message_id=update.message.message_id)
 		typing_task.cancel()
 	except Exception as e:
 		await update.message.reply_text(f'获取余额失败: {e}')
