@@ -138,14 +138,16 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 					total_answer += buffer
 					# 修改消息
 					await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-					                                    text=bot_util.escape_markdown_v2(total_answer), parse_mode=ParseMode.MARKDOWN_V2)
+					                                    text=bot_util.escape_markdown_v2(total_answer),
+					                                    parse_mode=ParseMode.MARKDOWN_V2)
 					buffer = ''
 			
 			# 发送剩余的字符
 			if buffer:
 				total_answer += buffer
 				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-				                                    text=bot_util.escape_markdown_v2(total_answer),parse_mode=ParseMode.MARKDOWN_V2)
+				                                    text=bot_util.escape_markdown_v2(total_answer),
+				                                    parse_mode=ParseMode.MARKDOWN_V2)
 		else:
 			answer = await chat.async_request(compressed_question, **OPENAI_COMPLETION_OPTIONS)
 			await update.message.reply_text(bot_util.escape_markdown_v2(answer)[:4096],
