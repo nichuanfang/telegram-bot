@@ -138,17 +138,18 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 					total_answer += buffer
 					# 修改消息
 					await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-					                                    text=total_answer)
+					                                    text=bot_util.escape_markdown_v2(total_answer), parse_mode=ParseMode.MARKDOWN_V2)
 					buffer = ''
 			
 			# 发送剩余的字符
 			if buffer:
 				total_answer += buffer
 				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-				                                    text=total_answer)
+				                                    text=bot_util.escape_markdown_v2(total_answer),parse_mode=ParseMode.MARKDOWN_V2)
 		else:
 			answer = await chat.async_request(compressed_question, **OPENAI_COMPLETION_OPTIONS)
-			await update.message.reply_text(answer[:4096])
+			await update.message.reply_text(bot_util.escape_markdown_v2(answer)[:4096],
+			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
