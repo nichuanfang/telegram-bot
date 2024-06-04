@@ -155,6 +155,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	except Exception as e:
 		logger.error(f'Error getting answer: {e}')
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+		chat.clear_messages()
 	finally:
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()

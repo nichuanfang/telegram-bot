@@ -23,4 +23,7 @@ def escape_markdown_v2(text: str) -> str:
 	"""
 	Escape special characters for Telegram MarkdownV2 and replace every pair of consecutive asterisks (**) with a single asterisk (*).
 	"""
-	return re.sub(f"([{re.escape(r'_[]()~>#+-=|{}.!')}])", r'\\\1', text.replace('**', '*'))
+	try:
+		return re.sub(f"([{re.escape(r'_[]()~>#+-=|{}.!')}])", r'\\\1', text.replace('**', '*'))
+	except Exception as e:
+		return e
