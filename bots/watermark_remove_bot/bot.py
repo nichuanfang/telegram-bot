@@ -42,7 +42,6 @@ async def watermark_remove_wsppx(update: Update, context: CallbackContext):
 			await watermark_remove_uumvp(update, context, typing_task)
 	
 	except Exception as e:
-		logger.error(e)
 		await watermark_remove_uumvp(update, context, typing_task)
 
 
@@ -65,9 +64,8 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext, typin
 			await update.message.reply_text(f'{update.message.text}解析失败!')
 			typing_task.cancel()
 	
-	except Exception as e:
-		logger.error(e)
-		await update.message.reply_text(f'{update.message.text}解析失败: \n\n {e}')
+	except Exception:
+		await update.message.reply_text(f'{update.message.text}解析失败')
 		typing_task.cancel()
 
 
