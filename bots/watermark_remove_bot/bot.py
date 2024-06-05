@@ -5,7 +5,6 @@ from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, CallbackContext, filters, CommandHandler
 
 from bots.watermark_remove_bot.uu_mvp_http_request import UuMvpHttpRequest
-from bots.watermark_remove_bot.wsppx_http_request import WsppxHttpRequest
 from my_utils import my_logging, bot_util
 
 # 获取日志
@@ -18,40 +17,14 @@ async def start(update: Update, context: CallbackContext) -> None:
 	)
 	await update.message.reply_text(start_message, parse_mode=ParseMode.MARKDOWN_V2)
 
-
-async def watermark_remove_wsppx(update: Update, context: CallbackContext):
-	"""
-	使用wsppx平台进行图片去水印
-	Args:
-		update:  update对象
-		context:  上下文
-	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-	content = update.message.text
-	try:
-		req = WsppxHttpRequest()
-		response = await req.parse(content)
-		if response['success']:
-			image_list = response['result']['image_list']
-			# 回复获取到的图片
-			for image in image_list:
-				await update.message.reply_photo(image, reply_to_message_id=update.message.message_id)
-			typing_task.cancel()
-		else:
-			# 尝试下一个平台
-			await watermark_remove_uumvp(update, context, typing_task)
-	
-	except Exception as e:
-		await watermark_remove_uumvp(update, context, typing_task)
-
-
-async def watermark_remove_uumvp(update: Update, context: CallbackContext, typing_task):
+async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 	"""
 	使用uumvp平台进行图片去水印
 	Args:
 		update:  更新对象
 		context:  上下文
 	"""
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	try:
 		req = UuMvpHttpRequest()
 		response = await req.query(update.message.text)
@@ -70,8 +43,7 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext, typin
 
 
 async def default_handler(update: Update, context: CallbackContext):
-	# 从wsppx获取去水印后的图片 如果接口不可用 则使用uumvp平台的接口
-	await watermark_remove_wsppx(update, context)
+	await watermark_remove_uumvp(update, context)
 
 
 def handlers():
