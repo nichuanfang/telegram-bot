@@ -67,12 +67,10 @@ async def get_server_status(update: Update, context: CallbackContext):
 		# reset_time = soup.find_all('div', class_='d-flex justify-content-between')[2].contents[1].contents[1].text.split(' ')[0]
 		status_message = f'CPU: {cpu}\n内存: {mem}\n本日流量: {curr_day_throughput}\n本月流量: {curr_month_throughput}'
 		await update.message.reply_text(status_message, reply_to_message_id=update.message.message_id)
-		typing_task.cancel()
 	except Exception as e:
-		try:
-			await update.message.reply_text(f'获取服务器状态失败: {e}', reply_to_message_id=update.message.message_id)
-		finally:
-			typing_task.cancel()
+		await update.message.reply_text(f'获取服务器状态失败: {e}', reply_to_message_id=update.message.message_id)
+	finally:
+		typing_task.cancel()
 
 
 # @gpt_bot.message_handler(commands=['draw_lottery'])
@@ -97,10 +95,12 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
 			typing_task.cancel()
-			# tg通知dogyun cookie已过期
-			await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
-			                                reply_to_message_id=update.message.message_id)
-			typing_task.cancel()
+			try:
+				# tg通知dogyun cookie已过期
+				await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
+				                                reply_to_message_id=update.message.message_id)
+			finally:
+				typing_task.cancel()
 			return
 		data = response.json()
 	except Exception as e:
@@ -114,7 +114,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		result = data['success']
 	except:
 		try:
-			await update.message.reply_text('目前没有抽奖活动')
+			await update.message.reply_text('目前没有抽奖活动', reply_to_message_id=update.message.message_id)
 		finally:
 			typing_task.cancel()
 		return
@@ -144,7 +144,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			prize_response = prize_res[0]
 		except Exception as e:
 			try:
-				await update.message.reply_text(f'查看奖品失败: {e.args[0]}', reply_to_message_id=update.message.message_id)
+				await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
+				                                reply_to_message_id=update.message.message_id)
 			finally:
 				typing_task.cancel()
 			return
@@ -163,13 +164,16 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		prize_infos: list = prize_data['data']
 		
 		if len(prize_infos) > 0 and prize_infos[0]['createTime'].split(' ')[0] == date.today().strftime("%Y-%m-%d"):
-			await update.message.reply_text(
-				f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}',
-				reply_to_message_id=update.message.message_id)
-			typing_task.cancel()
+			try:
+				await update.message.reply_text(
+					f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}',
+					reply_to_message_id=update.message.message_id)
+			finally:
+				typing_task.cancel()
 	else:
 		try:
-			await update.message.reply_text(f'抽奖失败: {data["message"]}', reply_to_message_id=update.message.message_id)
+			await update.message.reply_text(f'抽奖失败: {data["message"]}',
+			                                reply_to_message_id=update.message.message_id)
 		finally:
 			typing_task.cancel()
 
