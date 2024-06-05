@@ -32,8 +32,10 @@ async def default_search(update: Update, context: CallbackContext):
 		responses = await asyncio.gather(bot_util.async_func(search.movies, query),
 		                                 bot_util.async_func(search.tv_shows, query))
 	except Exception as e:
-		await update.message.reply_text(e)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(e)
+		finally:
+			typing_task.cancel()
 		return
 	movie_text = '*电影结果:*\n'
 	movie_search = responses[0]
@@ -62,18 +64,20 @@ async def default_search(update: Update, context: CallbackContext):
 		tv_name = f'{tv_res.name} {first_air_date}'
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
-	if len(movie_search.results) > 0 and len(tv_search.results) > 0:
-		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
-		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
-	elif len(movie_search.results) > 0 and len(tv_search.results) == 0:
-		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
-		                                reply_to_message_id=update.message.message_id)
-	elif len(movie_search.results) == 0 and len(tv_search.results) > 0:
-		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
-		                                reply_to_message_id=update.message.message_id)
-	else:
-		await update.message.reply_text('无任何结果!', reply_to_message_id=update.message.message_id)
-	typing_task.cancel()
+	try:
+		if len(movie_search.results) > 0 and len(tv_search.results) > 0:
+			await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2)
+			await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2)
+		elif len(movie_search.results) > 0 and len(tv_search.results) == 0:
+			await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
+			                                reply_to_message_id=update.message.message_id)
+		elif len(movie_search.results) == 0 and len(tv_search.results) > 0:
+			await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
+			                                reply_to_message_id=update.message.message_id)
+		else:
+			await update.message.reply_text('无任何结果!', reply_to_message_id=update.message.message_id)
+	finally:
+		typing_task.cancel()
 
 
 async def movie_popular(update: Update, context: CallbackContext):
@@ -87,8 +91,10 @@ async def movie_popular(update: Update, context: CallbackContext):
 	try:
 		res = await asyncio.gather(bot_util.async_func(movie.popular))
 	except Exception as e:
-		await update.message.reply_text(e)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(e)
+		finally:
+			typing_task.cancel()
 		return
 	movie_text = '*电影推荐:*\n'
 	for movie_res in res[0].results:
@@ -103,9 +109,11 @@ async def movie_popular(update: Update, context: CallbackContext):
 		movie_tmdb_url = f'https://www.themoviedb.org/movie/{movie_res.id}?language=zh-CN'
 		movie_text = movie_text + \
 		             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
-	await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
-	                                reply_to_message_id=update.message.message_id)
-	typing_task.cancel()
+	try:
+		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
+		                                reply_to_message_id=update.message.message_id)
+	finally:
+		typing_task.cancel()
 
 
 async def tv_popular(update: Update, context: CallbackContext):
@@ -119,8 +127,10 @@ async def tv_popular(update: Update, context: CallbackContext):
 	try:
 		res = await  asyncio.gather(bot_util.async_func(tv.popular))
 	except Exception as e:
-		await update.message.reply_text(e)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(e)
+		finally:
+			typing_task.cancel()
 		return
 	tv_text = '*剧集推荐:*\n'
 	for tv_res in res[0].results:
@@ -134,9 +144,11 @@ async def tv_popular(update: Update, context: CallbackContext):
 		tv_name = f'{tv_res.name} {first_air_date}'
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
-	await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
-	                                reply_to_message_id=update.message.message_id)
-	typing_task.cancel()
+	try:
+		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
+		                                reply_to_message_id=update.message.message_id)
+	finally:
+		typing_task.cancel()
 
 
 async def search_movie(update: Update, context: CallbackContext):
@@ -148,15 +160,19 @@ async def search_movie(update: Update, context: CallbackContext):
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/movie_search':
-		await update.message.reply_text('请输入电影名称!')
-		typing_task.cancel()
+		try:
+			await update.message.reply_text('请输入电影名称!')
+		finally:
+			typing_task.cancel()
 		return
 	movie_text = '*电影结果:*\n'
 	try:
 		res = await asyncio.gather(bot_util.async_func(search.movies, message_text[14:]))
 	except Exception as e:
-		await update.message.reply_text(e)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(e)
+		finally:
+			typing_task.cancel()
 		return
 	movie_search = res[0]
 	for movie_res in movie_search.results:
@@ -172,9 +188,11 @@ async def search_movie(update: Update, context: CallbackContext):
 		movie_text = movie_text + \
 		             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
 	if len(movie_search.results) != 0:
-		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
-		                                reply_to_message_id=update.message.message_id)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
+			                                reply_to_message_id=update.message.message_id)
+		finally:
+			typing_task.cancel()
 	else:
 		return None
 
@@ -202,15 +220,19 @@ async def search_tv(update: Update, context: CallbackContext):
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	message_text = update.message.text
 	if message_text.strip() == '/tv_search':
-		await update.message.reply_text('请输入剧集名称!', reply_to_message_id=update.message.message_id)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text('请输入剧集名称!', reply_to_message_id=update.message.message_id)
+		finally:
+			typing_task.cancel()
 		return
 	tv_text = '*剧集结果:*\n'
 	try:
 		res = await asyncio.gather(bot_util.async_func(search.tv_shows, message_text[11:]))
 	except Exception as e:
-		typing_task.cancel()
-		await update.message.reply_text(e)
+		try:
+			typing_task.cancel()
+		finally:
+			await update.message.reply_text(e)
 		return
 	tv_search = res[0]
 	for tv_res in tv_search.results:
@@ -225,9 +247,11 @@ async def search_tv(update: Update, context: CallbackContext):
 		tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
 		tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
 	if len(tv_search.results) != 0:
-		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
-		                                reply_to_message_id=update.message.message_id)
-		typing_task.cancel()
+		try:
+			await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
+			                                reply_to_message_id=update.message.message_id)
+		finally:
+			typing_task.cancel()
 	else:
 		return None
 
