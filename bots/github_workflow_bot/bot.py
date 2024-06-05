@@ -22,14 +22,18 @@ async def scrape_metadata(update: Update, context: CallbackContext):
 		await asyncio.gather(
 			bot_util.async_func(trigger_github_workflow, 'movie-tvshow-spider', 'crawl movies and shows'))
 	except Exception as e:
-		typing_task.cancel()
-		await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
+		try:
+			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
+		finally:
+			typing_task.cancel()
 		return
 	logger.info('Scraped!')
-	await update.message.reply_text(
-		'已触发工作流: 刮削影视元信息,查看刮削日志: https://github.com/nichuanfang/movie-tvshow-spider/actions',
-		reply_to_message_id=update.message.message_id)
-	typing_task.cancel()
+	try:
+		await update.message.reply_text(
+			'已触发工作流: 刮削影视元信息,查看刮削日志: https://github.com/nichuanfang/movie-tvshow-spider/actions',
+			reply_to_message_id=update.message.message_id)
+	finally:
+		typing_task.cancel()
 
 
 def handlers():

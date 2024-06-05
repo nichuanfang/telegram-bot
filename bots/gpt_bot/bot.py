@@ -173,9 +173,10 @@ async def balance_handler(update: Update, context: CallbackContext):
 		used = json.loads(usage.text)['total_usage'] / 100
 		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}',
 		                                reply_to_message_id=update.message.message_id)
-		typing_task.cancel()
+	
 	except Exception as e:
 		await update.message.reply_text(f'获取余额失败: {e}')
+	finally:
 		typing_task.cancel()
 
 

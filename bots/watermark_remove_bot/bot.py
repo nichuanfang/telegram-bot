@@ -17,6 +17,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 	)
 	await update.message.reply_text(start_message, parse_mode=ParseMode.MARKDOWN_V2)
 
+
 async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 	"""
 	使用uumvp平台进行图片去水印
@@ -32,13 +33,11 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 			pics = response['data']['pics']
 			for pic in pics:
 				await update.message.reply_photo(pic, reply_to_message_id=update.message.message_id)
-			typing_task.cancel()
 		else:
 			await update.message.reply_text(f'{update.message.text}解析失败!')
-			typing_task.cancel()
-	
 	except Exception:
 		await update.message.reply_text(f'{update.message.text}解析失败')
+	finally:
 		typing_task.cancel()
 
 
