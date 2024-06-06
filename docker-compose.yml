@@ -5,7 +5,6 @@ services:
     container_name: telegram-bot
     pid: host
     privileged: true
-    network_mode: bridge
     expose:
       - 10000
       - 10001
@@ -17,3 +16,8 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
+
+networks:
+  default:
+    external:
+      name: npm-net
