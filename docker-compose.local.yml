@@ -12,7 +12,7 @@ services:
       - '10003:10003'
       - '10004:10004'
     environment:
-      TZ: Asia/Shanghai
+      TZ: 'Asia/Shanghai'
     build:
       context: .
       dockerfile: Dockerfile
