@@ -107,7 +107,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
-	
+	# 开始发送“正在输入...”状态
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	question = update.effective_message.text.strip()
 	
 	# 限制问题的长度，避免过长的问题
@@ -119,8 +120,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	# 压缩问题内容
 	compressed_question = compress_question(question)
 	
-	# 开始发送“正在输入...”状态
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	curr_mask = context.user_data.get('current_mask', masks['common'])
 	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 	try:
@@ -154,9 +153,11 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
-		logger.error(f'Error getting answer: {e}')
-		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
-		chat.clear_messages()
+		try:
+			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+			chat.clear_messages()
+		finally:
+			typing_task.cancel()
 	finally:
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
