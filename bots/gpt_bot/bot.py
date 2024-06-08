@@ -140,7 +140,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 					                                    text=bot_util.escape_markdown_v2(total_answer),
 					                                    parse_mode=ParseMode.MARKDOWN_V2)
 					buffer = ''
-			
 			# 发送剩余的字符
 			if buffer:
 				total_answer += buffer
