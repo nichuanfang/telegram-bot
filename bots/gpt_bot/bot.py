@@ -23,9 +23,9 @@ OPENAI_BASE_URL = require_vars[1]
 # 允许访问的用户列表 逗号分割并去除空格
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].split(',')]
 # 模型
-OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo-0125')
 # 可用的模型列表
-MODELS = ['gpt-3.5-turbo', 'gpt-4-turbo-preview', 'gpt-4o-2024-05-13', 'dall-e-3']
+MODELS = ['gpt-3.5-turbo-0125', 'gpt-3.5-net', 'gpt-4o-n', 'dall-e-3']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
