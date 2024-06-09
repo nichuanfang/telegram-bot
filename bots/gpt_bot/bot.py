@@ -112,7 +112,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	question = update.effective_message.text.strip()
 	
 	# 限制问题的长度，避免过长的问题
-	max_length = 1000
+	max_length = 4000
 	if len(question) > max_length:
 		await update.message.reply_text(f'Your question is too long. Please limit it to {max_length} characters.')
 		return
