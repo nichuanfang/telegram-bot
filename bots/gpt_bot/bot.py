@@ -140,12 +140,16 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		try:
 			response = requests.get(photo_file.file_path)
 			image_data = response.content
-			content.append({
-				'type': 'image_url',
-				'image_url': {
-					'url': f'data:image/jpeg;base64,{base64.b64encode(image_data).decode("utf-8")}'
-				}
-			})
+			if image_data:  # Check if image data is not empty
+				encoded_image = base64.b64encode(image_data).decode("utf-8")
+				content.append({
+					'type': 'image_url',
+					'image_url': {
+						'url': f'data:image/jpeg;base64,{encoded_image}'
+					}
+				})
+			else:
+				raise ValueError("Empty image data received.")
 		except Exception as e:
 			try:
 				await update.message.reply_text(f'图片识别失败!: {e}')
@@ -197,13 +201,12 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
 		try:
+			await answer(update, context)
+		except Exception as e:
 			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
-			chat.clear_messages()
 		finally:
+			# 停止发送“正在输入...”状态
 			typing_task.cancel()
-	finally:
-		# 停止发送“正在输入...”状态
-		typing_task.cancel()
 
 
 async def balance_handler(update: Update, context: CallbackContext):
