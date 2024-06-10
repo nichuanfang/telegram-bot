@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import json
 import os
 import re
 
+import requests
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -25,7 +27,7 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 # 模型
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo-0125')
 # 可用的模型列表
-MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-n' ,'gpt-4-turbo-2024-04-09']
+MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-n', 'gpt-4-turbo-2024-04-09']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
@@ -109,16 +111,59 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		return
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-	question = update.effective_message.text.strip()
-	
 	# 限制问题的长度，避免过长的问题
 	max_length = 4000
-	if len(question) > max_length:
-		await update.message.reply_text(f'Your question is too long. Please limit it to {max_length} characters.')
-		return
-	
-	# 压缩问题内容
-	compressed_question = compress_question(question)
+	# 检查是否有图片
+	if update.message.photo:
+		current_model = chat._request_kwargs['model']
+		if current_model.lower().startswith('gpt-3.5'):
+			try:
+				await update.message.reply_text(f'当前模型: {current_model}不支持图片识别,请切换模型!')
+				return
+			finally:
+				typing_task.cancel()
+		content = []
+		photo = update.message.photo[-1]
+		photo_file = await context.bot.get_file(photo.file_id)
+		try:
+			response = requests.get(photo_file.file_path)
+			image_data = response.content
+			content.append({
+				'type': 'image_url',
+				'image_url': {
+					'url': f'data:image/jpeg;base64,{base64.b64encode(image_data).decode("utf-8")}'
+				}
+			})
+		except Exception as e:
+			try:
+				await update.message.reply_text(f'图片识别失败!: {e}')
+				return
+			finally:
+				typing_task.cancel()
+		if update.message.caption:
+			handled_question = compress_question(update.message.caption.strip())
+			if len(handled_question) > max_length:
+				try:
+					await update.message.reply_text(
+						f'Your question is too long. Please limit it to {max_length} characters.')
+					return
+				finally:
+					typing_task.cancel()
+			content.append({
+				'type': 'text',
+				'text': handled_question
+			})
+	else:
+		content = update.effective_message.text.strip()
+		# 压缩问题内容
+		content = compress_question(content)
+		if len(content) > max_length:
+			try:
+				await update.message.reply_text(
+					f'Your question is too long. Please limit it to {max_length} characters.')
+				return
+			finally:
+				typing_task.cancel()
 	
 	curr_mask = context.user_data.get('current_mask', masks['common'])
 	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
@@ -131,8 +176,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			message_id = sent_message.message_id
 			total_answer = ''
 			
-			async for answer in chat.async_stream_request(compressed_question, **OPENAI_COMPLETION_OPTIONS):
-				buffer += answer
+			async for res in chat.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
+				buffer += res
 				if len(buffer) >= buffer_limit:
 					total_answer += buffer
 					# 修改消息
@@ -147,8 +192,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				                                    text=bot_util.escape_markdown_v2(total_answer),
 				                                    parse_mode=ParseMode.MARKDOWN_V2)
 		else:
-			answer = await chat.async_request(compressed_question, **OPENAI_COMPLETION_OPTIONS)
-			await update.message.reply_text(bot_util.escape_markdown_v2(answer)[:4096],
+			res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
+			await update.message.reply_text(bot_util.escape_markdown_v2(res)[:4096],
 			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
@@ -327,5 +372,5 @@ def handlers():
 		                     pattern='^(common|github_copilot|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
 		CommandHandler('balance', balance_handler),
-		MessageHandler(filters.TEXT & ~filters.COMMAND, answer),
+		MessageHandler(filters.ALL & ~filters.COMMAND, answer)
 	]
