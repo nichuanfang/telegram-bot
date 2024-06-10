@@ -120,8 +120,7 @@ class Chat:
 	             max_retries=None,
 	             http_client=None,
 	             # request_kwargs
-	             model: Literal["gpt-4-1106-preview", "gpt-4-vision-preview", "gpt-4", "gpt-4-0314", "gpt-4-0613",
-	             "gpt-4-32k", "gpt-4-32k-0314", "gpt-4-32k-0613", "gpt-3.5-turbo"] = "gpt-3.5-turbo",
+	             model: Literal['gpt-3.5-turbo-0125', 'gpt-4o-n', 'gpt-4-turbo-2024-04-09'] = "gpt-3.5-turbo-0125",
 	             # Chat
 	             msg_max_count: int = None,
 	             # kwargs
@@ -156,7 +155,7 @@ class Chat:
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
 		completion = OpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			**self._request_kwargs,  # 全局参数
+			# **self._request_kwargs,  # 全局参数
 			**kwargs,  # 单次请求的参数覆盖全局参数
 			"messages": list(self._messages + messages),
 			"stream": False,
@@ -173,7 +172,7 @@ class Chat:
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
 		completion = OpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			**self._request_kwargs,  # 全局参数
+			# **self._request_kwargs,  # 全局参数
 			**kwargs,  # 单次请求的参数覆盖全局参数
 			"messages": list(self._messages + messages),
 			"stream": True,
@@ -193,7 +192,7 @@ class Chat:
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
 		completion = await AsyncOpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			**self._request_kwargs,  # 全局参数
+			# **self._request_kwargs,  # 全局参数
 			**kwargs,  # 单次请求的参数覆盖全局参数
 			# 预设面具 + 历史消息(最大历史消息可设置) + 最新一条消息
 			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
@@ -211,7 +210,7 @@ class Chat:
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
 		completion = await AsyncOpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			**self._request_kwargs,  # 全局参数
+			# **self._request_kwargs,  # 全局参数
 			**kwargs,  # 单次请求的参数覆盖全局参数
 			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
 			"stream": True,
