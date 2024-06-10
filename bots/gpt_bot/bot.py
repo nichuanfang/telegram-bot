@@ -201,6 +201,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
 		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+		chat.drop_last_message()
 	finally:
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
