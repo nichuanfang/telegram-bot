@@ -114,7 +114,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	max_length = 6000
 	# 检查是否有图片
 	if update.message.photo:
-		current_model =OPENAI_COMPLETION_OPTIONS['model']
+		current_model = OPENAI_COMPLETION_OPTIONS['model']
 		if current_model.lower().startswith('gpt-3.5'):
 			try:
 				await update.message.reply_text(f'当前模型: {current_model}不支持图片识别,请切换模型!')
@@ -122,6 +122,19 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			finally:
 				typing_task.cancel()
 		content = []
+		if update.message.caption:
+			handled_question = compress_question(update.message.caption.strip())
+			if len(handled_question) > max_length:
+				try:
+					await update.message.reply_text(
+						f'Your question is too long. Please limit it to {max_length} characters.')
+					return
+				finally:
+					typing_task.cancel()
+			content.append({
+				'type': 'text',
+				'text': handled_question
+			})
 		photo = update.message.photo[-2]
 		photo_file = await context.bot.get_file(photo.file_id)
 		try:
@@ -139,19 +152,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
-		if update.message.caption:
-			handled_question = compress_question(update.message.caption.strip())
-			if len(handled_question) > max_length:
-				try:
-					await update.message.reply_text(
-						f'Your question is too long. Please limit it to {max_length} characters.')
-					return
-				finally:
-					typing_task.cancel()
-			content.append({
-				'type': 'text',
-				'text': handled_question
-			})
 	else:
 		content = update.effective_message.text.strip()
 		# 压缩问题内容
