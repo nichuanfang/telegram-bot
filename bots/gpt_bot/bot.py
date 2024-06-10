@@ -31,7 +31,7 @@ MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13', 'gpt-4-turbo-2024-04-09']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=10)
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=10)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
@@ -114,7 +114,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	max_length = 6000
 	# 检查是否有图片
 	if update.message.photo:
-		current_model =OPENAI_COMPLETION_OPTIONS['model']
+		current_model = OPENAI_COMPLETION_OPTIONS['model']
 		if current_model.lower().startswith('gpt-3.5'):
 			try:
 				await update.message.reply_text(f'当前模型: {current_model}不支持图片识别,请切换模型!')
@@ -122,6 +122,19 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			finally:
 				typing_task.cancel()
 		content = []
+		if update.message.caption:
+			handled_question = compress_question(update.message.caption.strip())
+			if len(handled_question) > max_length:
+				try:
+					await update.message.reply_text(
+						f'Your question is too long. Please limit it to {max_length} characters.')
+					return
+				finally:
+					typing_task.cancel()
+			content.append({
+				'type': 'text',
+				'text': handled_question
+			})
 		photo = update.message.photo[-2]
 		photo_file = await context.bot.get_file(photo.file_id)
 		try:
@@ -139,19 +152,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
-		if update.message.caption:
-			handled_question = compress_question(update.message.caption.strip())
-			if len(handled_question) > max_length:
-				try:
-					await update.message.reply_text(
-						f'Your question is too long. Please limit it to {max_length} characters.')
-					return
-				finally:
-					typing_task.cancel()
-			content.append({
-				'type': 'text',
-				'text': handled_question
-			})
 	else:
 		content = update.effective_message.text.strip()
 		# 压缩问题内容
