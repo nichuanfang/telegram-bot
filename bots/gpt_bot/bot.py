@@ -123,7 +123,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			finally:
 				typing_task.cancel()
 		content = []
-		photo = update.message.photo[1]
+		photo = update.message.photo[-2]
 		photo_file = await context.bot.get_file(photo.file_id)
 		try:
 			response = requests.get(photo_file.file_path)
