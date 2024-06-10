@@ -25,7 +25,7 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 # 模型
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo-0125')
 # 可用的模型列表
-MODELS = ['gpt-3.5-turbo-0125', 'gpt-3.5-net', 'gpt-4o-n', 'dall-e-3']
+MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-n' ,'gpt-4-turbo-2024-04-09']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
@@ -199,7 +199,7 @@ def generate_mask_keyboard(masks, current_mask_key):
 		# 如果是当前选择的面具，添加标记
 		name = mask["name"]
 		if key == current_mask_key:
-			name += " *"
+			name = "* " + name
 		row.append(InlineKeyboardButton(name, callback_data=key))
 		if (i + 1) % 3 == 0:
 			keyboard.append(row)
@@ -263,7 +263,7 @@ def generate_model_keyboard(models, current_model):
 		# 如果是当前选择的模型，添加标记
 		name = model
 		if model == current_model:
-			name += " *"
+			name = "* " + name
 		row.append(InlineKeyboardButton(name, callback_data=model))
 		if (i + 1) % 2 == 0:
 			keyboard.append(row)
