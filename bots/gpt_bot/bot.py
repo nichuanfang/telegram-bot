@@ -200,13 +200,11 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
-		try:
-			await answer(update, context)
-		except Exception as e:
-			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
-		finally:
-			# 停止发送“正在输入...”状态
-			typing_task.cancel()
+		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+		chat.drop_last_message()
+	finally:
+		# 停止发送“正在输入...”状态
+		typing_task.cancel()
 
 
 async def balance_handler(update: Update, context: CallbackContext):

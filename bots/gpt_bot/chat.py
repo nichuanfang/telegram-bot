@@ -96,6 +96,10 @@ class Temque:
 			que.add_many(*obj)
 		return que
 	
+	def drop_last(self):
+		# 移除最后一个元素
+		self.core.pop()
+	
 	def clear(self):
 		"""清空队列中的所有元素"""
 		self.core = []
@@ -245,6 +249,9 @@ class Chat:
 	
 	def fetch_messages(self):
 		return list(self._messages)
+	
+	def drop_last_message(self):
+		self._messages.drop_last()
 	
 	def clear_messages(self):
 		"""
