@@ -33,47 +33,38 @@ ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
 chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, model=OPENAI_MODEL, msg_max_count=10)
 
-# 请求openai使用的选项
 OPENAI_COMPLETION_OPTIONS = {
-	"temperature": 0.7,
-	"max_tokens": 1000,
-	"top_p": 1,
-	"frequency_penalty": 0,
-	"presence_penalty": 0,
-	"timeout": None,
-	"max_retries": 3
+	"temperature": 0.5,  # 更低的温度提高了一致性
+	"max_tokens": 4000,   # 根据需求调整token长度
+	"top_p": 0.9,        # 采样更加多样化
+	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
+	"presence_penalty": 0.6    # 增加惩罚以提高新信息的引入
 }
-# 面具列表
+
 masks = {
 	'common': {
 		'name': '通用助手',
-		'mask': [{"role": "system",
-		          "content": '你是一个全能的问题回复专家,你能以最精简的方式提供最优的内容质量'}]
+		'mask': [{"role": "system", "content": '你是一个全能的问题回复专家，你能以最精简的方式提供最优的内容质量。'}]
 	},
 	'github_copilot': {
 		'name': '代码助手',
-		'mask': [{"role": "system",
-		          "content": '你是软件开发专家,你可以为我解答任何关于功能设计,bug修复,代码优化等软件开发方面的问题'}]
+		'mask': [{"role": "system", "content": '你是软件开发专家，你可以为我解答任何关于功能设计、bug修复、代码优化等软件开发方面的问题。'}]
 	},
 	'travel_guide': {
 		'name': '旅游助手',
-		'mask': [{"role": "system",
-		          "content": '你是高级聊天机器人旅游指南。您的主要目标是为用户提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗'}]
+		'mask': [{"role": "system", "content": '你是高级聊天机器人旅游指南。你的主要目标是为用户提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗。'}]
 	},
 	'song_recommender': {
 		'name': '歌曲推荐人',
-		'mask': [{"role": "system",
-		          'content': '我想让你担任歌曲推荐人。我将为您提供一首歌曲，您将创建一个包含 10 首与给定歌曲相似的歌曲的播放列表。您将为播放列表提供播放列表名称和描述。不要选择同名或同名歌手的歌曲。不要写任何解释或其他文字，只需回复播放列表名称、描述和歌曲'}]
+		'mask': [{"role": "system", "content": '我想让你担任歌曲推荐人。我将为你提供一首歌曲，你将创建一个包含 10 首与给定歌曲相似的歌曲的播放列表。你将为播放列表提供播放列表名称和描述。不要选择同名或同名歌手的歌曲。不要写任何解释或其他文字，只需回复播放列表名称、描述和歌曲。'}]
 	},
 	'movie_expert': {
 		'name': '电影专家',
-		'mask': [{"role": "system",
-		          "content": '作为高级聊天机器人电影专家助理，您的主要目标是尽您所能为用户提供帮助。您可以回答有关电影、演员、导演等的问题。您可以根据用户的喜好向他们推荐电影。您可以与用户讨论电影，并提供有关电影的有用信息。为了有效地帮助用户，在回复中保持详细和彻底是很重要的。使用示例和证据来支持您的观点并证明您的建议或解决方案的合理性。请记住始终优先考虑用户的需求和满意度。您的最终目标是为用户提供有用且愉快的体验'}]
+		'mask': [{"role": "system", "content": '作为高级聊天机器人电影专家助理，你的主要目标是尽你所能为用户提供帮助。你可以回答有关电影、演员、导演等的问题。你可以根据用户的喜好向他们推荐电影。你可以与用户讨论电影，并提供有关电影的有用信息。为了有效地帮助用户，在回复中保持详细和彻底是很重要的。使用示例和证据来支持你的观点并证明你的建议或解决方案的合理性。请记住始终优先考虑用户的需求和满意度。你的最终目标是为用户提供有用且愉快的体验。'}]
 	},
 	'doctor': {
 		'name': '医生',
-		'mask': [{"role": "system",
-		          "content": '我想让你扮演一名人工智能辅助医生.我将为您提供患者的详细信息,您的任务是使用最新的人工智能工具,例如医学成像软件和其他机器学习程序,以诊断最可能导致其症状的原因.您还应该将体检、实验室测试等传统方法纳入您的评估过程,以确保准确性'}]
+		'mask': [{"role": "system", "content": '我想让你扮演一名人工智能辅助医生。我将为你提供患者的详细信息，你的任务是使用最新的人工智能工具，例如医学成像软件和其他机器学习程序，以诊断最可能导致其症状的原因。你还应该将体检、实验室测试等传统方法纳入你的评估过程，以确保准确性。'}]
 	}
 }
 
@@ -114,7 +105,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
 	# 限制问题的长度，避免过长的问题
-	max_length = 4000
+	max_length = 6000
 	# 检查是否有图片
 	if update.message.photo:
 		current_model = chat._request_kwargs['model']
@@ -125,7 +116,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			finally:
 				typing_task.cancel()
 		content = []
-		photo = update.message.photo[-1]
+		photo = update.message.photo[-2]
 		photo_file = await context.bot.get_file(photo.file_id)
 		try:
 			response = requests.get(photo_file.file_path)

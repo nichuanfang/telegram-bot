@@ -114,7 +114,7 @@ class Chat:
 	
 	def __init__(self,
 	             # kwargs
-	             api_key: str|AKPool,
+	             api_key: str | AKPool,
 	             base_url: str = None,  # base_url 参数用于修改基础URL
 	             timeout=None,
 	             max_retries=None,
@@ -123,7 +123,7 @@ class Chat:
 	             model: Literal["gpt-4-1106-preview", "gpt-4-vision-preview", "gpt-4", "gpt-4-0314", "gpt-4-0613",
 	             "gpt-4-32k", "gpt-4-32k-0314", "gpt-4-32k-0613", "gpt-3.5-turbo"] = "gpt-3.5-turbo",
 	             # Chat
-	             msg_max_count: int=None,
+	             msg_max_count: int = None,
 	             # kwargs
 	             **kwargs,
 	             ):
@@ -139,16 +139,16 @@ class Chat:
 		
 		self.reset_api_key(api_key)
 		self._kwargs = kwargs
-		self._request_kwargs = {'model':model}
+		self._request_kwargs = {'model': model}
 		self._messages = Temque(maxlen=msg_max_count)
 	
-	def reset_api_key(self, api_key: str|AKPool):
+	def reset_api_key(self, api_key: str | AKPool):
 		if isinstance(api_key, AKPool):
 			self._akpool = api_key
 		else:
 			self._akpool = AKPool([api_key])
 	
-	def request(self, text: str=None, **kwargs):
+	def request(self, text: str = None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -165,7 +165,7 @@ class Chat:
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
-	def stream_request(self, text: str=None, **kwargs):
+	def stream_request(self, text: str = None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -185,7 +185,7 @@ class Chat:
 				yield content
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 	
-	async def async_request(self, text: str|list=None, **kwargs):
+	async def async_request(self, text: str | list = None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		# messages = (kwargs.pop('messages', None) or []) + messages  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -203,7 +203,7 @@ class Chat:
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
-	async def async_stream_request(self, text: str|list=None, **kwargs):
+	async def async_stream_request(self, text: str | list = None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		# messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -213,7 +213,7 @@ class Chat:
 		completion = await AsyncOpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
 			**self._request_kwargs,  # 全局参数
 			**kwargs,  # 单次请求的参数覆盖全局参数
-			"messages":  (kwargs.get('messages', None) or []) + list(self._messages + messages),
+			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
 			"stream": True,
 		})
 		answer: str = ""
@@ -227,7 +227,7 @@ class Chat:
 		'''
 		回滚对话
 		'''
-		self._messages.core[-2 * n :] = []
+		self._messages.core[-2 * n:] = []
 		for x in self._messages.core[-2:]:
 			x = x["obj"]
 			print(f"[{x['role']}]:{x['content']}")
@@ -253,7 +253,7 @@ class Chat:
 		"""
 		self._messages.clear()
 	
-	def add_dialogs(self, *ms: dict|system_msg|user_msg|assistant_msg):
+	def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
 		'''
 		添加历史对话
 		'''
