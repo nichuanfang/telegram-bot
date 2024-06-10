@@ -185,7 +185,7 @@ class Chat:
 				yield content
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 	
-	async def async_request(self, text: str=None, **kwargs):
+	async def async_request(self, text: str|list=None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		# messages = (kwargs.pop('messages', None) or []) + messages  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -203,7 +203,7 @@ class Chat:
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
-	async def async_stream_request(self, text: str=None, **kwargs):
+	async def async_stream_request(self, text: str|list=None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		# messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
