@@ -27,7 +27,7 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 # 模型
 OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo-0125')
 # 可用的模型列表
-MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13', 'gpt-4-turbo-2024-04-09']
+MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
@@ -110,6 +110,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		return
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	context.user_data['typing_task'] = typing_task
 	# 限制问题的长度，避免过长的问题
 	max_length = 6000
 	# 检查是否有图片
@@ -121,6 +122,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
+				context.user_data['typing_task'] = None
 		content = []
 		if update.message.caption:
 			handled_question = compress_question(update.message.caption.strip())
@@ -135,9 +137,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				'type': 'text',
 				'text': handled_question
 			})
-		photo = update.message.photo[-2]
-		photo_file = await context.bot.get_file(photo.file_id)
 		try:
+			photo = update.message.photo[-2]
+			photo_file = await context.bot.get_file(photo.file_id)
 			response = requests.get(photo_file.file_path)
 			image_data = response.content
 			if image_data:  # Check if image data is not empty
@@ -156,6 +158,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
+				context.user_data['typing_task'] = None
 	else:
 		content = update.effective_message.text.strip()
 		# 压缩问题内容
@@ -167,6 +170,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
+				context.user_data['typing_task'] = None
 	
 	curr_mask = context.user_data.get('current_mask', masks['common'])
 	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
@@ -205,10 +209,12 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	finally:
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
+		context.user_data['typing_task'] = None
 
 
 async def balance_handler(update: Update, context: CallbackContext):
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	context.user_data['typing_task'] = typing_task
 	request = BotHttpRequest()
 	try:
 		responses = await asyncio.gather(request.get_subscription(), request.get_usage())
@@ -223,6 +229,7 @@ async def balance_handler(update: Update, context: CallbackContext):
 		await update.message.reply_text(f'获取余额失败: {e}')
 	finally:
 		typing_task.cancel()
+		context.user_data['typing_task'] = None
 
 
 async def clear_handler(update: Update, context: CallbackContext):
@@ -234,6 +241,9 @@ async def clear_handler(update: Update, context: CallbackContext):
 	"""
 	# 清空历史消息
 	chat.clear_messages()
+	typing_task = context.user_data['typing_task']
+	if typing_task:
+		typing_task.cancel()
 	await update.message.reply_text('上下文已清除')
 
 
