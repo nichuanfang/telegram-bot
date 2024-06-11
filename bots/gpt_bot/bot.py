@@ -118,7 +118,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		current_model = OPENAI_COMPLETION_OPTIONS['model']
 		if current_model.lower().startswith('gpt-3.5'):
 			try:
-				await update.message.reply_text(f'当前模型: {current_model}不支持图片识别,请切换模型!')
+				await update.message.reply_text(
+					f'当前模型: *{telegram.helpers.escape_markdown(current_model, version=2)}*不支持图片识别,请切换模型\!',
+					parse_mode=ParseMode.MARKDOWN_V2)
 				return
 			finally:
 				typing_task.cancel()
