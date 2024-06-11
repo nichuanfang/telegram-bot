@@ -251,7 +251,10 @@ class Chat:
 		return list(self._messages)
 	
 	def drop_last_message(self):
-		self._messages.drop_last()
+		try:
+			self._messages.drop_last()
+		except:
+			pass
 	
 	def clear_messages(self):
 		"""

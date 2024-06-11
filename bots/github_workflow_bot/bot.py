@@ -26,18 +26,18 @@ async def scrape_metadata(update: Update, context: CallbackContext):
 			bot_util.async_func(trigger_github_workflow, 'movie-tvshow-spider', 'crawl movies and shows'))
 	except Exception as e:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	logger.info('Scraped!')
 	try:
+		context.user_data[flag_key] = False
 		await update.message.reply_text(
 			'已触发工作流: 刮削影视元信息,查看刮削日志: https://github.com/nichuanfang/movie-tvshow-spider/actions',
 			reply_to_message_id=update.message.message_id)
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 
