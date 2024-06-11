@@ -118,7 +118,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		current_model = OPENAI_COMPLETION_OPTIONS['model']
 		if current_model.lower().startswith('gpt-3.5'):
 			try:
-				await update.message.reply_text(f'当前模型: {current_model}不支持图片识别,请切换模型!')
+				await update.message.reply_text(
+					f'当前模型: *{telegram.helpers.escape_markdown(current_model, version=2)}*不支持图片识别,请切换模型\!',
+					parse_mode=ParseMode.MARKDOWN_V2)
 				return
 			finally:
 				typing_task.cancel()
@@ -245,6 +247,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 	typing_task = context.user_data['typing_task']
 	if typing_task:
 		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	await update.message.reply_text('上下文已清除')
 
 
@@ -303,7 +306,11 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	
+	# 清除未结束的typing任务
+	typing_task = context.user_data['typing_task']
+	if typing_task:
+		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	# 切换面具后清除上下文
 	chat.clear_messages()
 	
@@ -365,7 +372,11 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	
+	# 清除未结束的typing任务
+	typing_task = context.user_data['typing_task']
+	if typing_task:
+		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	# 切换模型后清除上下文
 	chat.clear_messages()
 	
