@@ -43,6 +43,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 		# 发送post请求
 		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
+			context.user_data[flag_key] = False
 			# tg通知dogyun cookie已过期
 			await update.message.reply_text(
 				'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
@@ -61,11 +62,12 @@ async def get_server_status(update: Update, context: CallbackContext):
 		# 重置时间
 		# reset_time = soup.find_all('div', class_='d-flex justify-content-between')[2].contents[1].contents[1].text.split(' ')[0]
 		status_message = f'CPU: {cpu}\n内存: {mem}\n本日流量: {curr_day_throughput}\n本月流量: {curr_month_throughput}'
+		context.user_data[flag_key] = False
 		await update.message.reply_text(status_message, reply_to_message_id=update.message.message_id)
 	except Exception as e:
+		context.user_data[flag_key] = False
 		await update.message.reply_text(f'获取服务器状态失败: {e}', reply_to_message_id=update.message.message_id)
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 
@@ -94,19 +96,19 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
 			try:
+				context.user_data[flag_key] = False
 				# tg通知dogyun cookie已过期
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				context.user_data[flag_key] = False
 				await typing_task
 			return
 		data = response.json()
 	except Exception as e:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	# 获取抽奖结果
@@ -114,9 +116,9 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		result = data['success']
 	except:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text('目前没有抽奖活动', reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	if result:
@@ -145,10 +147,10 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			prize_response = prize_res[0]
 		except Exception as e:
 			try:
+				context.user_data[flag_key] = False
 				await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				context.user_data[flag_key] = False
 				await typing_task
 			return
 		# 获取返回的json数据
@@ -156,11 +158,11 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			prize_data = prize_response.json()
 		except:
 			try:
+				context.user_data[flag_key] = False
 				# tg通知dogyun cookie已过期
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				context.user_data[flag_key] = False
 				await typing_task
 			return
 		# 获取奖品信息
@@ -168,18 +170,18 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		
 		if len(prize_infos) > 0 and prize_infos[0]['createTime'].split(' ')[0] == date.today().strftime("%Y-%m-%d"):
 			try:
+				context.user_data[flag_key] = False
 				await update.message.reply_text(
 					f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}',
 					reply_to_message_id=update.message.message_id)
 			finally:
-				context.user_data[flag_key] = False
 				await typing_task
 	else:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text(f'抽奖失败: {data["message"]}',
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 
 
@@ -205,15 +207,15 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 			bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
 	except:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text('执行脚本报错', reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	try:
+		context.user_data[flag_key] = False
 		await update.message.reply_text('备份bitwarden成功', reply_to_message_id=update.message.message_id)
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 
@@ -230,17 +232,17 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	message_text = update.message.text
 	if message_text.strip() == '/exec_cmd':
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text('请输入命令!', reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	script = message_text[10:].strip()
 	if script in ['systemctl stop telegram-bot', 'systemctl restart telegram-bot', 'reboot']:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text('禁止执行该命令', reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	# try:
@@ -254,15 +256,15 @@ async def exec_cmd(update: Update, context: CallbackContext):
 			bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
 	except:
 		try:
+			context.user_data[flag_key] = False
 			await update.message.reply_text('执行命令报错', reply_to_message_id=update.message.message_id)
 		finally:
-			context.user_data[flag_key] = False
 			await typing_task
 		return
 	try:
+		context.user_data[flag_key] = False
 		await update.message.reply_text('执行命令成功', reply_to_message_id=update.message.message_id)
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 

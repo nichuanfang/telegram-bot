@@ -34,14 +34,16 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 		response = await req.query(update.message.text)
 		if response['code'] == 100:
 			pics = response['data']['pics']
+			context.user_data[flag_key] = False
 			for pic in pics:
 				await update.message.reply_photo(pic, reply_to_message_id=update.message.message_id)
 		else:
+			context.user_data[flag_key] = False
 			await update.message.reply_text(f'{update.message.text}解析失败!')
 	except Exception:
+		context.user_data[flag_key] = False
 		await update.message.reply_text(f'{update.message.text}解析失败')
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 

@@ -3,7 +3,6 @@ import base64
 import json
 import os
 import re
-import threading
 
 import requests
 import telegram.helpers
@@ -36,7 +35,7 @@ chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=10)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
-	"max_tokens": 4000,  # 根据需求调整token长度
+	"max_tokens": 4096,  # 根据需求调整token长度
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
@@ -115,7 +114,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	
 	# 限制问题的长度，避免过长的问题
-	max_length = 6000
+	max_length = 4096
 	# 检查是否有图片
 	if update.message.photo:
 		current_model = OPENAI_COMPLETION_OPTIONS['model']
@@ -208,15 +207,21 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				                                    parse_mode=ParseMode.MARKDOWN_V2)
 		else:
 			res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
+			# 结束 typing 状态
+			context.user_data[flag_key] = False
 			await update.message.reply_text(bot_util.escape_markdown_v2(res)[:4096],
 			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
-		await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
-		chat.drop_last_message()
-	finally:
 		# 结束 typing 状态
 		context.user_data[flag_key] = False
+		if e.__str__().__contains__('at byte offset'):
+			# 说明缺少闭合符号 提示用户上传文本文件
+			await update.message.reply_text('缺少结束标记! 请使用文本文件解析!', reply_to_message_id=update.message.message_id)
+			chat.clear_messages()
+		else:
+			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+	finally:
 		await typing_task
 
 
@@ -233,13 +238,14 @@ async def balance_handler(update: Update, context: CallbackContext):
 		usage = responses[1]
 		total = json.loads(subscription.text)['soft_limit_usd']
 		used = json.loads(usage.text)['total_usage'] / 100
+		context.user_data[flag_key] = False
 		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}',
 		                                reply_to_message_id=update.message.message_id)
 	
 	except Exception as e:
+		context.user_data[flag_key] = False
 		await update.message.reply_text(f'获取余额失败: {e}')
 	finally:
-		context.user_data[flag_key] = False
 		await typing_task
 
 
