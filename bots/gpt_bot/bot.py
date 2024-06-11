@@ -133,6 +133,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 					return
 				finally:
 					typing_task.cancel()
+					context.user_data['typing_task'] = None
 			content.append({
 				'type': 'text',
 				'text': handled_question
