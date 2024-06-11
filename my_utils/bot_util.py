@@ -1,7 +1,10 @@
 import asyncio
 import re
+import time
 
+from telegram import Update
 from telegram.constants import ChatAction
+from telegram.ext import CallbackContext
 
 
 async def coroutine_wrapper(normal_function, *args, **kwargs):
@@ -12,11 +15,10 @@ async def async_func(normal_function, *args, **kwargs):
 	return await coroutine_wrapper(normal_function, *args, **kwargs)
 
 
-async def send_typing_action(update):
-	while True:
-		await update.message.reply_chat_action(action=ChatAction.TYPING)
-		# 每隔4秒发送一次“正在输入...”状态
-		await asyncio.sleep(4)
+async def send_typing_action(update: Update, context: CallbackContext, flag_key):
+	while context.user_data.get(flag_key, False):
+		await update.message.reply_chat_action(action='typing')
+		await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
 
 
 def escape_markdown_v2(text: str) -> str:
