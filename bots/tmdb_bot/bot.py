@@ -26,7 +26,10 @@ async def default_search(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_tmdb_default_search'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	query = update.message.text
 	try:
 		responses = await asyncio.gather(bot_util.async_func(search.movies, query),
@@ -35,7 +38,8 @@ async def default_search(update: Update, context: CallbackContext):
 		try:
 			await update.message.reply_text(e)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	movie_text = '*电影结果:*\n'
 	movie_search = responses[0]
@@ -77,7 +81,8 @@ async def default_search(update: Update, context: CallbackContext):
 		else:
 			await update.message.reply_text('无任何结果!', reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 async def movie_popular(update: Update, context: CallbackContext):
@@ -87,15 +92,20 @@ async def movie_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_tmdb_movie_popular'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	try:
 		res = await asyncio.gather(bot_util.async_func(movie.popular))
 	except Exception as e:
 		try:
 			await update.message.reply_text(e)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
+	
 	movie_text = '*电影推荐:*\n'
 	for movie_res in res[0].results:
 		try:
@@ -113,7 +123,8 @@ async def movie_popular(update: Update, context: CallbackContext):
 		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
 		                                reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 async def tv_popular(update: Update, context: CallbackContext):
@@ -123,7 +134,10 @@ async def tv_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_tmdb_tv_popular'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	try:
 		res = await  asyncio.gather(bot_util.async_func(tv.popular))
 	except Exception as e:
@@ -148,7 +162,8 @@ async def tv_popular(update: Update, context: CallbackContext):
 		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
 		                                reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 async def search_movie(update: Update, context: CallbackContext):
@@ -157,7 +172,10 @@ async def search_movie(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_tmdb_search_movie'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	message_text = update.message.text
 	if message_text.strip() == '/movie_search':
 		try:
@@ -172,7 +190,8 @@ async def search_movie(update: Update, context: CallbackContext):
 		try:
 			await update.message.reply_text(e)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	movie_search = res[0]
 	for movie_res in movie_search.results:
@@ -192,7 +211,8 @@ async def search_movie(update: Update, context: CallbackContext):
 			await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 	else:
 		return None
 
@@ -217,22 +237,27 @@ async def search_tv(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_tmdb_search_tv'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	message_text = update.message.text
 	if message_text.strip() == '/tv_search':
 		try:
 			await update.message.reply_text('请输入剧集名称!', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	tv_text = '*剧集结果:*\n'
 	try:
 		res = await asyncio.gather(bot_util.async_func(search.tv_shows, message_text[11:]))
 	except Exception as e:
 		try:
-			typing_task.cancel()
-		finally:
 			await update.message.reply_text(e)
+		finally:
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	tv_search = res[0]
 	for tv_res in tv_search.results:
@@ -251,7 +276,8 @@ async def search_tv(update: Update, context: CallbackContext):
 			await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 	else:
 		return None
 
@@ -267,191 +293,6 @@ async def search_tv_by_name(tmdb_name: str):
 		return tv_search.results
 	else:
 		return None
-
-
-# @gpt_bot.message_handler(commands=['add_resource'])
-# def add_resource(message):
-# 	gpt_bot.reply_to(message, '请输入电影/剧集名称')
-# 	gpt_bot.register_next_step_handler(message, add_resource_step)
-
-
-# def add_resource_step(message):
-# 	# 获取用户输入的电影/剧集名称
-# 	tmdb_name = message.text.strip().replace(' ', '')
-# 	if tmdb_name == '':
-# 		gpt_bot.reply_to(message, '输入的电影/剧集名称不能为空!')
-# 		gpt_bot.register_next_step_handler(message, add_resource_step)
-# 		return
-# 	elif tmdb_name.startswith('/'):
-# 		return
-# 	elif len(tmdb_name) > 100:
-# 		gpt_bot.reply_to(message, '输入的电影/剧集名称不能超过100个字符!')
-# 		gpt_bot.register_next_step_handler(message, add_resource_step)
-# 		return
-# 	# tmdb_name不能包含形如 (1995)这样的字符串
-# 	elif tmdb_name.find('(') != -1 and tmdb_name.find(')') != -1:
-# 		gpt_bot.reply_to(message, '输入的电影/剧集名称不合法!')
-# 		gpt_bot.register_next_step_handler(message, add_resource_step)
-# 		return
-# 	movie_res = search_movie_by_name(tmdb_name)
-# 	tv_res = search_tv_by_name(tmdb_name)
-# 	if movie_res == None and tv_res == None:
-# 		gpt_bot.reply_to(message, '未找到任何电影/剧集,请重新输入')
-# 		gpt_bot.register_next_step_handler(message, add_resource)
-# 	elif movie_res != None and tv_res == None:
-# 		# 只存在电影 直接让用户选择目标电影
-# 		markup_data = {}
-# 		for index, movie_res_item in enumerate(movie_res):
-# 			title = f'{index + 1}. {movie_res_item.title} ({movie_res_item.release_date.split("-")[0]})'
-# 			markup_data[title] = {
-# 				'callback_data': f'movie:{movie_res_item.id}'}
-# 		movie_markup = quick_markup(markup_data, row_width=2)
-# 		gpt_bot.reply_to(message, '请选择目标电影', reply_markup=movie_markup)
-# 		gpt_bot.register_callback_query_handler(
-# 			add_movie_callback, lambda query: query.data.startswith('movie:'))
-#
-# 	elif movie_res == None and tv_res != None:
-# 		# 只存在剧集 直接让用户选择目标剧集
-# 		markup_data = {}
-# 		for index, tv_res_item in enumerate(tv_res):
-# 			title = f'{index + 1}. {tv_res_item.name} ({tv_res_item.first_air_date.split("-")[0]})'
-# 			markup_data[tv_res_item.name] = {
-# 				'callback_data': f'tv:{tv_res_item.id}'}
-# 		tv_markup = quick_markup(markup_data, row_width=2)
-# 		gpt_bot.reply_to(message, '请选择目标剧集', reply_markup=tv_markup)
-# 		gpt_bot.register_callback_query_handler(
-# 			add_tv_callback, lambda query: query.data.startswith('tv:'))
-# 	else:
-# 		#  既存在电影又存在剧集 让用户选择电影/剧集
-# 		markup = quick_markup({
-# 			'电影': {'callback_data': f'choose_movie:{tmdb_name}'},
-# 			'剧集': {'callback_data': f'choose_tv:{tmdb_name}'}
-# 		}, row_width=2)
-# 		gpt_bot.reply_to(message, '添加电影还是剧集?', reply_markup=markup)
-# 		# 添加电影/剧集的回调函数 回调值为movie或tv
-# 		gpt_bot.register_callback_query_handler(
-# 			choose_movie_callback, lambda query: query.data.startswith('choose_movie:'))
-# 		gpt_bot.register_callback_query_handler(
-# 			choose_tv_callback, lambda query: query.data.startswith('choose_tv:'))
-
-
-# def choose_movie_callback(query):
-# 	tmdb_name = query.data.split(':')[1]
-# 	# 根据tmdb_name查询电影
-# 	movie_res = search_movie_by_name(tmdb_name)
-# 	markup_data = {}
-# 	# 让用户选择目标电影
-# 	for index, movie_res_item in enumerate(movie_res):
-# 		title = f'{index + 1}. {movie_res_item.title} ({movie_res_item.release_date.split("-")[0]})'
-# 		markup_data[title] = {
-# 			'callback_data': f'movie:{movie_res_item.id}'}
-# 	movie_markup = quick_markup(markup_data, row_width=2)
-# 	gpt_bot.send_message(query.message.chat.id, '请选择目标电影',
-# 	                 reply_markup=movie_markup)
-# 	gpt_bot.register_callback_query_handler(
-# 		add_movie_callback, lambda query: query.data.startswith('movie:'))
-#
-#
-# def choose_tv_callback(query):
-# 	tmdb_name = query.data.split(':')[1]
-# 	# 根据tmdb_name查询剧集
-# 	tv_res = search_tv_by_name(tmdb_name)
-# 	markup_data = {}
-# 	# 让用户选择目标剧集
-# 	for index, tv_res_item in enumerate(tv_res):
-# 		title = f'{index + 1}. {tv_res_item.name} ({tv_res_item.first_air_date.split("-")[0]})'
-# 		markup_data[title] = {
-# 			'callback_data': f'tv:{tv_res_item.id}'}
-# 	tv_markup = quick_markup(markup_data, row_width=2)
-# 	gpt_bot.send_message(query.message.chat.id, '请选择目标剧集', reply_markup=tv_markup)
-# 	gpt_bot.register_callback_query_handler(
-# 		add_tv_callback, lambda query: query.data.startswith('tv:'))
-#
-#
-# def add_movie_callback(query):
-# 	movie_id = query.data.split(':')[1]
-# 	# 查询电影详情
-# 	movie_detail = movie.details(movie_id)
-# 	# 要求输入分享链接
-# 	gpt_bot.send_message(query.message.chat.id,
-# 	                 f'请输入电影:`{movie_detail.title} ({movie_detail.release_date.split("-")[0]})`的分享链接',
-# 	                 'MarkdownV2')
-# 	gpt_bot.register_next_step_handler(query.message, add_movie_step, movie_id)
-#
-#
-# def add_tv_callback(query):
-# 	tv_id = query.data.split(':')[1]
-# 	# 查询剧集详情
-# 	tv_detail = tv.details(tv_id)
-# 	# 要求输入分享链接
-# 	gpt_bot.send_message(query.message.chat.id,
-# 	                 f'请输入剧集:`{tv_detail.name} ({tv_detail.first_air_date.split("-")[0]})`的分享链接',
-# 	                 'MarkdownV2')
-# 	gpt_bot.register_next_step_handler(query.message, add_tv_step, tv_id)
-#
-#
-# def add_movie_step(message, movie_id):
-# 	# 如果分享链接以`/`开头 则说明是指令 直接退出
-# 	if message.text.strip().startswith('/'):
-# 		return
-# 	# 获取用户输入的分享链接(支持批量) 通过正则表达式匹配url链接
-# 	share_res: list[dict[str, str]] = regex_util.get_share_ids(
-# 		message.html_text)
-# 	# 获取电影详情
-# 	movie_detail = movie.details(movie_id)
-# 	gpt_bot.send_message(message.chat.id, '正在处理分享链接,请稍后...')
-# 	# 处理分享链接
-# 	share_links = alidrive_util.handle_share_res(
-# 		f'{movie_detail.title} {movie_detail.release_date.split("-")[0]}', share_res)
-# 	# 让用户选择分享链接对应的资源
-# 	if len(share_links) == 0:
-# 		gpt_bot.reply_to(message, '未找到任何有效的分享链接!请重新输入')
-# 		gpt_bot.register_next_step_handler(message, add_movie_step, movie_id)
-# 		return
-# 	# 遍历share_links  返回一个列表
-# 	response_text = '搜索结果：\n'
-# 	for link in share_links:
-# 		response_text = response_text + \
-# 		                f'· <a href="{link["url"]}">{link["name"]}</a> \n'
-# 	gpt_bot.send_message(message.chat.id, response_text, 'HTML')
-#
-#
-# def add_tv_step(message, tv_id):
-# 	# 如果分享链接以`/`开头 则说明是指令 直接退出
-# 	if message.text.strip().startswith('/'):
-# 		return
-# 	# 获取用户输入的分享链接(支持批量) 通过正则表达式匹配url链接
-# 	share_res: list[dict[str, str]] = regex_util.get_share_ids(
-# 		message.html_text)
-# 	# 获取电影详情
-# 	tv_detail = tv.details(tv_id)
-# 	gpt_bot.send_message(message.chat.id, '正在处理分享链接,请稍后...')
-# 	# 处理分享链接
-# 	share_links = alidrive_util.handle_share_res(
-# 		f'{tv_detail.name} {tv_detail.first_air_date.split("-")[0]}', share_res)
-# 	# 让用户选择分享链接对应的资源
-# 	if len(share_links) == 0:
-# 		gpt_bot.reply_to(message, '未找到任何有效的分享链接!请重新输入')
-# 		gpt_bot.register_next_step_handler(message, add_tv_step, tv_id)
-# 		return
-# 	# 遍历share_links  返回一个列表
-# 	response_text = '搜索结果：\n'
-# 	for link in share_links:
-# 		response_text = response_text + \
-# 		                f'· <a href="{link["url"]}">{link["name"]}</a> \n'
-# 	gpt_bot.send_message(message.chat.id, response_text, 'HTML')
-
-
-# @gpt_bot.message_handler(content_types=['text'])
-# def common(message):
-#     raw_msg = message.text.strip().replace(' ', '')
-#     if raw_msg and not raw_msg.startswith('/'):
-#         message.text = '/movie_search '+raw_msg
-#         movie_res = search_movie(message)
-#         message.text = '/tv_search '+raw_msg
-#         tv_res = search_tv(message)
-#         if movie_res == None and tv_res == None:
-#             gpt_bot.reply_to(message, '未找到任何电影剧集!')
 
 
 def handlers():

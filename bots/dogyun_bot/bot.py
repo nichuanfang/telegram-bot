@@ -26,7 +26,10 @@ async def get_server_status(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_dogyun_get_server_status'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	url = f'https://cvm.dogyun.com/server/{DOGYUN_BOT_SERVER_ID}'
 	headers = {
 		'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
@@ -43,15 +46,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 			# tg通知dogyun cookie已过期
 			await update.message.reply_text(
 				'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
-			typing_task.cancel()
 			return
-	except Exception as e:
-		try:
-			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
-		finally:
-			typing_task.cancel()
-		return
-	try:
 		soup = BeautifulSoup(response.text, 'lxml')
 		# cpu
 		cpu = soup.find_all('div', class_='d-flex justify-content-between')[0].contents[1].contents[0]
@@ -70,7 +65,8 @@ async def get_server_status(update: Update, context: CallbackContext):
 	except Exception as e:
 		await update.message.reply_text(f'获取服务器状态失败: {e}', reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 # @gpt_bot.message_handler(commands=['draw_lottery'])
@@ -80,7 +76,10 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_dogyun_draw_lottery'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	url = f'https://console.dogyun.com/turntable/lottery'
 	headers = {
 		'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
@@ -94,20 +93,21 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			bot_util.async_func(requests.put, **{'url': url, 'headers': headers, 'verify': True}))
 		response = res[0]
 		if response.url == 'https://account.dogyun.com/login':
-			typing_task.cancel()
 			try:
 				# tg通知dogyun cookie已过期
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				typing_task.cancel()
+				context.user_data[flag_key] = False
+				await typing_task
 			return
 		data = response.json()
 	except Exception as e:
 		try:
 			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	# 获取抽奖结果
 	try:
@@ -116,7 +116,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 		try:
 			await update.message.reply_text('目前没有抽奖活动', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	if result:
 		# 查看奖品
@@ -147,7 +148,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 				await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				typing_task.cancel()
+				context.user_data[flag_key] = False
+				await typing_task
 			return
 		# 获取返回的json数据
 		try:
@@ -158,7 +160,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				typing_task.cancel()
+				context.user_data[flag_key] = False
+				await typing_task
 			return
 		# 获取奖品信息
 		prize_infos: list = prize_data['data']
@@ -169,13 +172,15 @@ async def draw_lottery(update: Update, context: CallbackContext):
 					f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}',
 					reply_to_message_id=update.message.message_id)
 			finally:
-				typing_task.cancel()
+				context.user_data[flag_key] = False
+				await typing_task
 	else:
 		try:
 			await update.message.reply_text(f'抽奖失败: {data["message"]}',
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 
 
 async def bitwarden_backup(update: Update, context: CallbackContext):
@@ -191,7 +196,10 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	# except:
 	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_dogyun_bitwarden_backup'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	try:
 		await asyncio.gather(
 			bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
@@ -199,12 +207,14 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 		try:
 			await update.message.reply_text('执行脚本报错', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	try:
 		await update.message.reply_text('备份bitwarden成功', reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 async def exec_cmd(update: Update, context: CallbackContext):
@@ -213,20 +223,25 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
+	flag_key = 'typing_flag_dogyun_exec_cmd'
+	# 启动一个异步任务来发送 typing 状态
+	context.user_data[flag_key] = True
+	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	message_text = update.message.text
 	if message_text.strip() == '/exec_cmd':
 		try:
 			await update.message.reply_text('请输入命令!', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	script = message_text[10:].strip()
 	if script in ['systemctl stop telegram-bot', 'systemctl restart telegram-bot', 'reboot']:
 		try:
 			await update.message.reply_text('禁止执行该命令', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	# try:
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
@@ -241,12 +256,14 @@ async def exec_cmd(update: Update, context: CallbackContext):
 		try:
 			await update.message.reply_text('执行命令报错', reply_to_message_id=update.message.message_id)
 		finally:
-			typing_task.cancel()
+			context.user_data[flag_key] = False
+			await typing_task
 		return
 	try:
 		await update.message.reply_text('执行命令成功', reply_to_message_id=update.message.message_id)
 	finally:
-		typing_task.cancel()
+		context.user_data[flag_key] = False
+		await typing_task
 
 
 def handlers():
