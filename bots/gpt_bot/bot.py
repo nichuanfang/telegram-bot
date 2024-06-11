@@ -35,7 +35,7 @@ chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=10)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
-	"max_tokens": 4096,  # 根据需求调整token长度
+	# "max_tokens": 32768,  # 根据需求调整token长度
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
@@ -104,6 +104,7 @@ def compress_question(question):
 
 
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+	global file
 	user_id = update.effective_user.id
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
@@ -132,11 +133,11 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			handled_question = compress_question(update.message.caption.strip())
 			if len(handled_question) > max_length:
 				try:
+					context.user_data[flag_key] = False
 					await update.message.reply_text(
 						f'Your question is too long. Please limit it to {max_length} characters.')
 					return
 				finally:
-					context.user_data[flag_key] = False
 					await typing_task
 			content.append({
 				'type': 'text',
@@ -159,12 +160,41 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				raise ValueError("Empty image data received.")
 		except Exception as e:
 			try:
+				# 结束 typing 状态
+				context.user_data[flag_key] = False
 				await update.message.reply_text(f'图片识别失败!: {e}')
 				return
 			finally:
+				await typing_task
+	elif update.message.document:
+		# 处理文档
+		try:
+			# 读文档
+			document = update.message.document
+			file = await context.bot.get_file(document.file_id)
+			response = requests.get(file.file_path)
+			document_text = response.text
+			# 读取文档内容
+			content = f'```{document.mime_type}\n' + document_text + '\n```\n'
+		except Exception as e:
+			try:
 				# 结束 typing 状态
 				context.user_data[flag_key] = False
+				await update.message.reply_text(f'文档识别失败!: {e}')
+				return
+			finally:
 				await typing_task
+		if update.message.caption:
+			handled_question = compress_question(update.message.caption.strip())
+			if len(handled_question) > max_length:
+				try:
+					await update.message.reply_text(
+						f'Your question is too long. Please limit it to {max_length} characters.')
+					return
+				finally:
+					context.user_data[flag_key] = False
+					await typing_task
+			content = content + handled_question
 	else:
 		content = update.effective_message.text.strip()
 		# 压缩问题内容
@@ -209,15 +239,27 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
 			# 结束 typing 状态
 			context.user_data[flag_key] = False
-			await update.message.reply_text(bot_util.escape_markdown_v2(res)[:4096],
-			                                reply_to_message_id=update.message.message_id,
-			                                parse_mode=ParseMode.MARKDOWN_V2)
+			if len(res) < 4096:
+				await update.message.reply_text(bot_util.escape_markdown_v2(res),
+				                                reply_to_message_id=update.message.message_id,
+				                                parse_mode=ParseMode.MARKDOWN_V2)
+			else:
+				# 将结果分割成多个部分并逐个发送
+				parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
+				for part in parts:
+					await update.message.reply_text(bot_util.escape_markdown_v2(part),
+					                                reply_to_message_id=update.message.message_id,
+					                                parse_mode=ParseMode.MARKDOWN_V2)
 	except Exception as e:
 		# 结束 typing 状态
 		context.user_data[flag_key] = False
 		if e.__str__().__contains__('at byte offset'):
 			# 说明缺少闭合符号 提示用户上传文本文件
-			await update.message.reply_text('缺少结束标记! 请使用文本文件解析!', reply_to_message_id=update.message.message_id)
+			await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
+			                                reply_to_message_id=update.message.message_id)
+			chat.clear_messages()
+		elif e.__str__().__contains__('504 Gateway Time-out'):
+			await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
 			chat.clear_messages()
 		else:
 			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
