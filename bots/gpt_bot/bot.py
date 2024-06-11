@@ -245,6 +245,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 	typing_task = context.user_data['typing_task']
 	if typing_task:
 		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	await update.message.reply_text('上下文已清除')
 
 
@@ -303,7 +304,11 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	
+	# 清除未结束的typing任务
+	typing_task = context.user_data['typing_task']
+	if typing_task:
+		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	# 切换面具后清除上下文
 	chat.clear_messages()
 	
@@ -365,7 +370,11 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	
+	# 清除未结束的typing任务
+	typing_task = context.user_data['typing_task']
+	if typing_task:
+		typing_task.cancel()
+		context.user_data['typing_task'] = None
 	# 切换模型后清除上下文
 	chat.clear_messages()
 	
