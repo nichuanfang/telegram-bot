@@ -108,9 +108,13 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
+	user_data = context.user_data
 	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-	context.user_data['typing_task'] = typing_task
+	if user_data.__contains__('typing_tasks'):
+		user_data['typing_tasks'].append(typing_task)
+	else:
+		user_data['typing_tasks'] = [typing_task]
 	# 限制问题的长度，避免过长的问题
 	max_length = 6000
 	# 检查是否有图片
@@ -124,7 +128,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
-				context.user_data['typing_task'] = None
+				user_data['typing_tasks'].remove(typing_task)
 		content = []
 		if update.message.caption:
 			handled_question = compress_question(update.message.caption.strip())
@@ -135,7 +139,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 					return
 				finally:
 					typing_task.cancel()
-					context.user_data['typing_task'] = None
+					user_data['typing_tasks'].remove(typing_task)
 			content.append({
 				'type': 'text',
 				'text': handled_question
@@ -161,7 +165,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
-				context.user_data['typing_task'] = None
+				user_data['typing_tasks'].remove(typing_task)
 	else:
 		content = update.effective_message.text.strip()
 		# 压缩问题内容
@@ -173,9 +177,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 				return
 			finally:
 				typing_task.cancel()
-				context.user_data['typing_task'] = None
+				user_data['typing_tasks'].remove(typing_task)
 	
-	curr_mask = context.user_data.get('current_mask', masks['common'])
+	curr_mask = user_data.get('current_mask', masks['common'])
 	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 	try:
 		if ENABLE_STREAM:
@@ -212,12 +216,18 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	finally:
 		# 停止发送“正在输入...”状态
 		typing_task.cancel()
-		context.user_data['typing_task'] = None
+		user_data['typing_tasks'].remove(typing_task)
 
 
 async def balance_handler(update: Update, context: CallbackContext):
+	user_data = context.user_data
+	# 开始发送“正在输入...”状态
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update))
-	context.user_data['typing_task'] = typing_task
+	if user_data.__contains__('typing_tasks'):
+		user_data['typing_tasks'].append(typing_task)
+	else:
+		user_data['typing_tasks'] = [typing_task]
+	
 	request = BotHttpRequest()
 	try:
 		responses = await asyncio.gather(request.get_subscription(), request.get_usage())
@@ -232,7 +242,7 @@ async def balance_handler(update: Update, context: CallbackContext):
 		await update.message.reply_text(f'获取余额失败: {e}')
 	finally:
 		typing_task.cancel()
-		context.user_data['typing_task'] = None
+		user_data['typing_tasks'].remove(typing_task)
 
 
 async def clear_handler(update: Update, context: CallbackContext):
@@ -244,10 +254,12 @@ async def clear_handler(update: Update, context: CallbackContext):
 	"""
 	# 清空历史消息
 	chat.clear_messages()
-	typing_task = context.user_data['typing_task']
-	if typing_task:
-		typing_task.cancel()
-		context.user_data['typing_task'] = None
+	user_data = context.user_data
+	if user_data.__contains__('typing_tasks'):
+		typing_tasks: list = user_data['typing_tasks']
+		for task in typing_tasks:
+			task.cancel()
+		user_data['typing_tasks'] = []
 	await update.message.reply_text('上下文已清除')
 
 
@@ -306,11 +318,12 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	# 清除未结束的typing任务
-	typing_task = context.user_data['typing_task']
-	if typing_task:
-		typing_task.cancel()
-		context.user_data['typing_task'] = None
+	user_data = context.user_data
+	if user_data.__contains__('typing_tasks'):
+		typing_tasks: list = user_data['typing_tasks']
+		for task in typing_tasks:
+			task.cancel()
+		user_data['typing_tasks'] = []
 	# 切换面具后清除上下文
 	chat.clear_messages()
 	
@@ -372,11 +385,12 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
-	# 清除未结束的typing任务
-	typing_task = context.user_data['typing_task']
-	if typing_task:
-		typing_task.cancel()
-		context.user_data['typing_task'] = None
+	user_data = context.user_data
+	if user_data.__contains__('typing_tasks'):
+		typing_tasks: list = user_data['typing_tasks']
+		for task in typing_tasks:
+			task.cancel()
+		user_data['typing_tasks'] = []
 	# 切换模型后清除上下文
 	chat.clear_messages()
 	
