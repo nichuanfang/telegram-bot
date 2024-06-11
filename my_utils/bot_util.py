@@ -18,7 +18,7 @@ async def async_func(normal_function, *args, **kwargs):
 async def send_typing_action(update: Update, context: CallbackContext, flag_key):
 	while context.user_data.get(flag_key, False):
 		await update.message.reply_chat_action(action='typing')
-		await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
+		await asyncio.sleep(2)  # 每2秒发送一次 typing 状态
 
 
 def escape_markdown_v2(text: str) -> str:
