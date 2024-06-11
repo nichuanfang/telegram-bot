@@ -31,7 +31,7 @@ MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=10)
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=5)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
@@ -104,167 +104,160 @@ def compress_question(question):
 
 
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-	global file
 	user_id = update.effective_user.id
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
+	
 	flag_key = update.message.message_id
-	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	
-	# 限制问题的长度，避免过长的问题
 	max_length = 4096
-	# 检查是否有图片
-	if update.message.photo:
-		current_model = OPENAI_COMPLETION_OPTIONS['model']
-		if current_model.lower().startswith('gpt-3.5'):
-			try:
-				await update.message.reply_text(
-					f'当前模型: *{telegram.helpers.escape_markdown(current_model, version=2)}*不支持图片识别,请切换模型\!',
-					parse_mode=ParseMode.MARKDOWN_V2)
-				return
-			finally:
-				context.user_data[flag_key] = False
-				await typing_task
-		content = []
-		if update.message.caption:
-			handled_question = compress_question(update.message.caption.strip())
-			if len(handled_question) > max_length:
-				try:
-					context.user_data[flag_key] = False
-					await update.message.reply_text(
-						f'Your question is too long. Please limit it to {max_length} characters.')
-					return
-				finally:
-					await typing_task
-			content.append({
-				'type': 'text',
-				'text': handled_question
-			})
-		try:
-			photo = update.message.photo[-2]
-			photo_file = await context.bot.get_file(photo.file_id)
-			response = requests.get(photo_file.file_path)
-			image_data = response.content
-			if image_data:  # Check if image data is not empty
-				encoded_image = base64.b64encode(image_data).decode("utf-8")
-				content.append({
-					'type': 'image_url',
-					'image_url': {
-						'url': f'data:image/jpeg;base64,{encoded_image}'
-					}
-				})
-			else:
-				raise ValueError("Empty image data received.")
-		except Exception as e:
-			try:
-				# 结束 typing 状态
-				context.user_data[flag_key] = False
-				await update.message.reply_text(f'图片识别失败!: {e}')
-				return
-			finally:
-				await typing_task
-	elif update.message.document:
-		# 处理文档
-		try:
-			# 读文档
-			document = update.message.document
-			file = await context.bot.get_file(document.file_id)
-			response = requests.get(file.file_path)
-			document_text = response.text
-			# 读取文档内容
-			content = f'```{document.mime_type}\n' + document_text + '\n```\n'
-		except Exception as e:
-			try:
-				# 结束 typing 状态
-				context.user_data[flag_key] = False
-				await update.message.reply_text(f'文档识别失败!: {e}')
-				return
-			finally:
-				await typing_task
-		if update.message.caption:
-			handled_question = compress_question(update.message.caption.strip())
-			if len(handled_question) > max_length:
-				try:
-					await update.message.reply_text(
-						f'Your question is too long. Please limit it to {max_length} characters.')
-					return
-				finally:
-					context.user_data[flag_key] = False
-					await typing_task
-			content = content + handled_question
-	else:
-		content = update.effective_message.text.strip()
-		# 压缩问题内容
-		content = compress_question(content)
-		if len(content) > max_length:
-			try:
-				await update.message.reply_text(
-					f'Your question is too long. Please limit it to {max_length} characters.')
-				return
-			finally:
-				# 结束 typing 状态
-				context.user_data[flag_key] = False
-				await typing_task
-	
-	curr_mask = context.user_data.get('current_mask', masks['common'])
-	OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 	try:
+		if update.message.photo:
+			content = await handle_photo(update, context, max_length)
+		elif update.message.document:
+			content = await handle_document(update, context, max_length)
+		elif update.message.audio or update.message.voice:
+			content = await handle_audio(update, context)
+		elif update.message.video:
+			content = await handle_video(update, context)
+		else:
+			content = await handle_text(update, max_length)
+		
+		curr_mask = context.user_data.get('current_mask', masks['common'])
+		OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
+		
 		if ENABLE_STREAM:
-			buffer = ''
-			buffer_limit = 100
-			# 发送初始消息
-			sent_message = await update.message.reply_text('Loading...', reply_to_message_id=update.message.message_id)
-			message_id = sent_message.message_id
-			total_answer = ''
-			
-			async for res in chat.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
-				buffer += res
-				if len(buffer) >= buffer_limit:
-					total_answer += buffer
-					# 修改消息
-					await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-					                                    text=bot_util.escape_markdown_v2(total_answer),
-					                                    parse_mode=ParseMode.MARKDOWN_V2)
-					buffer = ''
-			# 发送剩余的字符
-			if buffer:
-				total_answer += buffer
-				await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-				                                    text=bot_util.escape_markdown_v2(total_answer),
-				                                    parse_mode=ParseMode.MARKDOWN_V2)
+			await handle_stream_response(update, context, content)
 		else:
-			res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
-			# 结束 typing 状态
-			context.user_data[flag_key] = False
-			if len(res) < 4096:
-				await update.message.reply_text(bot_util.escape_markdown_v2(res),
-				                                reply_to_message_id=update.message.message_id,
-				                                parse_mode=ParseMode.MARKDOWN_V2)
-			else:
-				# 将结果分割成多个部分并逐个发送
-				parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
-				for part in parts:
-					await update.message.reply_text(bot_util.escape_markdown_v2(part),
-					                                reply_to_message_id=update.message.message_id,
-					                                parse_mode=ParseMode.MARKDOWN_V2)
+			await handle_response(update, context, content, flag_key)
+	
 	except Exception as e:
-		# 结束 typing 状态
-		context.user_data[flag_key] = False
-		if e.__str__().__contains__('at byte offset'):
-			# 说明缺少闭合符号 提示用户上传文本文件
-			await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
-			                                reply_to_message_id=update.message.message_id)
-			chat.clear_messages()
-		elif e.__str__().__contains__('504 Gateway Time-out'):
-			await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
-			chat.clear_messages()
-		else:
-			await update.message.reply_text(f'Failed to get an answer from the model: \n{e}')
+		await handle_exception(update, context, e, flag_key)
 	finally:
 		await typing_task
+
+
+async def handle_photo(update, context, max_length):
+	content = []
+	current_model = OPENAI_COMPLETION_OPTIONS['model']
+	if current_model.lower().startswith('gpt-3.5'):
+		raise ValueError(
+			f'当前模型: {current_model} 不支持图片识别,请切换模型!')
+	
+	if update.message.caption:
+		handled_question = compress_question(update.message.caption.strip())
+		if len(handled_question) > max_length:
+			raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
+		content.append({'type': 'text', 'text': handled_question})
+	
+	photo = update.message.photo[-2]
+	photo_file = await context.bot.get_file(photo.file_id)
+	response = requests.get(photo_file.file_path)
+	image_data = response.content
+	if image_data:
+		encoded_image = base64.b64encode(image_data).decode("utf-8")
+		content.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{encoded_image}'}})
+	else:
+		raise ValueError("Empty image data received.")
+	return content
+
+
+async def handle_document(update, context, max_length):
+	document = update.message.document
+	file = await context.bot.get_file(document.file_id)
+	response = requests.get(file.file_path)
+	document_text = response.text
+	content = f'```{document.mime_type}\n{document_text}\n```\n'
+	
+	if update.message.caption:
+		handled_question = compress_question(update.message.caption.strip())
+		if len(handled_question) > max_length:
+			raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
+		content = content + handled_question
+	return content
+
+
+async def handle_audio(update, context):
+	audio_file = update.message.audio or update.message.voice
+	if audio_file:
+		file_id = audio_file.file_id
+		new_file = await context.bot.get_file(file_id)
+		file_path = os.path.join(f"{file_id}.ogg")
+		await new_file.download_to_drive(file_path)
+		try:
+			return chat.transcribe_audio(file_path)
+		except Exception as e:
+			raise ValueError(e)
+		finally:
+			# 删除临时文件
+			if os.path.exists(file_path):
+				os.remove(file_path)
+				print(f"临时文件已删除: {file_path}")
+
+
+async def handle_video(update, context):
+	return "Video processing is not implemented yet."
+
+
+async def handle_text(update, max_length):
+	content_text = update.effective_message.text.strip()
+	content_text = compress_question(content_text)
+	if len(content_text) > max_length:
+		raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
+	return content_text
+
+
+async def handle_stream_response(update, context, content):
+	buffer = ''
+	buffer_limit = 100
+	sent_message = await update.message.reply_text('Loading...', reply_to_message_id=update.message.message_id)
+	message_id = sent_message.message_id
+	total_answer = ''
+	
+	async for res in chat.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
+		buffer += res
+		if len(buffer) >= buffer_limit:
+			total_answer += buffer
+			await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
+			                                    text=bot_util.escape_markdown_v2(total_answer),
+			                                    parse_mode=ParseMode.MARKDOWN_V2)
+			buffer = ''
+	if buffer:
+		total_answer += buffer
+		await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
+		                                    text=bot_util.escape_markdown_v2(total_answer),
+		                                    parse_mode=ParseMode.MARKDOWN_V2)
+
+
+async def handle_response(update, context, content, flag_key):
+	res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
+	context.user_data[flag_key] = False
+	if len(res) < 4096:
+		await update.message.reply_text(bot_util.escape_markdown_v2(res),
+		                                reply_to_message_id=update.message.message_id,
+		                                parse_mode=ParseMode.MARKDOWN_V2)
+	else:
+		parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
+		for part in parts:
+			await update.message.reply_text(bot_util.escape_markdown_v2(part),
+			                                reply_to_message_id=update.message.message_id,
+			                                parse_mode=ParseMode.MARKDOWN_V2)
+
+
+async def handle_exception(update, context, e, flag_key):
+	context.user_data[flag_key] = False
+	if 'at byte offset' in str(e):
+		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
+		                                reply_to_message_id=update.message.message_id)
+		chat.clear_messages()
+	elif '504 Gateway Time-out' in str(e):
+		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
+		chat.clear_messages()
+	else:
+		await update.message.reply_text(f'Failed to get an answer from the model: \n\n{e}')
 
 
 async def balance_handler(update: Update, context: CallbackContext):

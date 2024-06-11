@@ -1,9 +1,13 @@
+import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
 from pathlib import Path
 from typing import List, Literal
 
+import openai
+import whisper
 from openai import OpenAI, AsyncOpenAI
+from pydub import AudioSegment
 
 
 class AKPool:
@@ -141,6 +145,7 @@ class Chat:
 		if http_client: kwargs["http_client"] = http_client
 		
 		self.reset_api_key(api_key)
+		openai.api_key = api_key
 		self._kwargs = kwargs
 		self._request_kwargs = {'model': model}
 		self._messages = Temque(maxlen=msg_max_count)
@@ -168,7 +173,7 @@ class Chat:
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
-	def stream_request(self, text: str = None, **kwargs):
+	def stream_request(self, text: str | list = None, **kwargs):
 		messages = [{"role": "user", "content": text}]
 		messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
 		assert messages
@@ -296,3 +301,16 @@ class Chat:
 		jt = Path(fpath).read_text(encoding="utf8")
 		self._messages.add_many(*jsonLoads(jt))
 		return True
+	
+	def transcribe_audio(self, file_path):
+		wav_path = file_path.replace('.ogg', '.wav')
+		try:
+			# 将音频文件转换为适合Whisper模型的格式（如wav）
+			audio = AudioSegment.from_file(file_path)
+			audio.export(wav_path, format='wav')
+			whisper_model = whisper.load_model('small')
+			result = whisper_model.transcribe(wav_path,language='zh')
+			return result['text']
+		finally:
+			# 删除临时wav文件
+			os.remove(wav_path)
