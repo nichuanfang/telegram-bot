@@ -26,7 +26,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	flag_key = 'typing_flag_dogyun_get_server_status'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -76,7 +76,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
-	flag_key = 'typing_flag_dogyun_draw_lottery'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -196,7 +196,7 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	# except:
 	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
-	flag_key = 'typing_flag_dogyun_bitwarden_backup'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -223,7 +223,7 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	Args:
 		message (_type_): _description_
 	"""
-	flag_key = 'typing_flag_dogyun_exec_cmd'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))

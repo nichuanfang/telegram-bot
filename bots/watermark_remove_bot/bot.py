@@ -25,7 +25,7 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 		update:  更新对象
 		context:  上下文
 	"""
-	flag_key = 'typing_flag_watermark_remove_uumvp'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))

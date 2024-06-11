@@ -17,7 +17,7 @@ async def scrape_metadata(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	flag_key = 'typing_flag_github_workflow_scrape_metadata'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))

@@ -26,7 +26,7 @@ async def default_search(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	flag_key = 'typing_flag_tmdb_default_search'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -92,7 +92,7 @@ async def movie_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	flag_key = 'typing_flag_tmdb_movie_popular'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -134,7 +134,7 @@ async def tv_popular(update: Update, context: CallbackContext):
 		update: 可以获取消息对象
 		context:  可以获取机器人对象
 	"""
-	flag_key = 'typing_flag_tmdb_tv_popular'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -172,7 +172,7 @@ async def search_movie(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	flag_key = 'typing_flag_tmdb_search_movie'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -237,7 +237,7 @@ async def search_tv(update: Update, context: CallbackContext):
 	Returns:
 		_type_: _description_
 	"""
-	flag_key = 'typing_flag_tmdb_search_tv'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))

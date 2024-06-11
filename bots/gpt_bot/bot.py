@@ -109,7 +109,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
-	flag_key = 'typing_flag_gpt_answer'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
@@ -221,7 +221,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def balance_handler(update: Update, context: CallbackContext):
-	flag_key = 'typing_flag_gpt_balance_handler'
+	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
