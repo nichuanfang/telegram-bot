@@ -26,8 +26,6 @@ OPENAI_BASE_URL = require_vars[1]
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].split(',')]
 # 默认面具
 DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
-# 可用的模型列表
-# MODELS = ['gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13']
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
@@ -37,86 +35,12 @@ OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
-	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
-	# "model": OPENAI_MODEL
+	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
 }
 
-masks = {
-	'common': {
-		'name': '通用助手',
-		'mask': [{"role": "system", "content": '你是一个全能的问题回复专家，你能以最精简的方式提供最优的内容质量。'}],
-		'supported_models': [
-			'gpt-3.5-turbo-0125',
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-3.5-turbo-0125'
-	},
-	'github_copilot': {
-		'name': '代码助手',
-		'mask': [{"role": "system",
-		          "content": '你是软件开发专家，你可以为我解答任何关于功能设计、bug修复、代码优化等软件开发方面的问题。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	},
-	'image_analyzer': {
-		'name': '图像解析助手',
-		'mask': [{"role": "system",
-		          "content": '你是一个图像解析专家。你可以分析和解释图像内容，包括对象识别、场景描述和图像分类。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13',
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	},
-	'image_generator': {
-		'name': '图像生成助手',
-		'mask': [{"role": "system",
-		          "content": '你是一个图像生成专家。你可以根据用户的描述生成高质量的图像。'}],
-		'supported_models': [
-			'dall-e-2',
-			'dall-e-3'
-		],
-		'default_model': 'dall-e-2'
-	},
-	'travel_guide': {
-		'name': '旅游助手',
-		'mask': [{"role": "system",
-		          "content": '你是高级聊天机器人旅游指南。你的主要目标是为用户提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	},
-	'song_recommender': {
-		'name': '歌曲推荐人',
-		'mask': [{"role": "system",
-		          "content": '你是歌曲推荐专家。根据用户提供的歌曲，创建一个包含 10 首相似歌曲的播放列表，并提供播放列表名称和描述。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	},
-	'movie_expert': {
-		'name': '电影专家',
-		'mask': [{"role": "system",
-		          "content": '你是电影专家，回答有关电影、演员、导演的问题，并根据用户喜好推荐电影。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	},
-	'doctor': {
-		'name': '医生',
-		'mask': [{"role": "system",
-		          "content": '你是人工智能医生。根据患者信息，使用AI工具和传统方法进行诊断。'}],
-		'supported_models': [
-			'gpt-4o-2024-05-13'
-		],
-		'default_model': 'gpt-4o-2024-05-13'
-	}
-}
-
+with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
+	masks = json.load(masks_file)
+	pass
 
 async def start(update: Update, context: CallbackContext) -> None:
 	start_message = (
@@ -170,7 +94,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			content = await handle_text(update, max_length)
 		
 		# 获取面具
-		curr_mask = context.user_data.get('current_mask', masks['common'])
+		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
 		# 设置面具内容
 		OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 		# 选择模型
@@ -191,10 +115,10 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_photo(update, context, max_length):
 	content = []
-	current_model = OPENAI_COMPLETION_OPTIONS['model']
-	if current_model.lower().startswith('gpt-3.5'):
+	current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+	if current_mask['name'] != '图像解析助手':
 		raise ValueError(
-			f'当前模型: {current_model} 不支持图片识别,请切换模型!')
+			f'请将面具切换为"图像解析助手"!')
 	
 	if update.message.caption:
 		handled_question = compress_question(update.message.caption.strip())
@@ -375,7 +299,7 @@ async def masks_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 获取当前选择的面具
-	current_mask = context.user_data.get('current_mask', masks['common'])
+	current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
 	current_mask_key = next(key for key, value in masks.items() if value == current_mask)
 	# 生成内联键盘
 	keyboard = generate_mask_keyboard(masks, current_mask_key)
