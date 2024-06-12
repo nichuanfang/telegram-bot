@@ -2,12 +2,10 @@ import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Union, Dict, Any, AsyncGenerator
 
 import openai
-import whisper
-from openai import OpenAI, AsyncOpenAI
-from pydub import AudioSegment
+from openai import AsyncOpenAI
 
 
 class AKPool:
@@ -156,71 +154,34 @@ class Chat:
 		else:
 			self._akpool = AKPool([api_key])
 	
-	def request(self, text: str = None, **kwargs):
-		messages = [{"role": "user", "content": text}]
-		messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
-		assert messages
+	async def async_request(self, content: Union[str, List, Dict] = None, **kwargs) -> str:
 		self.recently_request_data = {
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
-		completion = OpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			# **self._request_kwargs,  # 全局参数
-			**kwargs,  # 单次请求的参数覆盖全局参数
-			"messages": list(self._messages + messages),
-			"stream": False,
-		})
+		openai_client = AsyncOpenAI(api_key=api_key, **self._kwargs)
+		messages = await self._prepare_messages(content, openai_client)
+		assert messages
+		
+		completion = await openai_client.chat.completions.create(**{
+			**kwargs,
+			"messages":  (kwargs.get('messages', None) or []) + list(self._messages + messages),
+			"stream": False
+		}
+		                                                         )
 		answer: str = completion.choices[0].message.content
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
-	def stream_request(self, text: str | list = None, **kwargs):
-		messages = [{"role": "user", "content": text}]
-		messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
-		assert messages
+	async def async_stream_request(self, content: Union[str, List, Dict] = None, **kwargs) -> AsyncGenerator[str, None]:
 		self.recently_request_data = {
 			'api_key': (api_key := self._akpool.fetch_key()),
 		}
-		completion = OpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			# **self._request_kwargs,  # 全局参数
-			**kwargs,  # 单次请求的参数覆盖全局参数
-			"messages": list(self._messages + messages),
-			"stream": True,
-		})
-		answer: str = ""
-		for chunk in completion:
-			if chunk.choices and (content := chunk.choices[0].delta.content):
-				answer += content
-				yield content
-		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
-	
-	async def async_request(self, text: str | list = None, **kwargs):
-		messages = [{"role": "user", "content": text}]
-		# messages = (kwargs.pop('messages', None) or []) + messages  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
+		openai_client = AsyncOpenAI(api_key=api_key, **self._kwargs)
+		messages = await self._prepare_messages(content, openai_client)
 		assert messages
-		self.recently_request_data = {
-			'api_key': (api_key := self._akpool.fetch_key()),
-		}
-		completion = await AsyncOpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			# **self._request_kwargs,  # 全局参数
-			**kwargs,  # 单次请求的参数覆盖全局参数
-			# 预设面具 + 历史消息(最大历史消息可设置) + 最新一条消息
-			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-			"stream": False,
-		})
-		answer: str = completion.choices[0].message.content
-		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
-		return answer
-	
-	async def async_stream_request(self, text: str | list = None, **kwargs):
-		messages = [{"role": "user", "content": text}]
-		# messages += (kwargs.pop('messages', None) or [])  # 兼容官方包[openai]用户, 使其代码可以无缝切换到[openai2]
-		assert messages
-		self.recently_request_data = {
-			'api_key': (api_key := self._akpool.fetch_key()),
-		}
-		completion = await AsyncOpenAI(api_key=api_key, **self._kwargs).chat.completions.create(**{
-			# **self._request_kwargs,  # 全局参数
-			**kwargs,  # 单次请求的参数覆盖全局参数
+		
+		completion = await openai_client.chat.completions.create(**{
+			**kwargs,
 			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
 			"stream": True,
 		})
@@ -230,6 +191,27 @@ class Chat:
 				answer += content
 				yield content
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
+	
+	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: Any) -> List[Dict[str, str]]:
+		if isinstance(content, dict) and content.get('type') == "audio":
+			return await self._handle_audio_content(content['audio_path'], openai_client)
+		return [{"role": "user", "content": content}]
+	
+	async def _handle_audio_content(self, audio_path: str, openai_client: Any) -> List[Dict[str, str]]:
+		try:
+			with open(audio_path, "rb") as audio_file:
+				transcript = await openai_client.audio.transcriptions.create(
+					model="whisper-1",
+					file=audio_file,
+					language='zh'
+				)
+				transcribed_text = transcript.text
+			return [{"role": "user", "content": transcribed_text}]
+		except Exception as e:
+			raise RuntimeError(e)
+		finally:
+			if os.path.exists(audio_path):
+				os.remove(audio_path)
 	
 	def rollback(self, n=1):
 		'''
@@ -301,16 +283,3 @@ class Chat:
 		jt = Path(fpath).read_text(encoding="utf8")
 		self._messages.add_many(*jsonLoads(jt))
 		return True
-	
-	def transcribe_audio(self, file_path):
-		wav_path = file_path.replace('.ogg', '.wav')
-		try:
-			# 将音频文件转换为适合Whisper模型的格式（如wav）
-			audio = AudioSegment.from_file(file_path)
-			audio.export(wav_path, format='wav')
-			whisper_model = whisper.load_model('small')
-			result = whisper_model.transcribe(wav_path,language='zh')
-			return result['text']
-		finally:
-			# 删除临时wav文件
-			os.remove(wav_path)

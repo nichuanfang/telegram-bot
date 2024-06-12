@@ -1,5 +1,0 @@
-numpy
-tqdm
-more-itertools
-transformers
-ffmpeg-python

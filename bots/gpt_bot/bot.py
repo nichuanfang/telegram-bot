@@ -188,14 +188,12 @@ async def handle_audio(update, context):
 		file_path = os.path.join(f"{file_id}.ogg")
 		await new_file.download_to_drive(file_path)
 		try:
-			return chat.transcribe_audio(file_path)
+			return {
+				'type': 'audio',
+				'audio_path': file_path
+			}
 		except Exception as e:
 			raise ValueError(e)
-		finally:
-			# 删除临时文件
-			if os.path.exists(file_path):
-				os.remove(file_path)
-				print(f"临时文件已删除: {file_path}")
 
 
 async def handle_video(update, context):
@@ -257,8 +255,13 @@ async def handle_exception(update, context, e, flag_key):
 		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
 		chat.clear_messages()
 	else:
-		await update.message.reply_text(f'Failed to get an answer from the model: \n\n{e}')
-
+		match = re.search(r"message': '(.+?) \(request id:", str(e))
+		if match:
+			clean_message = match.group(1)
+			await update.message.reply_text(f'Failed to get an answer from the model: \n\n{clean_message}', reply_to_message_id=update.message.message_id)
+		else:
+			await update.message.reply_text(f'Failed to get an answer from the model: \n\n{e}', reply_to_message_id=update.message.message_id)
+		
 
 async def balance_handler(update: Update, context: CallbackContext):
 	flag_key = update.message.message_id
