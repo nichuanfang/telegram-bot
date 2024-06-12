@@ -9,5 +9,3 @@ lxml==5.2.2
 tmdbv3api==1.9.0
 aligo==6.2.4
 openai==1.30.3
-pydub~=0.25.1
-openai-whisper==20231117
