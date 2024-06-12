@@ -44,14 +44,13 @@
     "mask": [
       {
         "role": "system",
-        "content": "你是一个图像生成专家。你可以根据用户的描述生成高质量的图像。"
+        "content": "你是一个图像生成专家。你可以根据用户的描述生成高质量的图像"
       }
     ],
     "supported_models": [
-      "dall-e-2",
       "dall-e-3"
     ],
-    "default_model": "dall-e-2"
+    "default_model": "dall-e-3"
   },
   "travel_guide": {
     "name": "旅游助手",

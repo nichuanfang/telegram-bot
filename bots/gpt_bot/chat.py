@@ -162,13 +162,26 @@ class Chat:
 		messages = await self._prepare_messages(content, openai_client)
 		assert messages
 		
-		completion = await openai_client.chat.completions.create(**{
-			**kwargs,
-			"messages":  (kwargs.get('messages', None) or []) + list(self._messages + messages),
-			"stream": False
-		}
-		                                                         )
-		answer: str = completion.choices[0].message.content
+		if kwargs.get('model') == "dall-e-3":
+			# 需要生成图像
+			generate_res = await openai_client.images.generate(**{
+				"prompt": content,
+				"model": kwargs.get('model'),
+				"quality": "standard",
+				"size": "1024x1792"
+			})
+			answer = {
+				'caption': generate_res.data[0].revised_prompt,
+				'url': generate_res.data[0].url
+			}
+		else:
+			completion = await openai_client.chat.completions.create(**{
+				**kwargs,
+				"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+				"stream": False
+			}
+			                                                         )
+			answer: str = completion.choices[0].message.content
 		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 		return answer
 	
