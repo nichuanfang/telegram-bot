@@ -40,7 +40,7 @@ OPENAI_COMPLETION_OPTIONS = {
 
 with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
 	masks = json.load(masks_file)
-	pass
+
 
 async def start(update: Update, context: CallbackContext) -> None:
 	start_message = (
@@ -205,17 +205,24 @@ async def handle_stream_response(update, context, content):
 
 async def handle_response(update, context, content, flag_key):
 	res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
-	context.user_data[flag_key] = False
-	if len(res) < 4096:
-		await update.message.reply_text(bot_util.escape_markdown_v2(res),
-		                                reply_to_message_id=update.message.message_id,
-		                                parse_mode=ParseMode.MARKDOWN_V2)
+	if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
+		# 将res的url下载 返回一个图片
+		img_response = requests.get(res['url'])
+		if img_response.content:
+			await update.message.reply_photo(photo=img_response.content, caption=res['caption'],reply_to_message_id=update.effective_message.message_id)
+			pass
 	else:
-		parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
-		for part in parts:
-			await update.message.reply_text(bot_util.escape_markdown_v2(part),
+		context.user_data[flag_key] = False
+		if len(res) < 4096:
+			await update.message.reply_text(bot_util.escape_markdown_v2(res),
 			                                reply_to_message_id=update.message.message_id,
 			                                parse_mode=ParseMode.MARKDOWN_V2)
+		else:
+			parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
+			for part in parts:
+				await update.message.reply_text(bot_util.escape_markdown_v2(part),
+				                                reply_to_message_id=update.message.message_id,
+				                                parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def handle_exception(update, context, e, flag_key):
