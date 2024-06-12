@@ -187,7 +187,6 @@ async def handle_stream_response(update, context, content):
 	sent_message = await update.message.reply_text('Loading...', reply_to_message_id=update.message.message_id)
 	message_id = sent_message.message_id
 	total_answer = ''
-	
 	async for res in chat.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
 		buffer += res
 		if len(buffer) >= buffer_limit:
@@ -205,14 +204,13 @@ async def handle_stream_response(update, context, content):
 
 async def handle_response(update, context, content, flag_key):
 	res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
+	context.user_data[flag_key] = False
 	if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
 		# 将res的url下载 返回一个图片
 		img_response = requests.get(res['url'])
 		if img_response.content:
 			await update.message.reply_photo(photo=img_response.content, caption=res['caption'],reply_to_message_id=update.effective_message.message_id)
-			pass
 	else:
-		context.user_data[flag_key] = False
 		if len(res) < 4096:
 			await update.message.reply_text(bot_util.escape_markdown_v2(res),
 			                                reply_to_message_id=update.message.message_id,
