@@ -308,7 +308,7 @@ class Chat:
 			# 将音频文件转换为适合Whisper模型的格式（如wav）
 			audio = AudioSegment.from_file(file_path)
 			audio.export(wav_path, format='wav')
-			whisper_model = whisper.load_model('small')
+			whisper_model = whisper.load_model('small',device='cpu')
 			result = whisper_model.transcribe(wav_path,language='zh')
 			return result['text']
 		finally:
