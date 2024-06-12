@@ -209,18 +209,15 @@ async def handle_response(update, context, content, flag_key):
 		# 将res的url下载 返回一个图片
 		img_response = requests.get(res['url'])
 		if img_response.content:
-			await update.message.reply_photo(photo=img_response.content, caption=res['caption'],reply_to_message_id=update.effective_message.message_id)
+			await update.message.reply_photo(photo=img_response.content, caption=res['caption'],
+			                                 reply_to_message_id=update.effective_message.message_id)
 	else:
 		if len(res) < 4096:
-			await update.message.reply_text(bot_util.escape_markdown_v2(res),
-			                                reply_to_message_id=update.message.message_id,
-			                                parse_mode=ParseMode.MARKDOWN_V2)
+			await bot_util.send_message(update, res)
 		else:
 			parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
 			for part in parts:
-				await update.message.reply_text(bot_util.escape_markdown_v2(part),
-				                                reply_to_message_id=update.message.message_id,
-				                                parse_mode=ParseMode.MARKDOWN_V2)
+				await bot_util.send_message(update, part)
 
 
 async def handle_exception(update, context, e, flag_key):
