@@ -1,3 +1,4 @@
+import asyncio
 import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
@@ -99,8 +100,11 @@ class Temque:
 		return que
 	
 	def drop_last(self):
-		# 移除最后一个元素
-		self.core.pop()
+		try:
+			# 移除最后一个元素
+			self.core.pop()
+		except:
+			pass
 	
 	def clear(self):
 		"""清空队列中的所有元素"""
@@ -143,7 +147,13 @@ class Chat:
 		if http_client: kwargs["http_client"] = http_client
 		
 		self.reset_api_key(api_key)
-		openai.api_key = api_key
+		# 历史消息摘要阈值
+		self.summary_message_threshold = kwargs.get('summary_message_threshold')
+		# 确保只有一个请求处理历史消息
+		self.summary_lock = asyncio.Lock()
+		# openai客户端封装
+		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
+		                                 max_retries=openai.DEFAULT_MAX_RETRIES)
 		self._kwargs = kwargs
 		self._request_kwargs = {'model': model}
 		self._messages = Temque(maxlen=msg_max_count)
@@ -154,46 +164,50 @@ class Chat:
 		else:
 			self._akpool = AKPool([api_key])
 	
+	async def summary_message(self, answer: str):
+		if len(answer) > self.summary_message_threshold:
+			response = await self.openai_client.chat.completions.create(**{
+				"messages": [{"role": "user", "content": f"Summarize the following text:\n\n{answer}"}],
+				"model": "gpt-3.5-turbo-0125",
+				"stream": False,
+				"max_tokens": 100,
+				"temperature": 0.5
+			})
+			return response.choices[0].message.content.strip()
+		return answer
+	
 	async def async_request(self, content: Union[str, List, Dict] = None, **kwargs) -> str:
-		self.recently_request_data = {
-			'api_key': (api_key := self._akpool.fetch_key()),
-		}
-		openai_client = AsyncOpenAI(api_key=api_key, **self._kwargs)
-		messages = await self._prepare_messages(content, openai_client)
+		messages = await self._prepare_messages(content, self.openai_client)
 		assert messages
-		
 		if kwargs.get('model') == "dall-e-3":
 			# 需要生成图像
-			generate_res = await openai_client.images.generate(**{
+			generate_res = await self.openai_client.images.generate(**{
 				"prompt": content,
 				"model": kwargs.get('model'),
-				"quality": "standard",
-				"size": "1024x1792"
+				"style": "natural",
+				"quality": "hd",
+				"size": "1024x1024"
 			})
-			answer = {
-				'caption': generate_res.data[0].revised_prompt,
-				'url': generate_res.data[0].url
-			}
+			answer = generate_res.data[0].url
+			yield answer
 		else:
-			completion = await openai_client.chat.completions.create(**{
+			completion = await self.openai_client.chat.completions.create(**{
 				**kwargs,
 				"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
 				"stream": False
-			}
-			                                                         )
+			})
 			answer: str = completion.choices[0].message.content
-		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
-		return answer
+			yield answer
+			async with self.summary_lock:
+				# 对符合长度阈值的历史消息进行摘要
+				summary_answer = await self.summary_message(answer)
+				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def async_stream_request(self, content: Union[str, List, Dict] = None, **kwargs) -> AsyncGenerator[str, None]:
-		self.recently_request_data = {
-			'api_key': (api_key := self._akpool.fetch_key()),
-		}
-		openai_client = AsyncOpenAI(api_key=api_key, **self._kwargs)
-		messages = await self._prepare_messages(content, openai_client)
+		messages = await self._prepare_messages(content, self.openai_client)
 		assert messages
 		
-		completion = await openai_client.chat.completions.create(**{
+		completion = await self.openai_client.chat.completions.create(**{
 			**kwargs,
 			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
 			"stream": True,

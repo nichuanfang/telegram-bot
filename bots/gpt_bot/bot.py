@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-import requests
+import httpx
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -29,7 +29,7 @@ DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=10)
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=5, summary_message_threshold=500)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
@@ -128,8 +128,9 @@ async def handle_photo(update, context, max_length):
 	
 	photo = update.message.photo[-2]
 	photo_file = await context.bot.get_file(photo.file_id)
-	response = requests.get(photo_file.file_path)
-	image_data = response.content
+	async with httpx.AsyncClient() as client:
+		photo_response = await client.get(photo_file.file_path)
+	image_data = photo_response.content
 	if image_data:
 		encoded_image = base64.b64encode(image_data).decode("utf-8")
 		content.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{encoded_image}'}})
@@ -141,7 +142,8 @@ async def handle_photo(update, context, max_length):
 async def handle_document(update, context, max_length):
 	document = update.message.document
 	file = await context.bot.get_file(document.file_id)
-	response = requests.get(file.file_path)
+	async with httpx.AsyncClient() as client:
+		response = await client.get(file.file_path)
 	document_text = response.text
 	content = f'```{document.mime_type}\n{document_text}\n```\n'
 	
@@ -203,21 +205,25 @@ async def handle_stream_response(update, context, content):
 
 
 async def handle_response(update, context, content, flag_key):
-	res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
-	context.user_data[flag_key] = False
-	if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
-		# 将res的url下载 返回一个图片
-		img_response = requests.get(res['url'])
-		if img_response.content:
-			await update.message.reply_photo(photo=img_response.content, caption=res['caption'],
-			                                 reply_to_message_id=update.effective_message.message_id)
-	else:
-		if len(res) < 4096:
-			await bot_util.send_message(update, res)
+	async for res in chat.async_request(content, **OPENAI_COMPLETION_OPTIONS):
+		if res is None or len(res) == 0:
+			pass
+		# res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
+		context.user_data[flag_key] = False
+		if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
+			async with httpx.AsyncClient() as client:
+				# 将res的url下载 返回一个图片
+				img_response = await client.get(res)
+			if img_response.content:
+				await update.message.reply_photo(photo=img_response.content,
+				                                 reply_to_message_id=update.effective_message.message_id)
 		else:
-			parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
-			for part in parts:
-				await bot_util.send_message(update, part)
+			if len(res) < 4096:
+				await bot_util.send_message(update, res)
+			else:
+				parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
+				for part in parts:
+					await bot_util.send_message(update, part)
 
 
 async def handle_exception(update, context, e, flag_key):
