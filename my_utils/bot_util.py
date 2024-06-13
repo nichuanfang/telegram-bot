@@ -30,6 +30,15 @@ async def send_message(update: Update, text):
 		await update.message.reply_text(text, reply_to_message_id=update.message.message_id)
 
 
+async def edit_message(update: Update, context: CallbackContext, message_id, text):
+	try:
+		escaped_text = escape_markdown_v2(text)  # 转义特殊字符
+		await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id, message_id=message_id,
+		                                    parse_mode=ParseMode.MARKDOWN_V2)
+	except:
+		await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
+
+
 def escape_markdown_v2(text: str) -> str:
 	"""
 	Escape special characters for Telegram MarkdownV2 and replace every pair of consecutive asterisks (**) with a single asterisk (*).
