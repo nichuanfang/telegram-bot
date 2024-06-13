@@ -187,9 +187,9 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
+					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
+					"stream": False,
 					**kwargs,
-					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-					"stream": False
 				})
 				answer: str = completion.choices[0].message.content
 				yield answer
@@ -200,7 +200,7 @@ class Chat:
 				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def async_stream_request(self, content: Union[str, List, Dict] = None, summary_lock=None, **kwargs) -> \
-	AsyncGenerator[str, None]:
+			AsyncGenerator[str, None]:
 		messages = await self._prepare_messages(content, self.openai_client)
 		assert messages, summary_lock
 		
@@ -218,14 +218,14 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
-					**kwargs,
-					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
 					"stream": True,
+					**kwargs
 				})
 				answer: str = ""
-				async for chunk in completion:
-					if chunk.choices and (content := chunk.choices[0].delta.content):
-						answer += content
+				async for chunk_iter in completion:
+					if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
+						answer += chunk
 						yield 'not_finished', answer
 				yield 'finished', answer
 			# 对符合长度阈值的历史消息进行摘要

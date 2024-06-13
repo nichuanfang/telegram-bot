@@ -5,6 +5,7 @@ import os
 import re
 
 import httpx
+import openai
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -35,7 +36,8 @@ OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
-	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
+	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
+	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN
 }
 
 with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
@@ -208,8 +210,6 @@ async def handle_stream_response(update, context, content):
 		else:
 			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 				continue
-			if len(curr_answer) > 4096:
-				init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
 			await bot_util.edit_message(update, context, init_message.message_id, curr_answer)
 			await asyncio.sleep(0.1)
 			prev_answer = curr_answer
