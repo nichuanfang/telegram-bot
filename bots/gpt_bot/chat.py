@@ -57,8 +57,8 @@ class Temque:
 			dc = len(core) - self.maxlen
 			indexes = []
 			for i, x in enumerate(core):
-				if not x["pin"]:
-					indexes.append(i)
+				# if not x["pin"]:
+				indexes.append(i)
 				if len(indexes) == dc:
 					break
 			for i in indexes[::-1]:
@@ -66,7 +66,7 @@ class Temque:
 	
 	def add_many(self, *objs):
 		for x in objs:
-			self.core.append({"obj": x, "pin": False})
+			self.core.append({"obj": x})
 		self._trim()
 	
 	def __iter__(self):
@@ -187,9 +187,9 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
-					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
+					"messages": kwargs.pop('messages', []) + list(self._messages + messages),
 					"stream": False,
-					**kwargs,
+					**kwargs
 				})
 				answer: str = completion.choices[0].message.content
 				yield answer
@@ -218,7 +218,7 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
-					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
+					"messages": kwargs.pop('messages', []) + list(self._messages + messages),
 					"stream": True,
 					**kwargs
 				})
