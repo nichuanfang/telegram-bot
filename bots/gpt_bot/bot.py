@@ -244,6 +244,10 @@ async def handle_exception(update, context, e, flag_key):
 		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
 		                                reply_to_message_id=update.message.message_id)
 		await chat.clear_messages(context.user_data['summary_lock'])
+	if 'content_filter' in str(e):
+		await update.message.reply_text("The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!",
+		                                reply_to_message_id=update.message.message_id)
+		await chat.clear_messages(context.user_data['summary_lock'])
 	elif '504 Gateway Time-out' in str(e):
 		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
 		await chat.clear_messages(context.user_data['summary_lock'])
