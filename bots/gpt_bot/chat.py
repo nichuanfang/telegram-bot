@@ -1,4 +1,3 @@
-import asyncio
 import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
@@ -100,11 +99,9 @@ class Temque:
 		return que
 	
 	def drop_last(self):
-		try:
+		if len(self.core) > 0:
 			# 移除最后一个元素
 			self.core.pop()
-		except:
-			pass
 	
 	def clear(self):
 		"""清空队列中的所有元素"""
@@ -149,8 +146,6 @@ class Chat:
 		self.reset_api_key(api_key)
 		# 历史消息摘要阈值
 		self.summary_message_threshold = kwargs.get('summary_message_threshold')
-		# 确保只有一个请求处理历史消息
-		self.summary_lock = asyncio.Lock()
 		# openai客户端封装
 		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
 		                                 max_retries=openai.DEFAULT_MAX_RETRIES)
@@ -176,9 +171,9 @@ class Chat:
 			return response.choices[0].message.content.strip()
 		return answer
 	
-	async def async_request(self, content: Union[str, List, Dict] = None, **kwargs) -> str:
+	async def async_request(self, content: Union[str, List, Dict] = None, summary_lock=None, **kwargs) -> str:
 		messages = await self._prepare_messages(content, self.openai_client)
-		assert messages
+		assert messages and summary_lock
 		if kwargs.get('model') == "dall-e-3":
 			# 需要生成图像
 			generate_res = await self.openai_client.images.generate(**{
@@ -191,16 +186,18 @@ class Chat:
 			answer = generate_res.data[0].url
 			yield answer
 		else:
-			completion = await self.openai_client.chat.completions.create(**{
-				**kwargs,
-				"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-				"stream": False
-			})
-			answer: str = completion.choices[0].message.content
-			yield answer
-			async with self.summary_lock:
-				# 对符合长度阈值的历史消息进行摘要
-				summary_answer = await self.summary_message(answer)
+			async with summary_lock:
+				completion = await self.openai_client.chat.completions.create(**{
+					**kwargs,
+					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+					"stream": False
+				})
+				answer: str = completion.choices[0].message.content
+				yield answer
+			
+			# 对符合长度阈值的历史消息进行摘要
+			summary_answer = await self.summary_message(answer)
+			async with summary_lock:
 				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def async_stream_request(self, content: Union[str, List, Dict] = None, **kwargs) -> AsyncGenerator[str, None]:
@@ -261,27 +258,28 @@ class Chat:
 		'''
 		self._messages.unpin(*indexes)
 	
-	def fetch_messages(self):
-		return list(self._messages)
+	async def fetch_messages(self, summary_lock):
+		async with summary_lock:
+			return list(self._messages)
 	
-	def drop_last_message(self):
-		try:
+	async def drop_last_message(self, summary_lock):
+		async with summary_lock:
 			self._messages.drop_last()
-		except:
-			pass
 	
-	def clear_messages(self):
+	async def clear_messages(self, summary_lock):
 		"""
 		清空历史消息
 		"""
-		self._messages.clear()
+		async with summary_lock:
+			self._messages.clear()
 	
-	def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
+	async def add_dialogs(self, summary_lock, *ms: dict | system_msg | user_msg | assistant_msg):
 		'''
 		添加历史对话
 		'''
 		messages = [dict(x) for x in ms]
-		self._messages.add_many(*messages)
+		async with summary_lock:
+			self._messages.add_many(*messages)
 	
 	def __getattr__(self, name):
 		match name:  # 兼容旧代码
@@ -299,14 +297,16 @@ class Chat:
 				return self._load
 		raise AttributeError(name)
 	
-	def _dump(self, fpath: str):
+	async def _dump(self, fpath: str, summary_lock):
 		""" 存档 """
-		jt = jsonDumps(self.fetch_messages(), ensure_ascii=False)
+		messages = await self.fetch_messages(summary_lock)
+		jt = jsonDumps(messages, ensure_ascii=False)
 		Path(fpath).write_text(jt, encoding="utf8")
 		return True
 	
-	def _load(self, fpath: str):
+	async def _load(self, fpath: str, summary_lock):
 		""" 载入存档 """
 		jt = Path(fpath).read_text(encoding="utf8")
-		self._messages.add_many(*jsonLoads(jt))
+		async with summary_lock:
+			self._messages.add_many(*jsonLoads(jt))
 		return True
