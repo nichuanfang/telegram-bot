@@ -103,7 +103,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		OPENAI_COMPLETION_OPTIONS['model'] = current_model
 		
 		# 设置用户级别历史消息摘要锁
-		if not context.user_data.__contains__('summary_lock'):
+		if 'summary_lock' not in context.user_data:
 			context.user_data['summary_lock'] = asyncio.Lock()
 		
 		if ENABLE_STREAM:
@@ -282,6 +282,8 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 清空历史消息
+	if 'summary_lock' not in context.user_data:
+		context.user_data['summary_lock'] = asyncio.Lock()
 	await chat.clear_messages(context.user_data['summary_lock'])
 	await update.message.reply_text('上下文已清除')
 
@@ -350,6 +352,8 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
+	if 'summary_lock' not in context.user_data:
+		context.user_data['summary_lock'] = asyncio.Lock()
 	# 切换面具后清除上下文
 	await chat.clear_messages(context.user_data['summary_lock'])
 
@@ -411,6 +415,8 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
+	if 'summary_lock' not in context.user_data:
+		context.user_data['summary_lock'] = asyncio.Lock()
 	# 切换模型后清除上下文
 	await chat.clear_messages(context.user_data['summary_lock'])
 
