@@ -102,6 +102,10 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		# 设置模型
 		OPENAI_COMPLETION_OPTIONS['model'] = current_model
 		
+		# 设置用户级别历史消息摘要锁
+		if not context.user_data.__contains__('summary_lock'):
+			context.user_data['summary_lock'] = asyncio.Lock()
+		
 		if ENABLE_STREAM:
 			await handle_stream_response(update, context, content)
 		else:
@@ -205,7 +209,7 @@ async def handle_stream_response(update, context, content):
 
 
 async def handle_response(update, context, content, flag_key):
-	async for res in chat.async_request(content, **OPENAI_COMPLETION_OPTIONS):
+	async for res in chat.async_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			pass
 		context.user_data[flag_key] = False
@@ -230,10 +234,10 @@ async def handle_exception(update, context, e, flag_key):
 	if 'at byte offset' in str(e):
 		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
 		                                reply_to_message_id=update.message.message_id)
-		await chat.clear_messages()
+		await chat.clear_messages(context.user_data['summary_lock'])
 	elif '504 Gateway Time-out' in str(e):
 		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
-		await chat.clear_messages()
+		await chat.clear_messages(context.user_data['summary_lock'])
 	else:
 		match = re.search(r"message': '(.+?) \(request id:", str(e))
 		if match:
@@ -243,6 +247,7 @@ async def handle_exception(update, context, e, flag_key):
 		else:
 			await update.message.reply_text(f'Failed to get an answer from the model: \n\n{e}',
 			                                reply_to_message_id=update.message.message_id)
+		await chat.drop_last_message(context.user_data['summary_lock'])
 
 
 async def balance_handler(update: Update, context: CallbackContext):
@@ -277,7 +282,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 清空历史消息
-	await chat.clear_messages()
+	await chat.clear_messages(context.user_data['summary_lock'])
 	await update.message.reply_text('上下文已清除')
 
 
@@ -346,7 +351,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
 	# 切换面具后清除上下文
-	await chat.clear_messages()
+	await chat.clear_messages(context.user_data['summary_lock'])
 
 
 # 生成模型选择键盘
@@ -407,7 +412,7 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
 	# 切换模型后清除上下文
-	await chat.clear_messages()
+	await chat.clear_messages(context.user_data['summary_lock'])
 
 
 def handlers():
