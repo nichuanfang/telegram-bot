@@ -191,16 +191,18 @@ class Chat:
 			answer = generate_res.data[0].url
 			yield answer
 		else:
-			completion = await self.openai_client.chat.completions.create(**{
-				**kwargs,
-				"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-				"stream": False
-			})
-			answer: str = completion.choices[0].message.content
-			yield answer
 			async with self.summary_lock:
-				# 对符合长度阈值的历史消息进行摘要
-				summary_answer = await self.summary_message(answer)
+				completion = await self.openai_client.chat.completions.create(**{
+					**kwargs,
+					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+					"stream": False
+				})
+				answer: str = completion.choices[0].message.content
+				yield answer
+			
+			# 对符合长度阈值的历史消息进行摘要
+			summary_answer = await self.summary_message(answer)
+			async with self.summary_lock:
 				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def async_stream_request(self, content: Union[str, List, Dict] = None, **kwargs) -> AsyncGenerator[str, None]:
@@ -261,8 +263,9 @@ class Chat:
 		'''
 		self._messages.unpin(*indexes)
 	
-	def fetch_messages(self):
-		return list(self._messages)
+	async def fetch_messages(self):
+		async with self.summary_lock:
+			return list(self._messages)
 	
 	async def drop_last_message(self):
 		try:
@@ -302,14 +305,16 @@ class Chat:
 				return self._load
 		raise AttributeError(name)
 	
-	def _dump(self, fpath: str):
+	async def _dump(self, fpath: str):
 		""" 存档 """
-		jt = jsonDumps(self.fetch_messages(), ensure_ascii=False)
+		messages = await self.fetch_messages()
+		jt = jsonDumps(messages, ensure_ascii=False)
 		Path(fpath).write_text(jt, encoding="utf8")
 		return True
 	
-	def _load(self, fpath: str):
+	async def _load(self, fpath: str):
 		""" 载入存档 """
 		jt = Path(fpath).read_text(encoding="utf8")
-		self._messages.add_many(*jsonLoads(jt))
+		async with self.summary_lock:
+			self._messages.add_many(*jsonLoads(jt))
 		return True
