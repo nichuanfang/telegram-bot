@@ -37,7 +37,8 @@ OPENAI_COMPLETION_OPTIONS = {
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
-	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN
+	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN,
+	"timeout": httpx.Timeout(timeout=120)
 }
 
 with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
