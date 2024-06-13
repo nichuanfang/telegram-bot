@@ -187,9 +187,9 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
+					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
+					"stream": False,
 					**kwargs,
-					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-					"stream": False
 				})
 				answer: str = completion.choices[0].message.content
 				yield answer
@@ -218,9 +218,9 @@ class Chat:
 		else:
 			async with summary_lock:
 				completion = await self.openai_client.chat.completions.create(**{
-					**kwargs,
-					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+					"messages": kwargs.pop('messages', []) + self._messages.core + messages,
 					"stream": True,
+					**kwargs
 				})
 				answer: str = ""
 				async for chunk_iter in completion:
