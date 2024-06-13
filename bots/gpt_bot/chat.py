@@ -283,7 +283,8 @@ class Chat:
 		添加历史对话
 		'''
 		messages = [dict(x) for x in ms]
-		self._messages.add_many(*messages)
+		async with self.summary_lock:
+			self._messages.add_many(*messages)
 	
 	def __getattr__(self, name):
 		match name:  # 兼容旧代码
