@@ -165,7 +165,6 @@ class Chat:
 				"messages": [{"role": "user", "content": f"Summarize the following text:\n\n{answer}"}],
 				"model": "gpt-3.5-turbo-0125",
 				"stream": False,
-				"max_tokens": 100,
 				"temperature": 0.5
 			})
 			return response.choices[0].message.content.strip()

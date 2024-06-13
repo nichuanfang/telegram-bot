@@ -47,6 +47,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 		"欢迎使用！以下是您可以使用的命令列表：\n"
 		"  /clear - 清除聊天\n"
 		"  /masks - 切换面具\n"
+		"  /model - 切换模型\n"
 		"  /balance - 余额查询\n\n"
 		"如需进一步帮助，请随时输入相应的命令。"
 	)
@@ -211,7 +212,7 @@ async def handle_stream_response(update, context, content):
 async def handle_response(update, context, content, flag_key):
 	async for res in chat.async_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
-			pass
+			continue
 		context.user_data[flag_key] = False
 		if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
 			async with httpx.AsyncClient() as client:
