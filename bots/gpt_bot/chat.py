@@ -266,7 +266,8 @@ class Chat:
 	
 	def drop_last_message(self):
 		try:
-			self._messages.drop_last()
+			async with self.summary_lock:
+				self._messages.drop_last()
 		except:
 			pass
 	
@@ -274,7 +275,8 @@ class Chat:
 		"""
 		清空历史消息
 		"""
-		self._messages.clear()
+		async with self.summary_lock:
+			self._messages.clear()
 	
 	def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
 		'''
