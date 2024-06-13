@@ -199,21 +199,39 @@ class Chat:
 			async with summary_lock:
 				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
-	async def async_stream_request(self, content: Union[str, List, Dict] = None, **kwargs) -> AsyncGenerator[str, None]:
+	async def async_stream_request(self, content: Union[str, List, Dict] = None, summary_lock=None, **kwargs) -> \
+	AsyncGenerator[str, None]:
 		messages = await self._prepare_messages(content, self.openai_client)
-		assert messages
+		assert messages, summary_lock
 		
-		completion = await self.openai_client.chat.completions.create(**{
-			**kwargs,
-			"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
-			"stream": True,
-		})
-		answer: str = ""
-		async for chunk in completion:
-			if chunk.choices and (content := chunk.choices[0].delta.content):
-				answer += content
-				yield content
-		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
+		if kwargs.get('model') == "dall-e-3":
+			# 需要生成图像
+			generate_res = await self.openai_client.images.generate(**{
+				"prompt": content,
+				"model": kwargs.get('model'),
+				"style": "natural",
+				"quality": "hd",
+				"size": "1024x1024"
+			})
+			answer = generate_res.data[0].url
+			yield 'finished', answer
+		else:
+			async with summary_lock:
+				completion = await self.openai_client.chat.completions.create(**{
+					**kwargs,
+					"messages": (kwargs.get('messages', None) or []) + list(self._messages + messages),
+					"stream": True,
+				})
+				answer: str = ""
+				async for chunk in completion:
+					if chunk.choices and (content := chunk.choices[0].delta.content):
+						answer += content
+						yield 'not_finished', answer
+				yield 'finished', answer
+			# 对符合长度阈值的历史消息进行摘要
+			summary_answer = await self.summary_message(answer)
+			async with summary_lock:
+				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: Any) -> List[Dict[str, str]]:
 		if isinstance(content, dict) and content.get('type') == "audio":

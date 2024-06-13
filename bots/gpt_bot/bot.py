@@ -76,11 +76,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
-	
-	flag_key = update.message.message_id
-	context.user_data[flag_key] = True
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
-	
+	flag_key = None
+	typing_task = None
 	max_length = 4096
 	try:
 		if update.message.photo:
@@ -110,12 +107,16 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		if ENABLE_STREAM:
 			await handle_stream_response(update, context, content)
 		else:
+			flag_key = update.message.message_id
+			context.user_data[flag_key] = True
+			typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 			await handle_response(update, context, content, flag_key)
 	
 	except Exception as e:
 		await handle_exception(update, context, e, flag_key)
 	finally:
-		await typing_task
+		if typing_task:
+			await typing_task
 
 
 async def handle_photo(update, context, max_length):
@@ -189,24 +190,29 @@ async def handle_text(update, max_length):
 
 
 async def handle_stream_response(update, context, content):
-	buffer = ''
-	buffer_limit = 100
-	sent_message = await update.message.reply_text('Loading...', reply_to_message_id=update.message.message_id)
-	message_id = sent_message.message_id
-	total_answer = ''
-	async for res in chat.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
-		buffer += res
-		if len(buffer) >= buffer_limit:
-			total_answer += buffer
-			await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-			                                    text=bot_util.escape_markdown_v2(total_answer),
-			                                    parse_mode=ParseMode.MARKDOWN_V2)
-			buffer = ''
-	if buffer:
-		total_answer += buffer
-		await context.bot.edit_message_text(chat_id=update.effective_chat.id, message_id=message_id,
-		                                    text=bot_util.escape_markdown_v2(total_answer),
-		                                    parse_mode=ParseMode.MARKDOWN_V2)
+	prev_answer = ''
+	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
+	if is_image_generator:
+		init_message = await update.message.reply_text('正在生成图片，请稍候...', reply_to_message_id=update.message.message_id)
+	else:
+		init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
+	async for item in chat.async_stream_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
+		status, curr_answer = item
+		if is_image_generator:
+			async with httpx.AsyncClient() as client:
+				img_response = await client.get(curr_answer)
+			if img_response.content:
+				await bot_util.edit_message(update, context, init_message.message_id, '图片生成成功! 正在发送...')
+				# 发送新的图片消息
+				await update.message.reply_photo(photo=img_response.content, reply_to_message_id=update.effective_message.message_id)
+		else:
+			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
+				continue
+			if len(curr_answer) > 4096:
+				init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
+			await bot_util.edit_message(update, context, init_message.message_id, curr_answer)
+			await asyncio.sleep(0.01)
+			prev_answer = curr_answer
 
 
 async def handle_response(update, context, content, flag_key):
@@ -231,7 +237,8 @@ async def handle_response(update, context, content, flag_key):
 
 
 async def handle_exception(update, context, e, flag_key):
-	context.user_data[flag_key] = False
+	if flag_key:
+		context.user_data[flag_key] = False
 	if 'at byte offset' in str(e):
 		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
 		                                reply_to_message_id=update.message.message_id)
