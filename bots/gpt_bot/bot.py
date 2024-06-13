@@ -208,8 +208,6 @@ async def handle_stream_response(update, context, content):
 		else:
 			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 				continue
-			if len(curr_answer) > 4096:
-				init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
 			await bot_util.edit_message(update, context, init_message.message_id, curr_answer)
 			await asyncio.sleep(0.1)
 			prev_answer = curr_answer

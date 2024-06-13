@@ -1,9 +1,15 @@
 import asyncio
 import re
+import uuid
 
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
+
+
+async def uuid_generator():
+	while True:
+		yield uuid.uuid4().__str__()
 
 
 async def coroutine_wrapper(normal_function, *args, **kwargs):
@@ -23,11 +29,11 @@ async def send_typing_action(update: Update, context: CallbackContext, flag_key)
 async def send_message(update: Update, text):
 	try:
 		escaped_text = escape_markdown_v2(text)  # 转义特殊字符
-		await update.message.reply_text(escaped_text,
-		                                reply_to_message_id=update.message.message_id,
-		                                parse_mode=ParseMode.MARKDOWN_V2)
+		return await update.message.reply_text(escaped_text,
+		                                       reply_to_message_id=update.message.message_id,
+		                                       parse_mode=ParseMode.MARKDOWN_V2)
 	except:
-		await update.message.reply_text(text, reply_to_message_id=update.message.message_id)
+		return await update.message.reply_text(text, reply_to_message_id=update.message.message_id)
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, text):
