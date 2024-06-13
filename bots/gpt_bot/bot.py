@@ -208,7 +208,6 @@ async def handle_response(update, context, content, flag_key):
 	async for res in chat.async_request(content, **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			pass
-		# res = await chat.async_request(content, **OPENAI_COMPLETION_OPTIONS)
 		context.user_data[flag_key] = False
 		if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
 			async with httpx.AsyncClient() as client:
@@ -231,10 +230,10 @@ async def handle_exception(update, context, e, flag_key):
 	if 'at byte offset' in str(e):
 		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
 		                                reply_to_message_id=update.message.message_id)
-		chat.clear_messages()
+		await chat.clear_messages()
 	elif '504 Gateway Time-out' in str(e):
 		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
-		chat.clear_messages()
+		await chat.clear_messages()
 	else:
 		match = re.search(r"message': '(.+?) \(request id:", str(e))
 		if match:
@@ -278,7 +277,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 清空历史消息
-	chat.clear_messages()
+	await chat.clear_messages()
 	await update.message.reply_text('上下文已清除')
 
 
@@ -347,7 +346,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
 	# 切换面具后清除上下文
-	chat.clear_messages()
+	await chat.clear_messages()
 
 
 # 生成模型选择键盘
@@ -408,7 +407,7 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		parse_mode=ParseMode.MARKDOWN_V2
 	)
 	# 切换模型后清除上下文
-	chat.clear_messages()
+	await chat.clear_messages()
 
 
 def handlers():

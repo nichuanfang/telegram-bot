@@ -264,21 +264,21 @@ class Chat:
 	def fetch_messages(self):
 		return list(self._messages)
 	
-	def drop_last_message(self):
+	async def drop_last_message(self):
 		try:
 			async with self.summary_lock:
 				self._messages.drop_last()
 		except:
 			pass
 	
-	def clear_messages(self):
+	async def clear_messages(self):
 		"""
 		清空历史消息
 		"""
 		async with self.summary_lock:
 			self._messages.clear()
 	
-	def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
+	async def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
 		'''
 		添加历史对话
 		'''
