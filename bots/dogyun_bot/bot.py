@@ -76,7 +76,6 @@ async def draw_lottery(update: Update, context: CallbackContext):
 	"""抽奖
 
 	Args:
-		message (_type_): _description_
 	"""
 	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
@@ -189,14 +188,12 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 	"""备份bitwarden
 
 	Args:
-		message (_type_): _description_
 	"""
 	script = 'curl -s https://raw.githubusercontent.com/nichuanfang/config-server/master/linux/bash/step2/vps/backup_bitwarden.sh | bash'
 	# try:
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
 	#                          vps_config["VPS_USER"], vps_config["VPS_PASS"])
 	# except:
-	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
 	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
@@ -223,7 +220,6 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	"""执行bash脚本
 
 	Args:
-		message (_type_): _description_
 	"""
 	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
@@ -249,7 +245,6 @@ async def exec_cmd(update: Update, context: CallbackContext):
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
 	#                          vps_config["VPS_USER"], vps_config["VPS_PASS"])
 	# except:
-	#     gpt_bot.reply_to(message, f'无法连接到服务器{vps_config["VPS_HOST"]}')
 	#     return
 	try:
 		await asyncio.gather(
