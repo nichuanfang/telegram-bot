@@ -4,7 +4,6 @@ from json import loads as jsonLoads
 from pathlib import Path
 from typing import List, Literal, Union, Dict, Any, AsyncGenerator
 
-import openai
 from openai import AsyncOpenAI
 
 
@@ -148,9 +147,9 @@ class Chat:
 		self.summary_message_threshold = kwargs.get('summary_message_threshold')
 		# openai客户端封装
 		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
-		                                 max_retries=openai.DEFAULT_MAX_RETRIES)
-		self._kwargs = kwargs
-		self._request_kwargs = {'model': model}
+		                                 max_retries=max_retries)
+		# self._kwargs = kwargs
+		# self._request_kwargs = {'model': model}
 		self._messages = Temque(maxlen=msg_max_count)
 	
 	def reset_api_key(self, api_key: str | AKPool):

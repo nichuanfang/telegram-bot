@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import re
+import traceback
 
 import httpx
 import openai
@@ -29,17 +30,18 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].spli
 DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
-# 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, msg_max_count=5, summary_message_threshold=500)
 
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
-	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN,
-	"timeout": httpx.Timeout(timeout=300)
+	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN,  # 最大token
 }
+
+# 初始化 Chat 实例
+chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=openai.DEFAULT_MAX_RETRIES,
+            timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5, summary_message_threshold=500)
 
 with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
 	masks = json.load(masks_file)
@@ -79,6 +81,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
+	# 设置用户级别历史消息摘要锁
+	if 'summary_lock' not in context.user_data:
+		context.user_data['summary_lock'] = asyncio.Lock()
 	flag_key = None
 	typing_task = None
 	max_length = 4096
@@ -102,10 +107,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		current_model = context.user_data.get('current_model', curr_mask['default_model'])
 		# 设置模型
 		OPENAI_COMPLETION_OPTIONS['model'] = current_model
-		
-		# 设置用户级别历史消息摘要锁
-		if 'summary_lock' not in context.user_data:
-			context.user_data['summary_lock'] = asyncio.Lock()
 		
 		if ENABLE_STREAM:
 			await handle_stream_response(update, context, content)
@@ -196,10 +197,12 @@ async def handle_stream_response(update, context, content):
 	prev_answer = ''
 	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
 	if is_image_generator:
-		init_message = await update.message.reply_text('正在生成图片，请稍候...', reply_to_message_id=update.message.message_id)
+		init_message = await update.message.reply_text('正在生成图片，请稍候...',
+		                                               reply_to_message_id=update.message.message_id)
 	else:
 		init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
-	async for item in chat.async_stream_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
+	async for item in chat.async_stream_request(content, context.user_data['summary_lock'],
+	                                            **OPENAI_COMPLETION_OPTIONS):
 		status, curr_answer = item
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
@@ -207,7 +210,8 @@ async def handle_stream_response(update, context, content):
 			if img_response.content:
 				await bot_util.edit_message(update, context, init_message.message_id, '图片生成成功! 正在发送...')
 				# 发送新的图片消息
-				await update.message.reply_photo(photo=img_response.content, reply_to_message_id=update.effective_message.message_id)
+				await update.message.reply_photo(photo=img_response.content,
+				                                 reply_to_message_id=update.effective_message.message_id)
 		else:
 			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 				continue
@@ -238,29 +242,40 @@ async def handle_response(update, context, content, flag_key):
 
 
 async def handle_exception(update, context, e, flag_key):
+	
+	logger.error(f"==================================================ERROR START==================================================================")
+	# 记录异常信息
+	logger.error(f"Exception occurred: {e}")
+	traceback.print_exc()
+	logger.error(f"==================================================ERROR END====================================================================")
+	
 	if flag_key:
 		context.user_data[flag_key] = False
-	if 'at byte offset' in str(e):
-		await update.message.reply_text('缺少结束标记! 请使用文本文件解析!',
+		logger.info(f"Flag {flag_key} set to False")
+	
+	error_message = str(e)
+	
+	if 'at byte offset' in error_message:
+		await update.message.reply_text('缺少结束标记!',
 		                                reply_to_message_id=update.message.message_id)
-		await chat.clear_messages(context.user_data['summary_lock'])
-	if 'content_filter' in str(e):
-		await update.message.reply_text("The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!",
-		                                reply_to_message_id=update.message.message_id)
-		await chat.clear_messages(context.user_data['summary_lock'])
-	elif '504 Gateway Time-out' in str(e):
-		await update.message.reply_text('网关超时!请减小文本或文件大小再进行尝试!')
-		await chat.clear_messages(context.user_data['summary_lock'])
+	elif 'content_filter' in error_message:
+		await update.message.reply_text(
+			"The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!",
+			reply_to_message_id=update.message.message_id)
+	elif '504 Gateway Time-out' in error_message:
+		await update.message.reply_text('网关超时')
 	else:
-		match = re.search(r"message': '(.+?) \(request id:", str(e))
+		match = re.search(r"message': '(.+?) \(request id:", error_message)
 		if match:
 			clean_message = match.group(1)
-			await update.message.reply_text(f'Failed to get an answer from the model: \n\n{clean_message}',
+			await update.message.reply_text(f'Exception occurred:: \n\n{clean_message}',
 			                                reply_to_message_id=update.message.message_id)
 		else:
-			await update.message.reply_text(f'Failed to get an answer from the model: \n\n{e}',
+			await update.message.reply_text(f'Exception occurred: \n\n{e}',
 			                                reply_to_message_id=update.message.message_id)
-		await chat.drop_last_message(context.user_data['summary_lock'])
+	
+	# 清理消息
+	await chat.clear_messages(context.user_data['summary_lock'])
 
 
 async def balance_handler(update: Update, context: CallbackContext):
