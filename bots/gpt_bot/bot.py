@@ -213,14 +213,14 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 			async with httpx.AsyncClient() as client:
 				img_response = await client.get(curr_answer)
 			if img_response.content:
-				await bot_util.edit_message(update, context, init_message.message_id, '图片生成成功! 正在发送...')
+				await bot_util.edit_message(update, context, init_message.message_id, True, '图片生成成功! 正在发送...')
 				# 发送新的图片消息
 				await update.message.reply_photo(photo=img_response.content,
 				                                 reply_to_message_id=update.effective_message.message_id)
 		else:
 			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 				continue
-			await bot_util.edit_message(update, context, init_message.message_id, curr_answer)
+			await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', curr_answer)
 			await asyncio.sleep(0.1)
 			prev_answer = curr_answer
 
@@ -278,7 +278,7 @@ async def handle_exception(update, context, e, init_message, flag_key):
 
 async def exception_message_handler(update, context, init_message, text):
 	if init_message:
-		await bot_util.edit_message(update, context, init_message.message_id, text)
+		await bot_util.edit_message(update, context, init_message.message_id, True, text)
 	else:
 		await bot_util.send_message(update, text)
 
