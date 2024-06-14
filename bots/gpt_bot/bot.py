@@ -314,12 +314,13 @@ async def clear_handler(update: Update, context: CallbackContext):
 		update: 更新
 		context:  上下文对象
 	"""
+	await update.message.reply_text('上下文已清除')
 	# 清空历史消息
 	user_data = context.user_data
 	if 'summary_lock' not in user_data:
 		user_data['summary_lock'] = asyncio.Lock()
 	await chat.clear_messages(user_data['summary_lock'])
-	await update.message.reply_text('上下文已清除')
+	
 
 
 def generate_mask_keyboard(masks, current_mask_key):
