@@ -107,14 +107,20 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		current_model = context.user_data.get('current_model', curr_mask['default_model'])
 		# 设置模型
 		OPENAI_COMPLETION_OPTIONS['model'] = current_model
-		
+		is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
 		if ENABLE_STREAM:
-			await handle_stream_response(update, context, content)
+			if is_image_generator:
+				init_message = await update.message.reply_text('正在生成图片，请稍候...',
+				                                               reply_to_message_id=update.message.message_id)
+			else:
+				init_message = await update.message.reply_text('正在输入...',
+				                                               reply_to_message_id=update.message.message_id)
+			await handle_stream_response(update, context, content, is_image_generator, init_message)
 		else:
 			flag_key = update.message.message_id
 			context.user_data[flag_key] = True
 			typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
-			await handle_response(update, context, content, flag_key)
+			await handle_response(update, context, content, is_image_generator, flag_key)
 	
 	except Exception as e:
 		await handle_exception(update, context, e, flag_key)
@@ -193,14 +199,8 @@ async def handle_text(update, max_length):
 	return content_text
 
 
-async def handle_stream_response(update, context, content):
+async def handle_stream_response(update, context, content, is_image_generator, init_message):
 	prev_answer = ''
-	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
-	if is_image_generator:
-		init_message = await update.message.reply_text('正在生成图片，请稍候...',
-		                                               reply_to_message_id=update.message.message_id)
-	else:
-		init_message = await update.message.reply_text('正在输入...', reply_to_message_id=update.message.message_id)
 	async for item in chat.async_stream_request(content, context.user_data['summary_lock'],
 	                                            **OPENAI_COMPLETION_OPTIONS):
 		status, curr_answer = item
@@ -220,12 +220,12 @@ async def handle_stream_response(update, context, content):
 			prev_answer = curr_answer
 
 
-async def handle_response(update, context, content, flag_key):
+async def handle_response(update, context, content, is_image_generator, flag_key):
 	async for res in chat.async_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			continue
 		context.user_data[flag_key] = False
-		if context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手':
+		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				# 将res的url下载 返回一个图片
 				img_response = await client.get(res)
@@ -242,12 +242,13 @@ async def handle_response(update, context, content, flag_key):
 
 
 async def handle_exception(update, context, e, flag_key):
-	
-	logger.error(f"==================================================ERROR START==================================================================")
+	logger.error(
+		f"==================================================ERROR START==================================================================")
 	# 记录异常信息
 	logger.error(f"Exception occurred: {e}")
 	traceback.print_exc()
-	logger.error(f"==================================================ERROR END====================================================================")
+	logger.error(
+		f"==================================================ERROR END====================================================================")
 	
 	if flag_key:
 		context.user_data[flag_key] = False
