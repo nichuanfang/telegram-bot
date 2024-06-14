@@ -311,9 +311,10 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 清空历史消息
-	if 'summary_lock' not in context.user_data:
-		context.user_data['summary_lock'] = asyncio.Lock()
-	await chat.clear_messages(context.user_data['summary_lock'])
+	user_data = context.user_data
+	if 'summary_lock' not in user_data:
+		user_data['summary_lock'] = asyncio.Lock()
+	await chat.clear_messages(user_data['summary_lock'])
 	await update.message.reply_text('上下文已清除')
 
 
