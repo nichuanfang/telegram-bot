@@ -4,7 +4,7 @@
     "mask": [],
     "supported_models": [
       "gpt-3.5-turbo-0125",
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
     "default_model": "gpt-3.5-turbo-0125"
   },
@@ -17,9 +17,9 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   },
   "image_analyzer": {
     "name": "图像解析助手",
@@ -30,9 +30,9 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   },
   "image_generator": {
     "name": "图像生成助手",
@@ -56,9 +56,9 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   },
   "song_recommender": {
     "name": "歌曲推荐人",
@@ -69,9 +69,9 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   },
   "movie_expert": {
     "name": "电影专家",
@@ -82,9 +82,9 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   },
   "doctor": {
     "name": "医生",
@@ -95,8 +95,8 @@
       }
     ],
     "supported_models": [
-      "gpt-4o-2024-05-13"
+      "gpt-4o"
     ],
-    "default_model": "gpt-4o-2024-05-13"
+    "default_model": "gpt-4o"
   }
 }
