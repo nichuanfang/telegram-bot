@@ -1,18 +1,12 @@
 # Telegram机器人项目
 
 ---
-**内容目录**：
-- [Dogyun机器人](#DogyunBot)
-  - [功能](#features)
-- [GithubWorkflow机器人](#GithubWorkflowBot)
-    - [功能](#features)
-- [Tmdb机器人](#TmdbBot)
-    - [功能](#features)
-- [去水印机器人](#WatermarkRemoveBot)
-    - [功能](#features)
-- [Chatgpt机器人](#DogyunBot)
-    - [功能](#features)
-
+**内容目录**
+- [DogyunBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
+- [GithubWorkflowBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
+- [TmdbBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
+- [WatermarkRemoveBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fwatermarkremovebot)
+- [GBTBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8FGBTBot)
 
 ## ❤️[DogyunBot](https://t.me/DogyunBot)
 
@@ -73,3 +67,33 @@
 <p align="center">
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjl5Y3BvaDJieWV0cHZnY3JsdjV3ejN1a2MxeGtvbHJ6eWRtdzh3byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dXToQVoruFywwmjCrm/giphy.gif" />
 </p>
+
+## 🔥[GPTBot](https://t.me/ncf_chatgpt_bot)
+
+Chatgpt聊天机器人telegram端! 强大的AI工具~
+
+### 🌈Features
+
+- [x] 流式响应和非流式响应都支持.默认采用流式响应
+- [x] 支持切换模型功能.不同的面具具备不同的模型选择列表和默认模型
+- [x] 支持面具切换功能.自带有八个面具: 
+  - 通用助手
+  - 代码助手
+  - 图像解析助手
+  - 图像生成助手
+  - 旅游助手
+  - 歌曲推荐人
+  - 电影专家
+  - 医生
+- [x] 清除聊天上下文功能,可以开启新的会话
+- [x] 余额查询
+- [x] 自动对过长的历史消息进行摘要
+- [x] 可以分析图像内容和使用DALL-E-3模型生成图片
+- [ ] 更多内容开发中...
+
+<p align="center">
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdDl1NzVrc2p1dzMyN2xsYzZhc251bnNlcmRoNGQ4MHE3NjA4cmkxNCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/dgdzvaPcW0g9GYicen/giphy.gif" />
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3BjcDNxMzRwMWQ1eGk0bHk3bTh0MTU3MHM3cmw5MTllYTg1bjh4OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/euKdZ5seD4tmDRlG8E/giphy.gif" />
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnZoeXYyZWtrYjJpeGI0azB1d3M2amk3c3AzZnl2MTJqOHM0MDFsayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/17g3e0IUCekPQgGJoj/giphy.gif" />
+</p>
+
