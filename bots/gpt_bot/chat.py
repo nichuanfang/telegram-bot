@@ -286,6 +286,8 @@ class Chat:
 		"""
 		清空历史消息
 		"""
+		if len(self._messages.core) == 0:
+			return
 		async with summary_lock:
 			self._messages.clear()
 	
