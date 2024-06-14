@@ -2,11 +2,11 @@
 
 ---
 **内容目录**
-- [DogyunBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
-- [GithubWorkflowBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
-- [TmdbBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
-- [WatermarkRemoveBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fwatermarkremovebot)
-- [GBTBot](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8FGBTBot)
+- [Dogyun机器人⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
+- [Github工作流机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
+- [Tmdb机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
+- [去水印机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fwatermarkremovebot)
+- [Chatgpt聊天机器人⭐⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#gptbot)
 
 ## ❤️[DogyunBot](https://t.me/DogyunBot)
 
