@@ -36,11 +36,16 @@ async def send_message(update: Update, text):
 		return await update.message.reply_text(text, reply_to_message_id=update.message.message_id)
 
 
-async def edit_message(update: Update, context: CallbackContext, message_id, text):
+async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
 	try:
-		escaped_text = escape_markdown_v2(text)  # 转义特殊字符
-		await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id, message_id=message_id,
-		                                    parse_mode=ParseMode.MARKDOWN_V2)
+		# 等流式响应完全结束再尝试markdown格式 加快速度
+		if stream_ended:
+			escaped_text = escape_markdown_v2(text)  # 转义特殊字符
+			await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
+			                                    message_id=message_id,
+			                                    parse_mode=ParseMode.MARKDOWN_V2)
+		else:
+			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
 	except:
 		await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
 
