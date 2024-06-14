@@ -419,6 +419,7 @@ async def model_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	# 获取当前的面具
+	
 	current_mask = context.user_data.get('current_mask', masks['common'])
 	# 获取当前选择的模型
 	current_model = context.user_data.get('current_model', current_mask['default_model'])
