@@ -81,15 +81,29 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not auth(user_id):
 		await update.message.reply_text('You are not authorized to use this bot.')
 		return
+	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
+	if ENABLE_STREAM:
+		if is_image_generator:
+			init_message = await update.message.reply_text('正在生成图片，请稍候...',
+			                                               reply_to_message_id=update.message.message_id)
+		else:
+			init_message = await update.message.reply_text('正在输入...',
+			                                               reply_to_message_id=update.message.message_id)
+	else:
+		init_message = None
 	# 设置用户级别历史消息摘要锁
 	if 'summary_lock' not in context.user_data:
 		context.user_data['summary_lock'] = asyncio.Lock()
+	#  跟非流式响应的typing...相关
 	flag_key = None
+	# typing...任务
 	typing_task = None
-	init_message = None
+	# 输入的最大长度
 	max_length = 4096
 	try:
-		if update.message.photo:
+		if update.message.text:
+			content = await handle_text(update, max_length)
+		elif update.message.photo:
 			content = await handle_photo(update, context, max_length)
 		elif update.message.document:
 			content = await handle_document(update, context, max_length)
@@ -98,24 +112,14 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		elif update.message.video:
 			content = await handle_video(update, context)
 		else:
-			content = await handle_text(update, max_length)
-		
+			raise ValueError('不支持的输入类型!')
 		# 获取面具
 		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
 		# 设置面具内容
 		OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
-		# 选择模型
-		current_model = context.user_data.get('current_model', curr_mask['default_model'])
 		# 设置模型
-		OPENAI_COMPLETION_OPTIONS['model'] = current_model
-		is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
+		OPENAI_COMPLETION_OPTIONS['model'] = context.user_data.get('current_model', curr_mask['default_model'])
 		if ENABLE_STREAM:
-			if is_image_generator:
-				init_message = await update.message.reply_text('正在生成图片，请稍候...',
-				                                               reply_to_message_id=update.message.message_id)
-			else:
-				init_message = await update.message.reply_text('正在输入...',
-				                                               reply_to_message_id=update.message.message_id)
 			await handle_stream_response(update, context, content, is_image_generator, init_message)
 		else:
 			flag_key = update.message.message_id
