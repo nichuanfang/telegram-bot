@@ -86,6 +86,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		context.user_data['summary_lock'] = asyncio.Lock()
 	flag_key = None
 	typing_task = None
+	init_message = None
 	max_length = 4096
 	try:
 		if update.message.photo:
@@ -123,7 +124,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			await handle_response(update, context, content, is_image_generator, flag_key)
 	
 	except Exception as e:
-		await handle_exception(update, context, e, flag_key)
+		await handle_exception(update, context, e, init_message, flag_key)
 	finally:
 		if typing_task:
 			await typing_task
@@ -241,7 +242,7 @@ async def handle_response(update, context, content, is_image_generator, flag_key
 					await bot_util.send_message(update, part)
 
 
-async def handle_exception(update, context, e, flag_key):
+async def handle_exception(update, context, e, init_message, flag_key):
 	logger.error(
 		f"==================================================ERROR START==================================================================")
 	# 记录异常信息
@@ -249,34 +250,33 @@ async def handle_exception(update, context, e, flag_key):
 	traceback.print_exc()
 	logger.error(
 		f"==================================================ERROR END====================================================================")
-	
 	if flag_key:
 		context.user_data[flag_key] = False
-		logger.info(f"Flag {flag_key} set to False")
-	
 	error_message = str(e)
-	
 	if 'at byte offset' in error_message:
-		await update.message.reply_text('缺少结束标记!',
-		                                reply_to_message_id=update.message.message_id)
+		await exception_message_handler(update, context, init_message, '缺少结束标记!')
 	elif 'content_filter' in error_message:
-		await update.message.reply_text(
-			"The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!",
-			reply_to_message_id=update.message.message_id)
+		await exception_message_handler(update, context, init_message,
+		                                "The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!")
 	elif '504 Gateway Time-out' in error_message:
-		await update.message.reply_text('网关超时')
+		await exception_message_handler(update, context, init_message, '网关超时!')
 	else:
 		match = re.search(r"message': '(.+?) \(request id:", error_message)
 		if match:
 			clean_message = match.group(1)
-			await update.message.reply_text(f'Exception occurred:: \n\n{clean_message}',
-			                                reply_to_message_id=update.message.message_id)
+			text = f'Exception occurred:: \n\n{clean_message}'
 		else:
-			await update.message.reply_text(f'Exception occurred: \n\n{e}',
-			                                reply_to_message_id=update.message.message_id)
-	
+			text = f'Exception occurred: \n\n{e}'
+		await exception_message_handler(update, context, init_message, text)
 	# 清理消息
 	await chat.clear_messages(context.user_data['summary_lock'])
+
+
+async def exception_message_handler(update, context, init_message, text):
+	if init_message:
+		await bot_util.edit_message(update, context, init_message.message_id, text)
+	else:
+		await bot_util.send_message(update, text)
 
 
 async def balance_handler(update: Update, context: CallbackContext):

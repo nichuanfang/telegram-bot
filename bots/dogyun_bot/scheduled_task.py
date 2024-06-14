@@ -11,15 +11,16 @@ from my_utils.validation_util import validate
 # 获取日志
 logger = my_logging.get_logger('dogyun_bot')
 
-values = validate('DOGYUN_BOT_SERVER_ID', 'DOGYUN_BOT_CSRF_TOKEN', 'DOGYUN_BOT_COOKIE','DOGYUN_BOT_CHAT_ID')
+values = validate('DOGYUN_BOT_SERVER_ID', 'DOGYUN_BOT_CSRF_TOKEN', 'DOGYUN_BOT_COOKIE', 'DOGYUN_BOT_CHAT_ID')
 
 DOGYUN_BOT_SERVER_ID = values[0]
 DOGYUN_BOT_CSRF_TOKEN = values[1]
 DOGYUN_BOT_COOKIE = values[2]
 DOGYUN_BOT_CHAT_ID = values[3]
 
+
 # 每月7号
-async def get_traffic_packet(bot:Bot):
+async def get_traffic_packet(bot: Bot):
 	"""自动领取流量包
 	"""
 	url = f'https://cvm.dogyun.com/traffic/package/level'
@@ -34,7 +35,7 @@ async def get_traffic_packet(bot:Bot):
 		response = requests.post(url, headers=headers, verify=True)
 		if response.url == 'https://account.dogyun.com/login':
 			# tg通知dogyun cookie已过期
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,'dogyun cookie已过期,请更新cookie!')
+			await bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
 			return
 		data = response.json()
 	except Exception as e:
@@ -44,7 +45,7 @@ async def get_traffic_packet(bot:Bot):
 	try:
 		result = data['message']
 	except Exception as e:
-		await bot.send_message(DOGYUN_BOT_CHAT_ID,f'领取失败: {e}')
+		await bot.send_message(DOGYUN_BOT_CHAT_ID, f'领取失败: {e}')
 		return
 	# 获取当前时间
 	now = datetime.now()
@@ -57,8 +58,8 @@ async def get_traffic_packet(bot:Bot):
 	# 记录日志
 	logger.info(f'{current_date} {current_time} {result}')
 	# 发送通知
-	await bot.send_message(DOGYUN_BOT_CHAT_ID,f'等级奖励通用流量包: {result}')
-	
+	await bot.send_message(DOGYUN_BOT_CHAT_ID, f'等级奖励通用流量包: {result}')
+
 
 async def lucky_draw_notice(bot: Bot):
 	"""抽奖活动通知
@@ -75,7 +76,7 @@ async def lucky_draw_notice(bot: Bot):
 		response = requests.get(url, headers=headers, verify=True)
 		if response.url == 'https://account.dogyun.com/login':
 			# tg通知dogyun cookie已过期
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,'dogyun cookie已过期,请更新cookie!')
+			await bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
 			return
 	except Exception as e:
 		logger.error(e)
@@ -84,10 +85,9 @@ async def lucky_draw_notice(bot: Bot):
 	try:
 		result = soup.find("strong")
 		if result is not None:
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,f'抽奖活动通知: {soup.find("strong").text}')
+			await bot.send_message(DOGYUN_BOT_CHAT_ID, f'抽奖活动通知: {soup.find("strong").text}')
 			logger.info(f'抽奖活动通知: {soup.find("strong").text}')
 		else:
-			# await bot.send_message(DOGYUN_BOT_CHAT_ID,f'暂无抽奖活动')
 			pass
 	except:
 		# '暂无抽奖活动'
@@ -111,7 +111,7 @@ async def balance_lack_notice(bot: Bot):
 		response = requests.get(url, headers=headers, verify=True)
 		if response.url == 'https://account.dogyun.com/login':
 			# tg通知dogyun cookie已过期
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,'dogyun cookie已过期,请更新cookie!')
+			await bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
 			return
 	except Exception as e:
 		logger.error(e)
@@ -122,7 +122,7 @@ async def balance_lack_notice(bot: Bot):
 		# 根据正则表达式提取数字
 		balance = re.findall(r"\d+\.?\d*", result)[0]
 		if float(balance) < 10:
-			await bot.send_message(DOGYUN_BOT_CHAT_ID,f'余额不足提醒: {balance}元')
+			await bot.send_message(DOGYUN_BOT_CHAT_ID, f'余额不足提醒: {balance}元')
 			logger.info(f'余额不足提醒: {balance}元')
 	except:
 		pass
