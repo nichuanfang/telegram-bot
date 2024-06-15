@@ -279,14 +279,19 @@ class Chat:
 		async with summary_lock:
 			return list(self._messages)
 	
-	async def drop_last_message(self, summary_lock):
-		async with summary_lock:
+	async def drop_last_message(self, context: CallbackContext):
+		if len(self._messages.core) == 0:
+			return
+		
+		async with context.user_data['summary_lock']:
 			self._messages.drop_last()
 	
 	async def recover_messages(self, context: CallbackContext):
 		clear_messages = context.user_data.get('clear_messages', None)
 		if clear_messages:
-			self._messages.core = clear_messages
+			async with context.user_data['summary_lock']:
+				context.user_data['clear_messages'] = None
+				self._messages.core = clear_messages
 	
 	async def clear_messages(self, context: CallbackContext):
 		"""
@@ -296,7 +301,7 @@ class Chat:
 			return
 		user_data = context.user_data
 		async with user_data['summary_lock']:
-			user_data.update('clear_messages', self._messages.core)
+			user_data['clear_messages'] = self._messages.core
 			self._messages.clear()
 	
 	async def add_dialogs(self, summary_lock, *ms: dict | system_msg | user_msg | assistant_msg):

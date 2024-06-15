@@ -263,8 +263,6 @@ async def handle_exception(update, context, e, init_message, flag_key):
 		else:
 			text = f'Exception occurred: \n\n{e}'
 		await exception_message_handler(update, context, init_message, text)
-	# 清理消息
-	await chat.clear_messages(context)
 
 
 async def exception_message_handler(update, context, init_message, text):
