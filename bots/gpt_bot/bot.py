@@ -10,7 +10,7 @@ import openai
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
-from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler
+from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
 from bots.gpt_bot.chat import Chat
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
@@ -227,6 +227,7 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 	current_message_length = 0
 	MAX_MESSAGE_LENGTH = 4096  # 测试用较小的值
 	message_content = ''
+	
 	async for status, curr_answer in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
@@ -246,10 +247,11 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 			current_message_id = new_init_message.message_id
 			current_message_length = 0
 			message_content = ''
-		message_content += new_content
 		if new_content:
-			await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
-			current_message_length += new_content_length
+			message_content += new_content
+			if message_content != prev_answer:
+				await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
+				current_message_length += new_content_length
 		prev_answer = curr_answer
 
 
@@ -347,12 +349,10 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	if 'chat' not in context.user_data:
-		await update.message.reply_text('无需清除上下文!')
 		# 初始化chat
 		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
 		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
 		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5)
-		return
 	# 创建内联按钮
 	keyboard = [
 		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
@@ -539,7 +539,8 @@ def handlers():
 		CallbackQueryHandler(mask_selection_handler,
 		                     pattern='^(common|github_copilot|image_generator|image_analyzer|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
-		CallbackQueryHandler(restore_context_handler, pattern='^restore_context$'),
+		CallbackQueryHandler(restore_context_handler, pattern='^(restore_context)$'),
 		CommandHandler('balance', balance_handler),
-		MessageHandler(filters.ALL & ~filters.COMMAND, answer)
+		MessageHandler(
+			filters.TEXT & ~filters.COMMAND | filters.ATTACHMENT, answer)
 	]
