@@ -39,8 +39,8 @@ OPENAI_COMPLETION_OPTIONS = {
 }
 
 # 初始化 Chat 实例
-chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=openai.DEFAULT_MAX_RETRIES,
-            timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5, summary_message_threshold=500)
+# chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=openai.DEFAULT_MAX_RETRIES,
+#             timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5, summary_message_threshold=500)
 
 with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
 	masks = json.load(masks_file)
@@ -110,6 +110,12 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
 		# 设置模型
 		OPENAI_COMPLETION_OPTIONS['model'] = context.user_data.get('current_model', curr_mask['default_model'])
+		if 'chat' not in context.user_data:
+			# 初始化chat
+			context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
+			                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+			                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+			                                 summary_message_threshold=500)
 		if ENABLE_STREAM:
 			await handle_stream_response(update, context, content, is_image_generator, init_message)
 		else:
@@ -197,7 +203,8 @@ async def handle_text(update, max_length):
 
 async def handle_stream_response(update, context, content, is_image_generator, init_message):
 	prev_answer = ''
-	async for item in chat.async_stream_request(content, context.user_data['summary_lock'],
+	chat: Chat = context.user_data['chat']
+	async for item in chat.async_stream_request(content, context.user_data['summary_lock'], chat.is_free,
 	                                            **OPENAI_COMPLETION_OPTIONS):
 		status, curr_answer = item
 		if is_image_generator:
@@ -217,7 +224,9 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 
 
 async def handle_response(update, context, content, is_image_generator, flag_key):
-	async for res in chat.async_request(content, context.user_data['summary_lock'], **OPENAI_COMPLETION_OPTIONS):
+	chat: Chat = context.user_data['chat']
+	async for res in chat.async_request(content, context.user_data['summary_lock'],
+	                                    **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			continue
 		context.user_data[flag_key] = False
@@ -305,6 +314,14 @@ async def clear_handler(update: Update, context: CallbackContext):
 		update: 更新
 		context:  上下文对象
 	"""
+	if 'chat' not in context.user_data:
+		await update.message.reply_text('无需清除上下文!')
+		# 初始化chat
+		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
+		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+		                                 summary_message_threshold=500)
+		return
 	# 创建内联按钮
 	keyboard = [
 		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
@@ -314,7 +331,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 	user_data = context.user_data
 	if 'summary_lock' not in user_data:
 		user_data['summary_lock'] = asyncio.Lock()
-	await chat.clear_messages(context)
+	await user_data['chat'].clear_messages(context)
 	await update.message.reply_text('上下文已清除', reply_markup=reply_markup)
 
 
@@ -325,7 +342,7 @@ async def restore_context_handler(update: Update, context: CallbackContext):
 	
 	# 检查按钮的回调数据
 	if query.data == 'restore_context':
-		await chat.recover_messages(context)
+		await context.user_data['chat'].recover_messages(context)
 		# 恢复上下文的逻辑
 		await query.edit_message_text(text="上下文已恢复")
 
@@ -397,8 +414,15 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	)
 	if 'summary_lock' not in context.user_data:
 		context.user_data['summary_lock'] = asyncio.Lock()
-	# 切换面具后清除上下文
-	await chat.clear_messages(context)
+	if 'chat' not in context.user_data:
+		# 初始化chat
+		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
+		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+		                                 summary_message_threshold=500)
+	else:
+		# 切换面具后清除上下文
+		await context.user_data['chat'].clear_messages(context)
 
 
 # 生成模型选择键盘
@@ -462,8 +486,15 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 	)
 	if 'summary_lock' not in context.user_data:
 		context.user_data['summary_lock'] = asyncio.Lock()
-	# 切换模型后清除上下文
-	await chat.clear_messages(context)
+	if 'chat' not in context.user_data:
+		# 初始化chat
+		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
+		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+		                                 summary_message_threshold=500)
+	else:
+		# 切换模型后清除上下文
+		await context.user_data['chat'].clear_messages(context)
 
 
 def handlers():

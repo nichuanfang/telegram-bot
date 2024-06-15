@@ -130,6 +130,8 @@ class Chat:
 	             model: Literal['gpt-3.5-turbo-0125', 'gpt-4o-n', 'gpt-4-turbo-2024-04-09'] = "gpt-3.5-turbo-0125",
 	             # Chat
 	             msg_max_count: int = None,
+	             # 是否为免费key
+	             is_free: bool = False,
 	             # kwargs
 	             **kwargs,
 	             ):
@@ -137,7 +139,7 @@ class Chat:
 		base_url = base_url or api_base
 		MsgMaxCount = kwargs.pop('MsgMaxCount', None)
 		msg_max_count = msg_max_count or MsgMaxCount
-		
+		self.is_free = is_free
 		if base_url: kwargs["base_url"] = base_url
 		if timeout: kwargs["timeout"] = timeout
 		if max_retries: kwargs["max_retries"] = max_retries
@@ -193,13 +195,13 @@ class Chat:
 				})
 				answer: str = completion.choices[0].message.content
 				yield answer
-			
 			# 对符合长度阈值的历史消息进行摘要
 			summary_answer = await self.summary_message(answer)
 			async with summary_lock:
 				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
-	async def async_stream_request(self, content: Union[str, List, Dict] = None, summary_lock=None, **kwargs) -> \
+	async def async_stream_request(self, content: Union[str, List, Dict] = None, summary_lock=None, is_free=False,
+	                               **kwargs) -> \
 			AsyncGenerator[str, None]:
 		messages = await self._prepare_messages(content, self.openai_client)
 		assert messages, summary_lock
@@ -228,10 +230,11 @@ class Chat:
 						answer += chunk
 						yield 'not_finished', answer
 				yield 'finished', answer
-			# 对符合长度阈值的历史消息进行摘要
-			summary_answer = await self.summary_message(answer)
-			async with summary_lock:
-				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
+			if not is_free:
+				# 对符合长度阈值的历史消息进行摘要
+				summary_answer = await self.summary_message(answer)
+				async with summary_lock:
+					self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
 	
 	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: Any) -> List[Dict[str, str]]:
 		if isinstance(content, dict) and content.get('type') == "audio":
