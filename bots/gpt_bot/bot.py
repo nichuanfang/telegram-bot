@@ -34,8 +34,7 @@ OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
-	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入,
-	"max_tokens": 4096 if ENABLE_STREAM else openai.NOT_GIVEN,  # 最大token
+	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
 }
 
 # 初始化 Chat 实例
