@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 from my_utils import my_logging, bot_util
+from my_utils.bot_util import auth
 from my_utils.validation_util import validate
 
 # 获取日志
@@ -20,6 +21,7 @@ DOGYUN_BOT_CSRF_TOKEN = values[1]
 DOGYUN_BOT_COOKIE = values[2]
 
 
+@auth
 async def get_server_status(update: Update, context: CallbackContext):
 	"""获取服务器状态
 
@@ -71,7 +73,7 @@ async def get_server_status(update: Update, context: CallbackContext):
 		await typing_task
 
 
-# @gpt_bot.message_handler(commands=['draw_lottery'])
+@auth
 async def draw_lottery(update: Update, context: CallbackContext):
 	"""抽奖
 
@@ -184,6 +186,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			await typing_task
 
 
+@auth
 async def bitwarden_backup(update: Update, context: CallbackContext):
 	"""备份bitwarden
 
@@ -216,6 +219,7 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 		await typing_task
 
 
+@auth
 async def exec_cmd(update: Update, context: CallbackContext):
 	"""执行bash脚本
 

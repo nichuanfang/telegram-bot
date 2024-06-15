@@ -2,6 +2,7 @@ import asyncio
 import multiprocessing
 import os
 import platform
+import traceback
 
 import aiocron
 import dotenv
@@ -38,9 +39,12 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 	"""
 	Handles errors in the telegram-python-bot library.
 	"""
-	
-	if platform.system().lower() == 'windows':
-		logger.error(f'Exception while handling an update: {context.error}')
+	logger.error(
+		f"==================================================ERROR START==================================================================")
+	logger.error(f'Exception while handling an update: {context.error}')
+	traceback.print_exc()
+	logger.error(
+		f"==================================================ERROR END====================================================================")
 
 
 def start_bot(bot_name, token, command_handlers=None):

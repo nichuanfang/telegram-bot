@@ -1,10 +1,43 @@
 import asyncio
+import functools
 import re
 import uuid
 
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
+
+from my_utils.my_logging import get_logger
+from my_utils.validation_util import validate
+
+logger = get_logger('bot_util')
+values = validate('ALLOWED_TELEGRAM_USER_IDS')
+# 允许访问的用户列表 逗号分割并去除空格
+ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in values[0].split(',')]
+
+
+def auth(func):
+	"""
+	自定义授权装饰器
+	Args:
+		func: 需要授权的方法
+
+	Returns:
+
+	"""
+	
+	@functools.wraps(func)
+	async def wrapper(*args, **kwargs):
+		# 获取update和context
+		update: Update = args[0]
+		user_id = update.effective_user.id
+		if str(user_id) not in ALLOWED_TELEGRAM_USER_IDS:
+			logger.warn(f'user {user_id} has been filtered!')
+			await update.message.reply_text('You are not authorized to use this bot.')
+			return
+		await func(*args, **kwargs)
+	
+	return wrapper
 
 
 async def uuid_generator():

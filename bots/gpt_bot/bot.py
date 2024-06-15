@@ -15,17 +15,16 @@ from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext,
 from bots.gpt_bot.chat import Chat
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
 from my_utils import my_logging, validation_util, bot_util
+from my_utils.bot_util import auth
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
 
-require_vars = validation_util.validate('OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ALLOWED_TELEGRAM_USER_IDS')
+require_vars = validation_util.validate('OPENAI_API_KEY', 'OPENAI_BASE_URL')
 # openai 的密钥
 OPENAI_API_KEY = require_vars[0]
 # 代理url
 OPENAI_BASE_URL = require_vars[1]
-# 允许访问的用户列表 逗号分割并去除空格
-ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in require_vars[2].split(',')]
 # 默认面具
 DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
 # 是否启用流式传输 默认不采用
@@ -59,11 +58,6 @@ async def start(update: Update, context: CallbackContext) -> None:
 	await update.message.reply_text(start_message)
 
 
-# 授权
-def auth(user_id: str) -> bool:
-	return str(user_id) in ALLOWED_TELEGRAM_USER_IDS
-
-
 def compress_question(question):
 	# 去除多余的空格和换行符
 	question = re.sub(r'\s+', ' ', question).strip()
@@ -76,11 +70,8 @@ def compress_question(question):
 	return compressed_question
 
 
+@auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-	user_id = update.effective_user.id
-	if not auth(user_id):
-		await update.message.reply_text('You are not authorized to use this bot.')
-		return
 	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
 	if ENABLE_STREAM:
 		if is_image_generator:
@@ -273,7 +264,7 @@ async def handle_exception(update, context, e, init_message, flag_key):
 			text = f'Exception occurred: \n\n{e}'
 		await exception_message_handler(update, context, init_message, text)
 	# 清理消息
-	await chat.clear_messages(context.user_data['summary_lock'])
+	await chat.clear_messages(context)
 
 
 async def exception_message_handler(update, context, init_message, text):
@@ -283,6 +274,7 @@ async def exception_message_handler(update, context, init_message, text):
 		await bot_util.send_message(update, text)
 
 
+@auth
 async def balance_handler(update: Update, context: CallbackContext):
 	flag_key = update.message.message_id
 	# 启动一个异步任务来发送 typing 状态
@@ -307,6 +299,7 @@ async def balance_handler(update: Update, context: CallbackContext):
 		await typing_task
 
 
+@auth
 async def clear_handler(update: Update, context: CallbackContext):
 	"""
 	清除上下文
@@ -314,13 +307,29 @@ async def clear_handler(update: Update, context: CallbackContext):
 		update: 更新
 		context:  上下文对象
 	"""
-	await update.message.reply_text('上下文已清除')
+	# 创建内联按钮
+	keyboard = [
+		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
+	]
+	reply_markup = InlineKeyboardMarkup(keyboard)
 	# 清空历史消息
 	user_data = context.user_data
 	if 'summary_lock' not in user_data:
 		user_data['summary_lock'] = asyncio.Lock()
-	await chat.clear_messages(user_data['summary_lock'])
+	await chat.clear_messages(context)
+	await update.message.reply_text('上下文已清除', reply_markup=reply_markup)
+
+
+# 处理按钮点击事件
+async def restore_context_handler(update: Update, context: CallbackContext):
+	query = update.callback_query
+	await query.answer()
 	
+	# 检查按钮的回调数据
+	if query.data == 'restore_context':
+		await chat.recover_messages(context)
+		# 恢复上下文的逻辑
+		await query.edit_message_text(text="上下文已恢复")
 
 
 def generate_mask_keyboard(masks, current_mask_key):
@@ -340,6 +349,7 @@ def generate_mask_keyboard(masks, current_mask_key):
 	return InlineKeyboardMarkup(keyboard)
 
 
+@auth
 async def masks_handler(update: Update, context: CallbackContext):
 	"""
 	切换面具处理器
@@ -390,7 +400,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	if 'summary_lock' not in context.user_data:
 		context.user_data['summary_lock'] = asyncio.Lock()
 	# 切换面具后清除上下文
-	await chat.clear_messages(context.user_data['summary_lock'])
+	await chat.clear_messages(context)
 
 
 # 生成模型选择键盘
@@ -411,6 +421,7 @@ def generate_model_keyboard(models, current_model):
 	return InlineKeyboardMarkup(keyboard)
 
 
+@auth
 async def model_handler(update: Update, context: CallbackContext):
 	"""
 	切换模型处理器
@@ -454,7 +465,7 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 	if 'summary_lock' not in context.user_data:
 		context.user_data['summary_lock'] = asyncio.Lock()
 	# 切换模型后清除上下文
-	await chat.clear_messages(context.user_data['summary_lock'])
+	await chat.clear_messages(context)
 
 
 def handlers():
@@ -466,6 +477,7 @@ def handlers():
 		CallbackQueryHandler(mask_selection_handler,
 		                     pattern='^(common|github_copilot|image_generator|image_analyzer|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
+		CallbackQueryHandler(restore_context_handler, pattern='^restore_context$'),
 		CommandHandler('balance', balance_handler),
 		MessageHandler(filters.ALL & ~filters.COMMAND, answer)
 	]
