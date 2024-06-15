@@ -1,8 +1,9 @@
+import asyncio
 import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
 from pathlib import Path
-from typing import List, Literal, Union, Dict, Any, AsyncGenerator
+from typing import List, Literal, Union, Dict, AsyncGenerator
 
 from openai import AsyncOpenAI
 from telegram.ext import CallbackContext
@@ -147,7 +148,7 @@ class Chat:
 		
 		self.reset_api_key(api_key)
 		# 历史消息摘要阈值
-		self.summary_message_threshold = kwargs.get('summary_message_threshold')
+		# self.summary_message_threshold = kwargs.get('summary_message_threshold')
 		# openai客户端封装
 		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
 		                                 max_retries=max_retries)
@@ -161,24 +162,13 @@ class Chat:
 		else:
 			self._akpool = AKPool([api_key])
 	
-	async def summary_message(self, answer: str):
-		if len(answer) > self.summary_message_threshold:
-			response = await self.openai_client.chat.completions.create(**{
-				"messages": [{"role": "user", "content": f"Summarize the following text:\n\n{answer}"}],
-				"model": "gpt-3.5-turbo-0125",
-				"stream": False,
-				"temperature": 0.5
-			})
-			return response.choices[0].message.content.strip()
-		return answer
-	
-	async def async_request(self, content: Union[str, List, Dict] = None, summary_lock=None, **kwargs) -> str:
-		messages = await self._prepare_messages(content, self.openai_client)
-		assert messages and summary_lock
+	async def async_request(self, content: Union[str, List, Dict] = None, **kwargs) -> str:
+		messages_task = asyncio.create_task(self._prepare_messages(content, self.openai_client))
 		if kwargs.get('model') == "dall-e-3":
+			messages = await messages_task
 			# 需要生成图像
 			generate_res = await self.openai_client.images.generate(**{
-				"prompt": content,
+				"prompt": messages[0]['content'],
 				"model": kwargs.get('model'),
 				"style": "natural",
 				"quality": "hd",
@@ -187,29 +177,24 @@ class Chat:
 			answer = generate_res.data[0].url
 			yield answer
 		else:
-			async with summary_lock:
-				completion = await self.openai_client.chat.completions.create(**{
-					"messages": kwargs.pop('messages', []) + list(self._messages + messages),
-					"stream": False,
-					**kwargs
-				})
-				answer: str = completion.choices[0].message.content
-				yield answer
-			# 对符合长度阈值的历史消息进行摘要
-			summary_answer = await self.summary_message(answer)
-			async with summary_lock:
-				self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
+			messages = await messages_task
+			completion = await self.openai_client.chat.completions.create(**{
+				"messages": kwargs.pop('messages', []) + list(self._messages + messages),
+				"stream": False,
+				**kwargs
+			})
+			answer: str = completion.choices[0].message.content
+			yield answer
+			self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 	
-	async def async_stream_request(self, content: Union[str, List, Dict] = None, summary_lock=None, is_free=False,
-	                               **kwargs) -> \
-			AsyncGenerator[str, None]:
-		messages = await self._prepare_messages(content, self.openai_client)
-		assert messages, summary_lock
-		
+	async def async_stream_request(self, content: Union[str, List, Dict] = None, is_free=False,
+	                               **kwargs) -> AsyncGenerator[str, None]:
+		messages_task = asyncio.create_task(self._prepare_messages(content, self.openai_client))
 		if kwargs.get('model') == "dall-e-3":
+			messages = await messages_task
 			# 需要生成图像
 			generate_res = await self.openai_client.images.generate(**{
-				"prompt": content,
+				"prompt": messages[0]['content'],
 				"model": kwargs.get('model'),
 				"style": "natural",
 				"quality": "hd",
@@ -218,35 +203,33 @@ class Chat:
 			answer = generate_res.data[0].url
 			yield 'finished', answer
 		else:
-			async with summary_lock:
-				completion = await self.openai_client.chat.completions.create(**{
-					"messages": kwargs.pop('messages', []) + list(self._messages + messages),
-					"stream": True,
-					**kwargs
-				})
-				answer: str = ""
-				async for chunk_iter in completion:
-					if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
-						answer += chunk
-						yield 'not_finished', answer
-				yield 'finished', answer
+			messages = await messages_task
+			completion = await self.openai_client.chat.completions.create(**{
+				"messages": kwargs.pop('messages', []) + list(self._messages + messages),
+				"stream": True,
+				**kwargs
+			})
+			answer: str = ""
+			async for chunk_iter in completion:
+				if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
+					answer += chunk
+					yield 'not_finished', answer
+			yield 'finished', answer
 			if not is_free:
-				# 对符合长度阈值的历史消息进行摘要
-				summary_answer = await self.summary_message(answer)
-				async with summary_lock:
-					self._messages.add_many(*messages, {"role": "assistant", "content": summary_answer})
+				self._messages.add_many(*messages, {"role": "assistant", "content": answer})
 	
-	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: Any) -> List[Dict[str, str]]:
+	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: AsyncOpenAI) -> List[
+		Dict[str, str]]:
 		if isinstance(content, dict) and content.get('type') == "audio":
 			return await self._handle_audio_content(content['audio_path'], openai_client)
 		return [{"role": "user", "content": content}]
 	
-	async def _handle_audio_content(self, audio_path: str, openai_client: Any) -> List[Dict[str, str]]:
+	async def _handle_audio_content(self, audio_path: str, openai_client: AsyncOpenAI) -> List[Dict[str, str]]:
 		try:
 			with open(audio_path, "rb") as audio_file:
 				transcript = await openai_client.audio.transcriptions.create(
-					model="whisper-1",
 					file=audio_file,
+					model='whisper-1',
 					language='zh'
 				)
 				transcribed_text = transcript.text
@@ -278,42 +261,39 @@ class Chat:
 		'''
 		self._messages.unpin(*indexes)
 	
-	async def fetch_messages(self, summary_lock):
-		async with summary_lock:
-			return list(self._messages)
+	def fetch_messages(self):
+		return list(self._messages)
 	
-	async def drop_last_message(self, context: CallbackContext):
+	def drop_last_message(self):
 		if len(self._messages.core) == 0:
 			return
-		
-		async with context.user_data['summary_lock']:
-			self._messages.drop_last()
+		self._messages.drop_last()
 	
-	async def recover_messages(self, context: CallbackContext):
+	def recover_messages(self, context: CallbackContext):
 		clear_messages = context.user_data.get('clear_messages', None)
 		if clear_messages:
-			async with context.user_data['summary_lock']:
-				context.user_data['clear_messages'] = None
-				self._messages.core = clear_messages
+			context.user_data['clear_messages'] = None
+			new_queue = Temque(maxlen=5)
+			new_queue.add_many(*clear_messages)
+			new_queue.add_many(*list(self._messages))
+			self._messages = new_queue
 	
-	async def clear_messages(self, context: CallbackContext):
+	def clear_messages(self, context: CallbackContext):
 		"""
 		清空历史消息
 		"""
+		user_data = context.user_data
 		if len(self._messages.core) == 0:
 			return
-		user_data = context.user_data
-		async with user_data['summary_lock']:
-			user_data['clear_messages'] = self._messages.core
-			self._messages.clear()
+		user_data['clear_messages'] = list(self._messages)
+		self._messages.clear()
 	
-	async def add_dialogs(self, summary_lock, *ms: dict | system_msg | user_msg | assistant_msg):
+	def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
 		'''
 		添加历史对话
 		'''
 		messages = [dict(x) for x in ms]
-		async with summary_lock:
-			self._messages.add_many(*messages)
+		self._messages.add_many(*messages)
 	
 	def __getattr__(self, name):
 		match name:  # 兼容旧代码
@@ -331,16 +311,15 @@ class Chat:
 				return self._load
 		raise AttributeError(name)
 	
-	async def _dump(self, fpath: str, summary_lock):
+	def _dump(self, fpath: str):
 		""" 存档 """
-		messages = await self.fetch_messages(summary_lock)
+		messages = self.fetch_messages()
 		jt = jsonDumps(messages, ensure_ascii=False)
 		Path(fpath).write_text(jt, encoding="utf8")
 		return True
 	
-	async def _load(self, fpath: str, summary_lock):
+	def _load(self, fpath: str):
 		""" 载入存档 """
 		jt = Path(fpath).read_text(encoding="utf8")
-		async with summary_lock:
-			self._messages.add_many(*jsonLoads(jt))
+		self._messages.add_many(*jsonLoads(jt))
 		return True

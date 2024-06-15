@@ -39,7 +39,8 @@ async def default_search(update: Update, context: CallbackContext):
 			await update.message.reply_text(e)
 		finally:
 			context.user_data[flag_key] = False
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	movie_text = '*电影结果:*\n'
 	movie_search = responses[0]
@@ -85,7 +86,8 @@ async def default_search(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('无任何结果!', reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 async def movie_popular(update: Update, context: CallbackContext):
@@ -106,7 +108,8 @@ async def movie_popular(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text(e)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	
 	movie_text = '*电影推荐:*\n'
@@ -127,7 +130,8 @@ async def movie_popular(update: Update, context: CallbackContext):
 		await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
 		                                reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 async def tv_popular(update: Update, context: CallbackContext):
@@ -148,7 +152,8 @@ async def tv_popular(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text(e)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	tv_text = '*剧集推荐:*\n'
 	for tv_res in res[0].results:
@@ -167,7 +172,8 @@ async def tv_popular(update: Update, context: CallbackContext):
 		await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
 		                                reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 async def search_movie(update: Update, context: CallbackContext):
@@ -186,7 +192,8 @@ async def search_movie(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('请输入电影名称!')
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	movie_text = '*电影结果:*\n'
 	try:
@@ -196,7 +203,8 @@ async def search_movie(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text(e)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	movie_search = res[0]
 	for movie_res in movie_search.results:
@@ -217,7 +225,8 @@ async def search_movie(update: Update, context: CallbackContext):
 			await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 	else:
 		return None
 
@@ -252,7 +261,8 @@ async def search_tv(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('请输入剧集名称!', reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	tv_text = '*剧集结果:*\n'
 	try:
@@ -262,7 +272,8 @@ async def search_tv(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text(e)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	tv_search = res[0]
 	for tv_res in tv_search.results:
@@ -282,7 +293,8 @@ async def search_tv(update: Update, context: CallbackContext):
 			await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 	else:
 		return None
 

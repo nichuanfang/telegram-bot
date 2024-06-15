@@ -70,7 +70,8 @@ async def get_server_status(update: Update, context: CallbackContext):
 		context.user_data[flag_key] = False
 		await update.message.reply_text(f'获取服务器状态失败: {e}', reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 @auth
@@ -102,7 +103,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				await typing_task
+				if not typing_task.done():
+					typing_task.cancel()
 			return
 		data = response.json()
 	except Exception as e:
@@ -110,7 +112,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	# 获取抽奖结果
 	try:
@@ -152,7 +155,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 				await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				await typing_task
+				if not typing_task.done():
+					typing_task.cancel()
 			return
 		# 获取返回的json数据
 		try:
@@ -164,7 +168,8 @@ async def draw_lottery(update: Update, context: CallbackContext):
 				await update.message.reply_text('dogyun cookie已过期,请更新cookie',
 				                                reply_to_message_id=update.message.message_id)
 			finally:
-				await typing_task
+				if not typing_task.done():
+					typing_task.cancel()
 			return
 		# 获取奖品信息
 		prize_infos: list = prize_data['data']
@@ -176,14 +181,16 @@ async def draw_lottery(update: Update, context: CallbackContext):
 					f'抽奖结果: 成功\n奖品: {prize_infos[0]["prizeName"]}\n状态: {prize_infos[0]["status"]}\n描述: {prize_infos[0]["descr"]}',
 					reply_to_message_id=update.message.message_id)
 			finally:
-				await typing_task
+				if not typing_task.done():
+					typing_task.cancel()
 	else:
 		try:
 			context.user_data[flag_key] = False
 			await update.message.reply_text(f'抽奖失败: {data["message"]}',
 			                                reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 
 
 @auth
@@ -216,7 +223,8 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
 		context.user_data[flag_key] = False
 		await update.message.reply_text('备份bitwarden成功', reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 @auth
@@ -235,7 +243,8 @@ async def exec_cmd(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('请输入命令!', reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	script = message_text[10:].strip()
 	if script in ['systemctl stop telegram-bot', 'systemctl restart telegram-bot', 'reboot']:
@@ -243,7 +252,8 @@ async def exec_cmd(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('禁止执行该命令', reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	# try:
 	#     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
@@ -258,13 +268,15 @@ async def exec_cmd(update: Update, context: CallbackContext):
 			context.user_data[flag_key] = False
 			await update.message.reply_text('执行命令报错', reply_to_message_id=update.message.message_id)
 		finally:
-			await typing_task
+			if not typing_task.done():
+				typing_task.cancel()
 		return
 	try:
 		context.user_data[flag_key] = False
 		await update.message.reply_text('执行命令成功', reply_to_message_id=update.message.message_id)
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 def handlers():

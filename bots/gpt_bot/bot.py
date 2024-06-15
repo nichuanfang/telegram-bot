@@ -8,7 +8,7 @@ import traceback
 import httpx
 import openai
 import telegram.helpers
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, filters, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler
 
@@ -72,63 +72,89 @@ def compress_question(question):
 
 @auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+	if not update.message:
+		return  # 无用消息
+	
 	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
+	
+	init_message_task = None
 	if ENABLE_STREAM:
-		if is_image_generator:
-			init_message = await update.message.reply_text('正在生成图片，请稍候...',
-			                                               reply_to_message_id=update.message.message_id)
-		else:
-			init_message = await update.message.reply_text('正在输入...',
-			                                               reply_to_message_id=update.message.message_id)
-	else:
-		init_message = None
-	# 设置用户级别历史消息摘要锁
-	if 'summary_lock' not in context.user_data:
-		context.user_data['summary_lock'] = asyncio.Lock()
-	#  跟非流式响应的typing...相关
-	flag_key = None
-	# typing...任务
-	typing_task = None
-	# 输入的最大长度
+		message_text = '正在生成图片，请稍候...' if is_image_generator else '正在输入...'
+		init_message_task = asyncio.create_task(
+			update.message.reply_text(message_text, reply_to_message_id=update.message.message_id)
+		)
+	
+	flag_key = None  # typing...相关 flag_key
+	typing_task = None  # typing...任务
 	max_length = 4096
+	
 	try:
 		if update.message.text:
-			content = await handle_text(update, max_length)
+			content_task = asyncio.create_task(handle_text(update, max_length))
 		elif update.message.photo:
-			content = await handle_photo(update, context, max_length)
+			content_task = asyncio.create_task(handle_photo(update, context, max_length))
 		elif update.message.document:
-			content = await handle_document(update, context, max_length)
+			content_task = asyncio.create_task(handle_document(update, context, max_length))
 		elif update.message.audio or update.message.voice:
-			content = await handle_audio(update, context)
+			content_task = asyncio.create_task(handle_audio(update, context))
 		elif update.message.video:
-			content = await handle_video(update, context)
+			content_task = asyncio.create_task(handle_video(update, context))
 		else:
 			raise ValueError('不支持的输入类型!')
-		# 获取面具
+		
 		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
-		# 设置面具内容
-		OPENAI_COMPLETION_OPTIONS['messages'] = curr_mask['mask']
-		# 设置模型
-		OPENAI_COMPLETION_OPTIONS['model'] = context.user_data.get('current_model', curr_mask['default_model'])
+		
+		OPENAI_COMPLETION_OPTIONS.update({
+			'messages': curr_mask['mask'],
+			'model': context.user_data.get('current_model', curr_mask['default_model'])
+		})
+		
 		if 'chat' not in context.user_data:
-			# 初始化chat
-			context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
-			                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-			                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-			                                 summary_message_threshold=500)
+			chat_init_params = {
+				"api_key": OPENAI_API_KEY,
+				"base_url": OPENAI_BASE_URL,
+				"max_retries": openai.DEFAULT_MAX_RETRIES,
+				"timeout": openai.DEFAULT_TIMEOUT,
+				"msg_max_count": 5
+			}
+			context.user_data['chat'] = Chat(**chat_init_params)
+		
+		content_result = await content_task
+		
 		if ENABLE_STREAM:
-			await handle_stream_response(update, context, content, is_image_generator, init_message)
+			await handle_stream_response(update, context, content_result, is_image_generator, init_message_task)
 		else:
 			flag_key = update.message.message_id
 			context.user_data[flag_key] = True
 			typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
-			await handle_response(update, context, content, is_image_generator, flag_key)
-	
+			
+			await handle_response(update, context, content_result, is_image_generator, flag_key)
 	except Exception as e:
-		await handle_exception(update, context, e, init_message, flag_key)
+		await handle_exception(update, context, e, init_message_task, flag_key)
 	finally:
-		if typing_task:
-			await typing_task
+		if typing_task and not typing_task.done():
+			typing_task.cancel()
+
+
+async def handle_caption(update: Update, max_length):
+	if update.message.caption:
+		handled_question = compress_question(update.message.caption.strip())
+		if len(handled_question) > max_length:
+			raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
+		return handled_question
+	return None
+
+
+async def handle_photo_download(update: Update, context: CallbackContext):
+	photo = update.message.photo[-2]
+	photo_file = await context.bot.get_file(photo.file_id)
+	async with httpx.AsyncClient() as client:
+		photo_response = await client.get(photo_file.file_path)
+	image_data = photo_response.content
+	if image_data:
+		return base64.b64encode(image_data).decode("utf-8")
+	else:
+		raise ValueError("Empty image data received.")
 
 
 async def handle_photo(update, context, max_length):
@@ -138,39 +164,32 @@ async def handle_photo(update, context, max_length):
 		raise ValueError(
 			f'请将面具切换为"图像解析助手"!')
 	
-	if update.message.caption:
-		handled_question = compress_question(update.message.caption.strip())
-		if len(handled_question) > max_length:
-			raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
-		content.append({'type': 'text', 'text': handled_question})
-	
-	photo = update.message.photo[-2]
-	photo_file = await context.bot.get_file(photo.file_id)
-	async with httpx.AsyncClient() as client:
-		photo_response = await client.get(photo_file.file_path)
-	image_data = photo_response.content
-	if image_data:
-		encoded_image = base64.b64encode(image_data).decode("utf-8")
-		content.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{encoded_image}'}})
-	else:
-		raise ValueError("Empty image data received.")
+	handle_result = await asyncio.gather(handle_caption(update, max_length),
+	                                     handle_photo_download(update, context))
+	caption_result = handle_result[0]
+	photo_download_result = handle_result[1]
+	if caption_result:
+		content.append({'type': 'text', 'text': caption_result})
+	if photo_download_result:
+		content.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{photo_download_result}'}})
 	return content
 
 
-async def handle_document(update, context, max_length):
+async def handle_document_download(update: Update, context: CallbackContext):
 	document = update.message.document
 	file = await context.bot.get_file(document.file_id)
 	async with httpx.AsyncClient() as client:
 		response = await client.get(file.file_path)
 	document_text = response.text
-	content = f'```{document.mime_type}\n{document_text}\n```\n'
-	
-	if update.message.caption:
-		handled_question = compress_question(update.message.caption.strip())
-		if len(handled_question) > max_length:
-			raise ValueError(f'Your question is too long. Please limit it to {max_length} characters.')
-		content = content + handled_question
-	return content
+	return f'```{document.mime_type}\n{document_text}\n```\n'
+
+
+async def handle_document(update, context, max_length):
+	handled_result = await asyncio.gather(handle_document_download(update, context),
+	                                      handle_caption(update, max_length))
+	handle_document_result = handled_result[0]
+	handle_caption_result = handled_result[1]
+	return handle_document_result + handle_caption_result
 
 
 async def handle_audio(update, context):
@@ -201,20 +220,20 @@ async def handle_text(update, max_length):
 	return content_text
 
 
-async def handle_stream_response(update, context, content, is_image_generator, init_message):
+async def handle_stream_response(update, context, content, is_image_generator, init_message_task):
 	prev_answer = ''
 	chat: Chat = context.user_data['chat']
-	async for item in chat.async_stream_request(content, context.user_data['summary_lock'], chat.is_free,
-	                                            **OPENAI_COMPLETION_OPTIONS):
+	init_message: Message = await init_message_task
+	async for item in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
 		status, curr_answer = item
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				img_response = await client.get(curr_answer)
 			if img_response.content:
-				await bot_util.edit_message(update, context, init_message.message_id, True, '图片生成成功! 正在发送...')
-				# 发送新的图片消息
-				await update.message.reply_photo(photo=img_response.content,
-				                                 reply_to_message_id=update.effective_message.message_id)
+				await asyncio.gather(
+					bot_util.edit_message(update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
+					update.message.reply_photo(photo=img_response.content,
+					                           reply_to_message_id=update.effective_message.message_id))
 		else:
 			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 				continue
@@ -225,19 +244,19 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 
 async def handle_response(update, context, content, is_image_generator, flag_key):
 	chat: Chat = context.user_data['chat']
-	async for res in chat.async_request(content, context.user_data['summary_lock'],
-	                                    **OPENAI_COMPLETION_OPTIONS):
+	async for res in chat.async_request(content, **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			continue
-		context.user_data[flag_key] = False
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				# 将res的url下载 返回一个图片
 				img_response = await client.get(res)
+				context.user_data[flag_key] = False
 			if img_response.content:
 				await update.message.reply_photo(photo=img_response.content,
 				                                 reply_to_message_id=update.effective_message.message_id)
 		else:
+			context.user_data[flag_key] = False
 			if len(res) < 4096:
 				await bot_util.send_message(update, res)
 			else:
@@ -246,7 +265,7 @@ async def handle_response(update, context, content, is_image_generator, flag_key
 					await bot_util.send_message(update, part)
 
 
-async def handle_exception(update, context, e, init_message, flag_key):
+async def handle_exception(update, context, e, init_message_task, flag_key):
 	logger.error(
 		f"==================================================ERROR START==================================================================")
 	# 记录异常信息
@@ -258,12 +277,12 @@ async def handle_exception(update, context, e, init_message, flag_key):
 		context.user_data[flag_key] = False
 	error_message = str(e)
 	if 'at byte offset' in error_message:
-		await exception_message_handler(update, context, init_message, '缺少结束标记!')
+		await exception_message_handler(update, context, init_message_task, '缺少结束标记!')
 	elif 'content_filter' in error_message:
-		await exception_message_handler(update, context, init_message,
+		await exception_message_handler(update, context, init_message_task,
 		                                "The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!")
 	elif '504 Gateway Time-out' in error_message:
-		await exception_message_handler(update, context, init_message, '网关超时!')
+		await exception_message_handler(update, context, init_message_task, '网关超时!')
 	else:
 		match = re.search(r"message': '(.+?) \(request id:", error_message)
 		if match:
@@ -271,11 +290,12 @@ async def handle_exception(update, context, e, init_message, flag_key):
 			text = f'Exception occurred:: \n\n{clean_message}'
 		else:
 			text = f'Exception occurred: \n\n{e}'
-		await exception_message_handler(update, context, init_message, text)
+		await exception_message_handler(update, context, init_message_task, text)
 
 
-async def exception_message_handler(update, context, init_message, text):
-	if init_message:
+async def exception_message_handler(update, context, init_message_task, text):
+	if init_message_task:
+		init_message = await init_message_task
 		await bot_util.edit_message(update, context, init_message.message_id, True, text)
 	else:
 		await bot_util.send_message(update, text)
@@ -303,7 +323,8 @@ async def balance_handler(update: Update, context: CallbackContext):
 		context.user_data[flag_key] = False
 		await update.message.reply_text(f'获取余额失败: {e}')
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 @auth
@@ -319,20 +340,17 @@ async def clear_handler(update: Update, context: CallbackContext):
 		# 初始化chat
 		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
 		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-		                                 summary_message_threshold=500)
+		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5)
 		return
 	# 创建内联按钮
 	keyboard = [
 		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
 	]
 	reply_markup = InlineKeyboardMarkup(keyboard)
+	task = asyncio.create_task(update.message.reply_text('上下文已清除', reply_markup=reply_markup))
 	# 清空历史消息
-	user_data = context.user_data
-	if 'summary_lock' not in user_data:
-		user_data['summary_lock'] = asyncio.Lock()
-	await user_data['chat'].clear_messages(context)
-	await update.message.reply_text('上下文已清除', reply_markup=reply_markup)
+	context.user_data['chat'].clear_messages(context)
+	await task
 
 
 # 处理按钮点击事件
@@ -342,9 +360,9 @@ async def restore_context_handler(update: Update, context: CallbackContext):
 	
 	# 检查按钮的回调数据
 	if query.data == 'restore_context':
-		await context.user_data['chat'].recover_messages(context)
-		# 恢复上下文的逻辑
-		await query.edit_message_text(text="上下文已恢复")
+		task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
+		context.user_data['chat'].recover_messages(context)
+		await task
 
 
 def generate_mask_keyboard(masks, current_mask_key):
@@ -408,21 +426,23 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		context.user_data['current_model'] = selected_mask['default_model']
 	
 	# 根据选择的面具进行相应的处理
-	await query.edit_message_text(
+	switch_success_message_task = asyncio.create_task(query.edit_message_text(
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
-	)
-	if 'summary_lock' not in context.user_data:
-		context.user_data['summary_lock'] = asyncio.Lock()
+	))
 	if 'chat' not in context.user_data:
-		# 初始化chat
-		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
-		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-		                                 summary_message_threshold=500)
+		chat_init_params = {
+			"api_key": OPENAI_API_KEY,
+			"base_url": OPENAI_BASE_URL,
+			"max_retries": openai.DEFAULT_MAX_RETRIES,
+			"timeout": openai.DEFAULT_TIMEOUT,
+			"msg_max_count": 5
+		}
+		context.user_data['chat'] = Chat(**chat_init_params)
 	else:
 		# 切换面具后清除上下文
-		await context.user_data['chat'].clear_messages(context)
+		context.user_data['chat'].clear_messages(context)
+	await switch_success_message_task
 
 
 # 生成模型选择键盘
@@ -480,21 +500,23 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 	# 应用选择的面具
 	context.user_data['current_model'] = selected_model
 	# 根据选择的模型进行相应的处理
-	await query.edit_message_text(
+	switch_model_task = asyncio.create_task(query.edit_message_text(
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
-	)
-	if 'summary_lock' not in context.user_data:
-		context.user_data['summary_lock'] = asyncio.Lock()
+	))
 	if 'chat' not in context.user_data:
-		# 初始化chat
-		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
-		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-		                                 summary_message_threshold=500)
+		chat_init_params = {
+			"api_key": OPENAI_API_KEY,
+			"base_url": OPENAI_BASE_URL,
+			"max_retries": openai.DEFAULT_MAX_RETRIES,
+			"timeout": openai.DEFAULT_TIMEOUT,
+			"msg_max_count": 5
+		}
+		context.user_data['chat'] = Chat(**chat_init_params)
 	else:
 		# 切换模型后清除上下文
-		await context.user_data['chat'].clear_messages(context)
+		context.user_data['chat'].clear_messages(context)
+	await switch_model_task
 
 
 def handlers():
