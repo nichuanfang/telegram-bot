@@ -43,10 +43,15 @@ def auth(func):
 			if context.bot.first_name == 'GPTBot':
 				logger.info(f'=================user {user_id} access the GPTbot for free===================')
 				if 'chat' not in context.user_data:
-					context.user_data['chat'] = Chat(api_key=FREE_OPENAI_API_KEY, base_url=FREE_OPENAI_BASE_URL,
-					                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-					                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-					                                 summary_message_threshold=500, is_free=True)
+					chat_init_params = {
+						"api_key": FREE_OPENAI_API_KEY,
+						"base_url": FREE_OPENAI_BASE_URL,
+						"max_retries": openai.DEFAULT_MAX_RETRIES,
+						"timeout": openai.DEFAULT_TIMEOUT,
+						"msg_max_count": 5,
+						"is_free": True
+					}
+					context.user_data['chat'] = Chat(**chat_init_params)
 			else:
 				logger.warn(f"======================user {user_id}'s  access has been filtered====================")
 				await update.message.reply_text('You are not authorized to use this bot.')
@@ -86,17 +91,22 @@ async def send_message(update: Update, text):
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
+	# 获取当前消息内容
+	current_text = update.message.text
 	try:
-		# 等流式响应完全结束再尝试markdown格式 加快速度
-		if stream_ended:
-			escaped_text = escape_markdown_v2(text)  # 转义特殊字符
-			await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
-			                                    message_id=message_id,
-			                                    parse_mode=ParseMode.MARKDOWN_V2)
-		else:
+		# 检查新内容是否与当前内容不同
+		if current_text != text:
+			# 等流式响应完全结束再尝试markdown格式 加快速度
+			if stream_ended:
+				escaped_text = escape_markdown_v2(text)  # 转义特殊字符
+				await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
+				                                    message_id=message_id,
+				                                    parse_mode=ParseMode.MARKDOWN_V2)
+			else:
+				await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
+	except Exception:
+		if current_text != text:
 			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
-	except:
-		await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
 
 
 def escape_markdown_v2(text: str) -> str:

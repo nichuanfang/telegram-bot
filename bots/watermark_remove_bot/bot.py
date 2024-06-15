@@ -44,7 +44,8 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 		context.user_data[flag_key] = False
 		await update.message.reply_text(f'{update.message.text}解析失败')
 	finally:
-		await typing_task
+		if not typing_task.done():
+			typing_task.cancel()
 
 
 async def default_handler(update: Update, context: CallbackContext):
