@@ -189,7 +189,7 @@ async def handle_document(update, context, max_length):
 	                                      handle_caption(update, max_length))
 	handle_document_result = handled_result[0]
 	handle_caption_result = handled_result[1]
-	return handle_document_result + handle_caption_result
+	return handle_document_result + (handle_caption_result if handle_caption_result else '')
 
 
 async def handle_audio(update, context):
