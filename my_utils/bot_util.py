@@ -3,17 +3,23 @@ import functools
 import re
 import uuid
 
+import openai
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 
+from bots.gpt_bot.chat import Chat
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 
 logger = get_logger('bot_util')
-values = validate('ALLOWED_TELEGRAM_USER_IDS')
+values = validate('ALLOWED_TELEGRAM_USER_IDS', 'FREE_OPENAI_API_KEY', 'FREE_OPENAI_BASE_URL')
 # 允许访问的用户列表 逗号分割并去除空格
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in values[0].split(',')]
+# 免费的api-key
+FREE_OPENAI_API_KEY = values[1]
+# 免费的base_url
+FREE_OPENAI_BASE_URL = values[2]
 
 
 def auth(func):
@@ -30,11 +36,15 @@ def auth(func):
 	async def wrapper(*args, **kwargs):
 		# 获取update和context
 		update: Update = args[0]
+		context: CallbackContext = args[1]
 		user_id = update.effective_user.id
 		if str(user_id) not in ALLOWED_TELEGRAM_USER_IDS:
-			logger.warn(f'user {user_id} has been filtered!')
-			await update.message.reply_text('You are not authorized to use this bot.')
-			return
+			logger.info(f'=================user {user_id} access the GPTbot for free===================')
+			if 'chat' not in context.user_data:
+				context.user_data['chat'] = Chat(api_key=FREE_OPENAI_API_KEY, base_url=FREE_OPENAI_BASE_URL,
+				                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+				                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+				                                 summary_message_threshold=500, is_free=True)
 		await func(*args, **kwargs)
 	
 	return wrapper
