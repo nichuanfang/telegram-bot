@@ -224,22 +224,34 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 	prev_answer = ''
 	chat: Chat = context.user_data['chat']
 	init_message: Message = await init_message_task
-	async for item in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
-		status, curr_answer = item
+	current_message_id = init_message.message_id
+	current_message_length = 0
+	MAX_MESSAGE_LENGTH = 4096  # 测试用较小的值
+	message_content = ''
+	async for status, curr_answer in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				img_response = await client.get(curr_answer)
 			if img_response.content:
 				await asyncio.gather(
-					bot_util.edit_message(update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
+					bot_util.edit_message(update, context, current_message_id, True, '图片生成成功! 正在发送...'),
 					update.message.reply_photo(photo=img_response.content,
 					                           reply_to_message_id=update.effective_message.message_id))
-		else:
-			if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
-				continue
-			await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', curr_answer)
-			await asyncio.sleep(0.1)
-			prev_answer = curr_answer
+			continue
+		if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
+			continue
+		new_content = curr_answer[len(prev_answer):]
+		new_content_length = len(new_content)
+		if current_message_length + new_content_length > MAX_MESSAGE_LENGTH:
+			new_init_message = await context.bot.send_message(chat_id=update.message.chat_id, text='正在输入...')
+			current_message_id = new_init_message.message_id
+			current_message_length = 0
+			message_content = ''
+		message_content += new_content
+		if new_content:
+			await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
+			current_message_length += new_content_length
+		prev_answer = curr_answer
 
 
 async def handle_response(update, context, content, is_image_generator, flag_key):
