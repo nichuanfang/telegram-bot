@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Literal, Union, Dict, Any, AsyncGenerator
 
 from openai import AsyncOpenAI
+from telegram.ext import CallbackContext
 
 
 class AKPool:
@@ -278,17 +279,29 @@ class Chat:
 		async with summary_lock:
 			return list(self._messages)
 	
-	async def drop_last_message(self, summary_lock):
-		async with summary_lock:
+	async def drop_last_message(self, context: CallbackContext):
+		if len(self._messages.core) == 0:
+			return
+		
+		async with context.user_data['summary_lock']:
 			self._messages.drop_last()
 	
-	async def clear_messages(self, summary_lock):
+	async def recover_messages(self, context: CallbackContext):
+		clear_messages = context.user_data.get('clear_messages', None)
+		if clear_messages:
+			async with context.user_data['summary_lock']:
+				context.user_data['clear_messages'] = None
+				self._messages.core = clear_messages
+	
+	async def clear_messages(self, context: CallbackContext):
 		"""
 		清空历史消息
 		"""
 		if len(self._messages.core) == 0:
 			return
-		async with summary_lock:
+		user_data = context.user_data
+		async with user_data['summary_lock']:
+			user_data['clear_messages'] = self._messages.core
 			self._messages.clear()
 	
 	async def add_dialogs(self, summary_lock, *ms: dict | system_msg | user_msg | assistant_msg):
