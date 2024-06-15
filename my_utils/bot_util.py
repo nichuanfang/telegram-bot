@@ -39,12 +39,18 @@ def auth(func):
 		context: CallbackContext = args[1]
 		user_id = update.effective_user.id
 		if str(user_id) not in ALLOWED_TELEGRAM_USER_IDS:
-			logger.info(f'=================user {user_id} access the GPTbot for free===================')
-			if 'chat' not in context.user_data:
-				context.user_data['chat'] = Chat(api_key=FREE_OPENAI_API_KEY, base_url=FREE_OPENAI_BASE_URL,
-				                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-				                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
-				                                 summary_message_threshold=500, is_free=True)
+			# 只针对GBTBot开放访问 其他机器人正常拦截
+			if context.bot.first_name == 'GPTBot':
+				logger.info(f'=================user {user_id} access the GPTbot for free===================')
+				if 'chat' not in context.user_data:
+					context.user_data['chat'] = Chat(api_key=FREE_OPENAI_API_KEY, base_url=FREE_OPENAI_BASE_URL,
+					                                 max_retries=openai.DEFAULT_MAX_RETRIES,
+					                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5,
+					                                 summary_message_threshold=500, is_free=True)
+			else:
+				logger.warn(f"======================user {user_id}'s  access has been filtered====================")
+				await update.message.reply_text('You are not authorized to use this bot.')
+				return
 		await func(*args, **kwargs)
 	
 	return wrapper
