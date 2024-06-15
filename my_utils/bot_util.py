@@ -91,22 +91,20 @@ async def send_message(update: Update, text):
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
-	# 获取当前消息内容
-	current_text = update.message.text
 	try:
-		# 检查新内容是否与当前内容不同
-		if current_text != text:
-			# 等流式响应完全结束再尝试markdown格式 加快速度
-			if stream_ended:
-				escaped_text = escape_markdown_v2(text)  # 转义特殊字符
-				await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
-				                                    message_id=message_id,
-				                                    parse_mode=ParseMode.MARKDOWN_V2)
-			else:
-				await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
-	except Exception:
-		if current_text != text:
+		# 等流式响应完全结束再尝试markdown格式 加快速度
+		if stream_ended:
+			escaped_text = escape_markdown_v2(text)  # 转义特殊字符
+			await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
+			                                    message_id=message_id,
+			                                    parse_mode=ParseMode.MARKDOWN_V2)
+		else:
 			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
+	except Exception:
+		try:
+			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
+		except:
+			pass
 
 
 def escape_markdown_v2(text: str) -> str:
