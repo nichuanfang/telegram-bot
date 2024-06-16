@@ -2,8 +2,9 @@
 
 import httpx
 from fake_useragent import UserAgent
+from telegram.ext import CallbackContext
 
-from my_utils.validation_util import validate
+from bots.gpt_bot.gpt_platform import Platform
 
 headers = {
 	'accept': 'application/json',
@@ -19,11 +20,6 @@ headers = {
 	'sec-fetch-mode': 'cors',
 	'sec-fetch-site': 'cross-site'
 }
-requires = validate('OPENAI_API_KEY', 'OPENAI_BASE_URL')
-OPENAI_API_KEY = requires[0]
-OPENAI_BASE_URL = requires[1]
-headers['authorization'] = f'Bearer {OPENAI_API_KEY}'
-
 # 创建一个 UserAgent 实例
 ua = UserAgent()
 
@@ -31,22 +27,24 @@ ua = UserAgent()
 class BotHttpRequest:
 	
 	# 获取订阅
-	async def get_subscription(self):
+	async def get_subscription(self, OPENAI_API_KEY: str, OPENAI_BASE_URL: str):
 		# 生成一个随机的 User-Agent
 		headers['user-agent'] = ua.random
+		headers['authorization'] = f'Bearer {OPENAI_API_KEY}'
 		async with httpx.AsyncClient() as client:
 			response = await client.get(
 				f'{OPENAI_BASE_URL[:-3]}/dashboard/billing/subscription',
 				headers=headers
 			)
-			return response
+		return response
 	
 	# 获取使用信息
-	async def get_usage(self):
+	async def get_usage(self, OPENAI_API_KEY: str, OPENAI_BASE_URL: str):
 		headers['user-agent'] = ua.random
+		headers['authorization'] = f'Bearer {OPENAI_API_KEY}'
 		async with httpx.AsyncClient() as client:
 			response = await client.get(
 				f'{OPENAI_BASE_URL[:-3]}/dashboard/billing/usage',
 				headers=headers
 			)
-			return response
+		return response

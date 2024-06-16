@@ -6,7 +6,6 @@ import re
 import traceback
 
 import httpx
-import openai
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
@@ -14,29 +13,27 @@ from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandH
 
 from bots.gpt_bot.chat import Chat
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
-from my_utils import my_logging, validation_util, bot_util
-from my_utils.bot_util import auth
+from bots.gpt_bot.gpt_platform import Platform
+from my_utils import my_logging, bot_util
+from my_utils.bot_util import auth, instantiate_platform
+
+# 模型注册表
+global PLATFORMS_REGISTRY
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
-
-require_vars = validation_util.validate('OPENAI_API_KEY', 'OPENAI_BASE_URL')
-# openai 的密钥
-OPENAI_API_KEY = require_vars[0]
-# 代理url
-OPENAI_BASE_URL = require_vars[1]
 # 默认面具
 DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
-
+# openai相关参数
 OPENAI_COMPLETION_OPTIONS = {
 	"temperature": 0.5,  # 更低的温度提高了一致性
 	"top_p": 0.9,  # 采样更加多样化
 	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
 }
-
+# 加载面具
 with open(os.path.join(os.path.dirname(__file__), 'config', 'masks.json'), encoding='utf-8') as masks_file:
 	masks = json.load(masks_file)
 
@@ -104,15 +101,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			'model': context.user_data.get('current_model', curr_mask['default_model'])
 		})
 		
-		if 'chat' not in context.user_data:
-			chat_init_params = {
-				"api_key": OPENAI_API_KEY,
-				"base_url": OPENAI_BASE_URL,
-				"max_retries": openai.DEFAULT_MAX_RETRIES,
-				"timeout": openai.DEFAULT_TIMEOUT,
-				"msg_max_count": 5
-			}
-			context.user_data['chat'] = Chat(**chat_init_params)
+		if 'platform' not in context.user_data:
+			context.user_data['platform'] = instantiate_platform()
 		
 		content_result = await content_task
 		
@@ -318,20 +308,19 @@ async def balance_handler(update: Update, context: CallbackContext):
 	context.user_data[flag_key] = True
 	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
 	
-	request = BotHttpRequest()
+	if 'platform' not in context.user_data:
+		context.user_data['platform'] = instantiate_platform()
+	# 使用平台内置的方法查询余额
+	platform: Platform = context.user_data['platform']
 	try:
-		responses = await asyncio.gather(request.get_subscription(), request.get_usage())
-		subscription = responses[0]
-		usage = responses[1]
-		total = json.loads(subscription.text)['soft_limit_usd']
-		used = json.loads(usage.text)['total_usage'] / 100
+		# 不同平台有不同的结果
+		balance_result = await platform.query_balance()
 		context.user_data[flag_key] = False
-		await update.message.reply_text(f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}',
-		                                reply_to_message_id=update.message.message_id)
-	
+		await update.message.reply_text(balance_result, reply_to_message_id=update.message.message_id)
 	except Exception as e:
+		traceback.print_exc()
 		context.user_data[flag_key] = False
-		await update.message.reply_text(f'获取余额失败: {e}')
+		await update.message.reply_text(f'余额查询失败:\n\n {str(e)}', reply_to_message_id=update.message.message_id)
 	finally:
 		if not typing_task.done():
 			typing_task.cancel()
@@ -345,11 +334,8 @@ async def clear_handler(update: Update, context: CallbackContext):
 		update: 更新
 		context:  上下文对象
 	"""
-	if 'chat' not in context.user_data:
-		# 初始化chat
-		context.user_data['chat'] = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL,
-		                                 max_retries=openai.DEFAULT_MAX_RETRIES,
-		                                 timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5)
+	if 'platform' not in context.user_data:
+		context.user_data['platform'] = instantiate_platform()
 	# 创建内联按钮
 	keyboard = [
 		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
@@ -357,7 +343,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 	reply_markup = InlineKeyboardMarkup(keyboard)
 	task = asyncio.create_task(update.message.reply_text('上下文已清除', reply_markup=reply_markup))
 	# 清空历史消息
-	context.user_data['chat'].clear_messages(context)
+	context.user_data['platform'].chat.clear_messages(context)
 	await task
 
 
@@ -438,18 +424,11 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 		text=f'面具已切换至*{selected_mask["name"]}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	))
-	if 'chat' not in context.user_data:
-		chat_init_params = {
-			"api_key": OPENAI_API_KEY,
-			"base_url": OPENAI_BASE_URL,
-			"max_retries": openai.DEFAULT_MAX_RETRIES,
-			"timeout": openai.DEFAULT_TIMEOUT,
-			"msg_max_count": 5
-		}
-		context.user_data['chat'] = Chat(**chat_init_params)
+	if 'platform' not in context.user_data:
+		context.user_data['platform'] = instantiate_platform()
 	else:
 		# 切换面具后清除上下文
-		context.user_data['chat'].clear_messages(context)
+		context.user_data['platform'].chat.clear_messages(context)
 	await switch_success_message_task
 
 
@@ -512,18 +491,11 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
 		parse_mode=ParseMode.MARKDOWN_V2
 	))
-	if 'chat' not in context.user_data:
-		chat_init_params = {
-			"api_key": OPENAI_API_KEY,
-			"base_url": OPENAI_BASE_URL,
-			"max_retries": openai.DEFAULT_MAX_RETRIES,
-			"timeout": openai.DEFAULT_TIMEOUT,
-			"msg_max_count": 5
-		}
-		context.user_data['chat'] = Chat(**chat_init_params)
+	if 'platform' not in context.user_data:
+		context.user_data['platform'] = instantiate_platform()
 	else:
 		# 切换模型后清除上下文
-		context.user_data['chat'].clear_messages(context)
+		context.user_data['platform'].chat.clear_messages(context)
 	await switch_model_task
 
 

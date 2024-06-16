@@ -1,25 +1,77 @@
 import asyncio
 import functools
+import json
+import os
 import re
 import uuid
 
-import openai
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 
-from bots.gpt_bot.chat import Chat
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 
 logger = get_logger('bot_util')
-values = validate('ALLOWED_TELEGRAM_USER_IDS', 'FREE_OPENAI_API_KEY', 'FREE_OPENAI_BASE_URL')
+
+values = validate('ALLOWED_TELEGRAM_USER_IDS')
 # 允许访问的用户列表 逗号分割并去除空格
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in values[0].split(',')]
-# 免费的api-key
-FREE_OPENAI_API_KEY = values[1]
-# 免费的base_url
-FREE_OPENAI_BASE_URL = values[2]
+# 默认平台
+DEFAULT_PLATFORM: str = os.getenv('DEFAULT_PLATFORM', 'bianxieai')
+# 模型注册表
+PLATFORMS_REGISTRY = {}
+
+
+def load_platforms():
+	platforms_path = os.path.abspath(os.path.join('bots', 'gpt_bot', 'config', 'platforms.json'))
+	if os.path.exists(platforms_path):
+		with open(platforms_path, encoding='utf-8') as platforms_file:
+			return json.load(platforms_file)
+	else:
+		raise RuntimeError('platforms.json不存在,无法加载平台数据!')
+
+
+def register_platform():
+	platforms_path = os.path.abspath(os.path.join('bots', 'gpt_bot', 'platforms'))
+	for file in os.listdir(platforms_path):
+		if not file.endswith('.py'):
+			continue
+		name = file.split(".")[0]
+		platform_module = __import__(f'bots.gpt_bot.platforms.{name}', fromlist=['register'])
+		try:
+			register = getattr(platform_module, 'register')
+			platform_name, class_module = register()
+			PLATFORMS_REGISTRY[platform_name] = class_module
+		except:
+			raise RuntimeError(f'未注册平台: {name}!')
+
+
+# 加载平台元数据
+platforms = load_platforms()
+# 注册平台
+register_platform()
+
+
+def instantiate_platform(platform_name: str = DEFAULT_PLATFORM):
+	"""
+	初始化平台
+	@param platform_name: 平台名称(英文)  
+	@return:  平台对象
+	"""
+	# 默认平台
+	platform = platforms[platform_name]
+	# 平台初始化参数
+	platform_init_params = {
+		'name': DEFAULT_PLATFORM,
+		'name_zh': platform['name'],
+		'domestic_openai_base_url': platform['domestic_openai_base_url'],
+		'foreign_openai_base_url': platform['foreign_openai_base_url'],
+		'openai_api_key': platform['openai_api_key'],
+		'index_url': platform['index_url'],
+		'payment_url': platform['payment_url']
+	}
+	return PLATFORMS_REGISTRY[platform_name](**platform_init_params)
 
 
 def auth(func):
@@ -42,16 +94,8 @@ def auth(func):
 			# 只针对GBTBot开放访问 其他机器人正常拦截
 			if context.bot.first_name == 'GPTBot':
 				logger.info(f'=================user {user_id} access the GPTbot for free===================')
-				if 'chat' not in context.user_data:
-					chat_init_params = {
-						"api_key": FREE_OPENAI_API_KEY,
-						"base_url": FREE_OPENAI_BASE_URL,
-						"max_retries": openai.DEFAULT_MAX_RETRIES,
-						"timeout": openai.DEFAULT_TIMEOUT,
-						"msg_max_count": 5,
-						"is_free": True
-					}
-					context.user_data['chat'] = Chat(**chat_init_params)
+				if 'platform' not in context.user_data:
+					context.user_data['platform'] = instantiate_platform('free')
 			else:
 				logger.warn(f"======================user {user_id}'s  access has been filtered====================")
 				await update.message.reply_text('You are not authorized to use this bot.')
@@ -77,7 +121,7 @@ async def async_func(normal_function, *args, **kwargs):
 async def send_typing_action(update: Update, context: CallbackContext, flag_key):
 	while context.user_data.get(flag_key, False):
 		await update.message.reply_chat_action(action='typing')
-		await asyncio.sleep(2)  # 每2秒发送一次 typing 状态
+		await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
 
 
 async def send_message(update: Update, text):

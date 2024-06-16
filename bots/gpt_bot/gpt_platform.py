@@ -1,6 +1,14 @@
 # 平台接口
 from abc import ABCMeta, abstractmethod
 
+import openai
+
+from bots.gpt_bot.chat import Chat
+import platform
+
+# 最大历史消息数
+MSG_MAX_COUNT = 5
+
 
 # ABCMeta表明这是个抽象类
 class Platform(metaclass=ABCMeta):
@@ -18,7 +26,7 @@ class Platform(metaclass=ABCMeta):
 			foreign_openai_base_url: str,
 			openai_api_key,
 			index_url: str,
-			payment_url: str
+			payment_url: str,
 	):
 		# 平台名称(英文)
 		self.name = name
@@ -28,19 +36,40 @@ class Platform(metaclass=ABCMeta):
 		self.domestic_openai_base_url = domestic_openai_base_url
 		# 转发openai的base_url(国外专用)
 		self.foreign_openai_base_url = foreign_openai_base_url
+		# 实际使用的base_url
+		self.openai_base_url = domestic_openai_base_url if platform.system().lower() == 'windows' else foreign_openai_base_url
 		# 转发openai的api_key
 		self.openai_api_key = openai_api_key
 		# 平台的首页
 		self.index_url = index_url
 		# 平台充值页面
 		self.payment_url = payment_url
+		chat_init_params = {
+			"api_key": openai_api_key,
+			"base_url": self.openai_base_url,
+			"max_retries": openai.DEFAULT_MAX_RETRIES,
+			"timeout": openai.DEFAULT_TIMEOUT,
+			"msg_max_count": MSG_MAX_COUNT
+		}
+		
+		self.chat = Chat(**chat_init_params)
 	
 	@abstractmethod
-	def handle(self):
+	async def handle(self):
 		# 业务处理方法
 		pass
 	
 	@abstractmethod
-	def query_balance(self):
+	async def handle_audio_content(self):
+		# 解析音频
+		pass
+	
+	@abstractmethod
+	async def handle_image_content(self):
+		# 解析图片
+		pass
+	
+	@abstractmethod
+	async def query_balance(self):
 		# 查询余额
 		pass
