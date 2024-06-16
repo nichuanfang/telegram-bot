@@ -219,15 +219,15 @@ async def handle_text(update, max_length):
 	return content_text
 
 
-async def handle_stream_response(update, context, content, is_image_generator, init_message_task):
+async def handle_stream_response(update: Update, context: CallbackContext, content: str, is_image_generator: bool,
+                                 init_message_task):
 	prev_answer = ''
 	chat: Chat = context.user_data['chat']
 	init_message: Message = await init_message_task
 	current_message_id = init_message.message_id
 	current_message_length = 0
-	MAX_MESSAGE_LENGTH = 4096  # 测试用较小的值
+	MAX_MESSAGE_LENGTH = 4096
 	message_content = ''
-	
 	async for status, curr_answer in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
@@ -252,6 +252,7 @@ async def handle_stream_response(update, context, content, is_image_generator, i
 			if message_content != prev_answer:
 				await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
 				current_message_length += new_content_length
+		await asyncio.sleep(0.1)
 		prev_answer = curr_answer
 
 
