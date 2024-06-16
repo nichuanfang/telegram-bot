@@ -5,3 +5,4 @@
 docker-compose.yml
 Dockerfile
 .venv
+bots/gpt_bot/config/platforms.json

@@ -37,11 +37,7 @@ OPENAI_COMPLETION_OPTIONS = {
 	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
 }
 
-# 初始化 Chat 实例
-# chat = Chat(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=openai.DEFAULT_MAX_RETRIES,
-#             timeout=openai.DEFAULT_TIMEOUT, msg_max_count=5, summary_message_threshold=500)
-
-with open(os.path.join(os.path.dirname(__file__), 'masks.json'), encoding='utf-8') as masks_file:
+with open(os.path.join(os.path.dirname(__file__), 'config', 'masks.json'), encoding='utf-8') as masks_file:
 	masks = json.load(masks_file)
 
 
@@ -238,7 +234,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 					update.message.reply_photo(photo=img_response.content,
 					                           reply_to_message_id=update.effective_message.message_id))
 			continue
-		if abs(len(curr_answer) - len(prev_answer)) < 50 and status != 'finished':
+		if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
 			continue
 		new_content = curr_answer[len(prev_answer):]
 		new_content_length = len(new_content)
