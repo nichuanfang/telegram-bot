@@ -85,25 +85,39 @@ async def send_message(update: Update, text):
 		escaped_text = escape_markdown_v2(text)  # 转义特殊字符
 		return await update.message.reply_text(escaped_text,
 		                                       reply_to_message_id=update.message.message_id,
+		                                       disable_web_page_preview=False,
 		                                       parse_mode=ParseMode.MARKDOWN_V2)
 	except:
-		return await update.message.reply_text(text, reply_to_message_id=update.message.message_id)
+		return await update.message.reply_text(text, reply_to_message_id=update.message.message_id,
+		                                       disable_web_page_preview=False)
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
 	try:
 		# 等流式响应完全结束再尝试markdown格式 加快速度
 		if stream_ended:
-			escaped_text = escape_markdown_v2(text)  # 转义特殊字符
-			await context.bot.edit_message_text(text=escaped_text, chat_id=update.message.chat_id,
-			                                    message_id=message_id,
-			                                    parse_mode=ParseMode.MARKDOWN_V2)
+			escaped_text = escape_markdown_v2(text)
+			await context.bot.edit_message_text(
+				text=escaped_text,
+				chat_id=update.message.chat_id,
+				message_id=message_id,
+				disable_web_page_preview=False,
+				parse_mode=ParseMode.MARKDOWN_V2
+			)
 		else:
-			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
+			await context.bot.edit_message_text(
+				text=text,
+				chat_id=update.message.chat_id,
+				message_id=message_id,
+				disable_web_page_preview=False
+			)
 	except Exception:
 		try:
-			await context.bot.edit_message_text(text=text, chat_id=update.message.chat_id, message_id=message_id)
-		except:
+			await context.bot.edit_message_text(
+				text=text,
+				chat_id=update.message.chat_id,
+				message_id=message_id, disable_web_page_preview=False)
+		except Exception:
 			pass
 
 
@@ -112,12 +126,9 @@ def escape_markdown_v2(text: str) -> str:
 	Escape special characters for Telegram MarkdownV2 and replace every pair of consecutive asterisks (**) with a single asterisk (*).
 	"""
 	try:
-		# List of characters that need to be escaped in MarkdownV2
-		escape_chars = r'_[]()~>#+-=|{}.!'
-		# Escape each character
+		escape_chars = r"\_[]()#~>+-=|{}.!"
 		escaped_text = re.sub(f"([{re.escape(escape_chars)}])", r'\\\1', text)
-		# Replace every pair of consecutive asterisks (**) with a single asterisk (*)
-		escaped_text = escaped_text.replace('**', '*')
+		escaped_text = re.sub(r'\\\*\\\*', '**', escaped_text)
 		return escaped_text
 	except Exception as e:
 		return str(e)

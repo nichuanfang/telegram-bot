@@ -147,13 +147,8 @@ class Chat:
 		if http_client: kwargs["http_client"] = http_client
 		
 		self.reset_api_key(api_key)
-		# 历史消息摘要阈值
-		# self.summary_message_threshold = kwargs.get('summary_message_threshold')
-		# openai客户端封装
 		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
 		                                 max_retries=max_retries)
-		# self._kwargs = kwargs
-		# self._request_kwargs = {'model': model}
 		self._messages = Temque(maxlen=msg_max_count)
 	
 	def reset_api_key(self, api_key: str | AKPool):
