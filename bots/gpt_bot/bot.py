@@ -238,7 +238,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 					update.message.reply_photo(photo=img_response.content,
 					                           reply_to_message_id=update.effective_message.message_id))
 			continue
-		if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
+		if abs(len(curr_answer) - len(prev_answer)) < 50 and status != 'finished':
 			continue
 		new_content = curr_answer[len(prev_answer):]
 		new_content_length = len(new_content)
@@ -252,7 +252,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 			if message_content != prev_answer:
 				await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
 				current_message_length += new_content_length
-		await asyncio.sleep(0.1)
+		await asyncio.sleep(0.05)
 		prev_answer = curr_answer
 
 
