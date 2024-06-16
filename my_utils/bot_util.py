@@ -85,11 +85,11 @@ async def send_message(update: Update, text):
 		escaped_text = escape_markdown_v2(text)  # 转义特殊字符
 		return await update.message.reply_text(escaped_text,
 		                                       reply_to_message_id=update.message.message_id,
-		                                       disable_web_page_preview=False,
+		                                       disable_web_page_preview=True,
 		                                       parse_mode=ParseMode.MARKDOWN_V2)
 	except:
 		return await update.message.reply_text(text, reply_to_message_id=update.message.message_id,
-		                                       disable_web_page_preview=False)
+		                                       disable_web_page_preview=True)
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
@@ -101,7 +101,7 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
 				text=escaped_text,
 				chat_id=update.message.chat_id,
 				message_id=message_id,
-				disable_web_page_preview=False,
+				disable_web_page_preview=True,
 				parse_mode=ParseMode.MARKDOWN_V2
 			)
 		else:
@@ -109,14 +109,14 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
 				text=text,
 				chat_id=update.message.chat_id,
 				message_id=message_id,
-				disable_web_page_preview=False
+				disable_web_page_preview=True
 			)
 	except Exception:
 		try:
 			await context.bot.edit_message_text(
 				text=text,
 				chat_id=update.message.chat_id,
-				message_id=message_id, disable_web_page_preview=False)
+				message_id=message_id, disable_web_page_preview=True)
 		except Exception:
 			pass
 
