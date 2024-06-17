@@ -4,6 +4,7 @@ import json
 import os
 import re
 import traceback
+import webbrowser
 
 import httpx
 import telegram.helpers
@@ -14,9 +15,6 @@ from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandH
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth, instantiate_platform
-
-# 模型注册表
-global PLATFORMS_REGISTRY
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
@@ -358,6 +356,7 @@ async def masks_handler(update: Update, context: CallbackContext):
 		update:  更新对象
 		context:  上下文对象
 	"""
+	await bot_util.send_typing(update)
 	# 获取当前选择的面具
 	current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
 	current_mask_key = next(key for key, value in masks.items() if value == current_mask)
@@ -432,8 +431,8 @@ async def model_handler(update: Update, context: CallbackContext):
 		update:  更新对象
 		context:  上下文对象
 	"""
+	await bot_util.send_typing(update)
 	# 获取当前的面具
-	
 	current_mask = context.user_data.get('current_mask', masks['common'])
 	# 获取当前选择的模型
 	current_model = context.user_data.get('current_model', current_mask['default_model'])
@@ -473,17 +472,95 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 	await switch_model_task
 
 
+@auth
+async def platform_handler(update: Update, context: CallbackContext):
+	"""
+	切换平台处理器
+	Args:
+		update:  更新对象
+		context:  上下文对象
+	"""
+	await bot_util.send_typing(update)
+	if 'platform' not in context.user_data:
+		context.user_data['platform'] = instantiate_platform()
+	current_platform: Platform = context.user_data['platform']
+	# current_mask_key = next(key for key, value in masks.items() if value == current_platform.name_zh)
+	# 生成内联键盘
+	keyboard = generate_platform_keyboard(update, bot_util.platforms, current_platform.name)
+	
+	await update.message.reply_text(
+		'请选择一个平台:',
+		reply_markup=keyboard
+	)
+
+
+def generate_platform_keyboard(update, platforms, current_platform_key):
+	user_id = update.effective_user.id
+	keyboard = []
+	row = []
+	if str(user_id) in bot_util.ALLOWED_TELEGRAM_USER_IDS:
+		for i, (key, platform) in enumerate(platforms.items()):
+			# 如果是当前选择的面具，添加标记
+			name = platform["name"]
+			if key == current_platform_key:
+				name = "* " + name
+			row.append(InlineKeyboardButton(name, callback_data=key))
+			if (i + 1) % 3 == 0:
+				keyboard.append(row)
+				row = []
+		if row:
+			keyboard.append(row)
+	else:
+		row.append(InlineKeyboardButton('* 免费', callback_data='free'))
+		keyboard.append(row)
+	return InlineKeyboardMarkup(keyboard)
+
+
+async def platform_selection_handler(update: Update, context: CallbackContext):
+	"""
+	处理平台选择
+	Args:
+		update:  更新对象
+		context:  上下文对象
+	"""
+	query = update.callback_query
+	await query.answer()
+	# 获取用户选择的平台
+	selected_platform_key = query.data
+	# 应用选择的平台
+	context.user_data['platform'] = bot_util.instantiate_platform(selected_platform_key)
+	curr_platform: Platform = context.user_data['platform']
+	switch_message = f'平台已切换至[{curr_platform.name_zh}]({curr_platform.index_url}) '
+	await query.edit_message_text(
+		text=switch_message,
+		parse_mode=ParseMode.MARKDOWN_V2,
+	)
+	context.user_data['platform'].chat.clear_messages(context)
+
+
+async def shop_handler(update: Update, context: CallbackContext):
+	user_id = update.effective_user.id
+	if str(user_id) not in bot_util.ALLOWED_TELEGRAM_USER_IDS:
+		if 'platform' not in context.user_data:
+			context.user_data['platform'] = instantiate_platform()
+		platform = context.user_data['platform']
+		webbrowser.open(platform.payment_url)
+
+
 def handlers():
 	return [
 		CommandHandler('start', start),
 		CommandHandler('clear', clear_handler),
 		CommandHandler('masks', masks_handler),
 		CommandHandler('model', model_handler),
+		CommandHandler('balance', balance_handler),
+		CommandHandler('platform', platform_handler),
+		CommandHandler('shop', shop_handler),
 		CallbackQueryHandler(mask_selection_handler,
 		                     pattern='^(common|github_copilot|image_generator|image_analyzer|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
 		CallbackQueryHandler(restore_context_handler, pattern='^(restore_context)$'),
-		CommandHandler('balance', balance_handler),
+		CallbackQueryHandler(platform_selection_handler, pattern='^(free|chatanywhere|bianxieai)$'),
 		MessageHandler(
 			filters.TEXT & ~filters.COMMAND | filters.ATTACHMENT, answer)
 	]
