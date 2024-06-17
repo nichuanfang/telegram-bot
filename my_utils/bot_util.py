@@ -64,7 +64,7 @@ def instantiate_platform(platform_name: str = DEFAULT_PLATFORM):
 	platform = platforms[platform_name]
 	# 平台初始化参数
 	platform_init_params = {
-		'name': DEFAULT_PLATFORM,
+		'name': platform_name,
 		'name_zh': platform['name'],
 		'domestic_openai_base_url': platform['domestic_openai_base_url'],
 		'foreign_openai_base_url': platform['foreign_openai_base_url'],
