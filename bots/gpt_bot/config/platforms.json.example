@@ -5,7 +5,7 @@
     "foreign_openai_base_url": "https://api.bianxieai.com/v1",
     "index_url": "https://api.bianxieai.com",
     "payment_url": "https://shop.bianxieai.com/",
-    "openai_api_key": "此处设置你的api-key",
+    "openai_api_key": ""
   },
   "chatanywhere": {
     "name": "ChatAnywhere",
@@ -13,14 +13,22 @@
     "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
     "index_url": "https://api.chatanywhere.tech",
     "payment_url": "https://peiqishop.me/",
-    "openai_api_key": "此处设置你的api-key",
+    "openai_api_key": ""
   },
-  "free": {
-      "name": "免费",
-      "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
-      "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
-      "index_url": "https://api.chatanywhere.tech",
-      "payment_url": "https://peiqishop.me/",
-      "openai_api_key": "此处设置你的api-key"
-    }
+  "free_1": {
+    "name": "免费_1",
+    "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
+    "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
+    "index_url": "https://api.chatanywhere.tech",
+    "payment_url": "https://peiqishop.me/",
+    "openai_api_key": ""
+  },
+  "free_2": {
+    "name": "免费_2",
+    "domestic_openai_base_url": "https://free.gpt.ge/v1",
+    "foreign_openai_base_url": "https://free.gpt.ge/v1",
+    "index_url": "https://v3.cm/",
+    "payment_url": "https://v3.cm/",
+    "openai_api_key": ""
+  }
 }
