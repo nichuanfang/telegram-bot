@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import importlib
 import json
 import os
 import re
@@ -38,17 +39,17 @@ def register_platform():
 		if not file.endswith('.py'):
 			continue
 		name = file.split(".")[0]
-		platform_module = __import__(f'bots.gpt_bot.platforms.{name}', fromlist=['register'])
-		try:
-			register = getattr(platform_module, 'register')
-			platform_name, class_module = register()
-			PLATFORMS_REGISTRY[platform_name] = class_module
-		except:
-			raise RuntimeError(f'未注册平台: {name}!')
+		platform_module = importlib.import_module(f'bots.gpt_bot.platforms.{name}')
+		for attr_name in dir(platform_module):
+			attr = getattr(platform_module, attr_name)
+			if isinstance(attr, type) and getattr(attr, '_is_gpt_platform', False):
+				platform_name = attr._platform_name()
+				PLATFORMS_REGISTRY[platform_name] = attr
 
 
 # 加载平台元数据
 platforms = load_platforms()
+
 # 注册平台
 register_platform()
 
@@ -71,6 +72,7 @@ def instantiate_platform(platform_name: str = DEFAULT_PLATFORM):
 		'index_url': platform['index_url'],
 		'payment_url': platform['payment_url']
 	}
+	logger.info(f'当前使用的openai代理平台为{platform_name}.')
 	return PLATFORMS_REGISTRY[platform_name](**platform_init_params)
 
 
@@ -116,6 +118,10 @@ async def coroutine_wrapper(normal_function, *args, **kwargs):
 
 async def async_func(normal_function, *args, **kwargs):
 	return await coroutine_wrapper(normal_function, *args, **kwargs)
+
+
+async def send_typing(update: Update):
+	await update.message.reply_chat_action(action='typing')
 
 
 async def send_typing_action(update: Update, context: CallbackContext, flag_key):

@@ -11,8 +11,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
-from bots.gpt_bot.chat import Chat
-from bots.gpt_bot.gpt_http_request import BotHttpRequest
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth, instantiate_platform
@@ -66,20 +64,14 @@ def compress_question(question):
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 	if not update.message:
 		return  # 无用消息
-	
 	is_image_generator = context.user_data.get('current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
-	
 	init_message_task = None
 	if ENABLE_STREAM:
 		message_text = '正在生成图片，请稍候...' if is_image_generator else '正在输入...'
 		init_message_task = asyncio.create_task(
 			update.message.reply_text(message_text, reply_to_message_id=update.message.message_id)
 		)
-	
-	flag_key = None  # typing...相关 flag_key
-	typing_task = None  # typing...任务
 	max_length = 4096
-	
 	try:
 		if update.message.text:
 			content_task = asyncio.create_task(handle_text(update, max_length))
@@ -93,32 +85,20 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 			content_task = asyncio.create_task(handle_video(update, context))
 		else:
 			raise ValueError('不支持的输入类型!')
-		
 		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
-		
 		OPENAI_COMPLETION_OPTIONS.update({
 			'messages': curr_mask['mask'],
 			'model': context.user_data.get('current_model', curr_mask['default_model'])
 		})
-		
 		if 'platform' not in context.user_data:
 			context.user_data['platform'] = instantiate_platform()
-		
 		content_result = await content_task
-		
 		if ENABLE_STREAM:
 			await handle_stream_response(update, context, content_result, is_image_generator, init_message_task)
 		else:
-			flag_key = update.message.message_id
-			context.user_data[flag_key] = True
-			typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
-			
-			await handle_response(update, context, content_result, is_image_generator, flag_key)
+			await handle_response(update, context, content_result, is_image_generator)
 	except Exception as e:
-		await handle_exception(update, context, e, init_message_task, flag_key)
-	finally:
-		if typing_task and not typing_task.done():
-			typing_task.cancel()
+		await handle_exception(update, context, e, init_message_task)
 
 
 async def handle_caption(update: Update, max_length):
@@ -142,7 +122,7 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 		raise ValueError("Empty image data received.")
 
 
-async def handle_photo(update, context, max_length):
+async def handle_photo(update: Update, context: CallbackContext, max_length):
 	content = []
 	current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
 	if current_mask['name'] != '图像解析助手':
@@ -169,7 +149,7 @@ async def handle_document_download(update: Update, context: CallbackContext):
 	return f'```{document.mime_type}\n{document_text}\n```\n'
 
 
-async def handle_document(update, context, max_length):
+async def handle_document(update: Update, context: CallbackContext, max_length):
 	handled_result = await asyncio.gather(handle_document_download(update, context),
 	                                      handle_caption(update, max_length))
 	handle_document_result = handled_result[0]
@@ -177,17 +157,17 @@ async def handle_document(update, context, max_length):
 	return handle_document_result + (handle_caption_result if handle_caption_result else '')
 
 
-async def handle_audio(update, context):
+async def handle_audio(update: Update, context: CallbackContext):
 	audio_file = update.message.audio or update.message.voice
 	if audio_file:
 		file_id = audio_file.file_id
 		new_file = await context.bot.get_file(file_id)
-		file_path = os.path.join(f"{file_id}.ogg")
-		await new_file.download_to_drive(file_path)
+		ogg_path = os.path.join(f"{file_id}.ogg")
+		await new_file.download_to_drive(ogg_path)
 		try:
 			return {
 				'type': 'audio',
-				'audio_path': file_path
+				'audio_path': ogg_path
 			}
 		except Exception as e:
 			raise ValueError(e)
@@ -208,13 +188,13 @@ async def handle_text(update, max_length):
 async def handle_stream_response(update: Update, context: CallbackContext, content: str, is_image_generator: bool,
                                  init_message_task):
 	prev_answer = ''
-	chat: Chat = context.user_data['chat']
+	current_message_length = 0
+	max_message_length = 4096
+	message_content = ''
+	gpt_platform: Platform = context.user_data['platform']
 	init_message: Message = await init_message_task
 	current_message_id = init_message.message_id
-	current_message_length = 0
-	MAX_MESSAGE_LENGTH = 4096
-	message_content = ''
-	async for status, curr_answer in chat.async_stream_request(content, chat.is_free, **OPENAI_COMPLETION_OPTIONS):
+	async for status, curr_answer in gpt_platform.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				img_response = await client.get(curr_answer)
@@ -228,7 +208,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 			continue
 		new_content = curr_answer[len(prev_answer):]
 		new_content_length = len(new_content)
-		if current_message_length + new_content_length > MAX_MESSAGE_LENGTH:
+		if current_message_length + new_content_length > max_message_length:
 			new_init_message = await context.bot.send_message(chat_id=update.message.chat_id, text='正在输入...')
 			current_message_id = new_init_message.message_id
 			current_message_length = 0
@@ -242,21 +222,20 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 		prev_answer = curr_answer
 
 
-async def handle_response(update, context, content, is_image_generator, flag_key):
-	chat: Chat = context.user_data['chat']
-	async for res in chat.async_request(content, **OPENAI_COMPLETION_OPTIONS):
+async def handle_response(update, context, content, is_image_generator):
+	await bot_util.send_typing(update)
+	gpt_platform: Platform = context.user_data['platform']
+	async for res in gpt_platform.async_request(content, **OPENAI_COMPLETION_OPTIONS):
 		if res is None or len(res) == 0:
 			continue
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				# 将res的url下载 返回一个图片
 				img_response = await client.get(res)
-				context.user_data[flag_key] = False
 			if img_response.content:
 				await update.message.reply_photo(photo=img_response.content,
 				                                 reply_to_message_id=update.effective_message.message_id)
 		else:
-			context.user_data[flag_key] = False
 			if len(res) < 4096:
 				await bot_util.send_message(update, res)
 			else:
@@ -265,7 +244,7 @@ async def handle_response(update, context, content, is_image_generator, flag_key
 					await bot_util.send_message(update, part)
 
 
-async def handle_exception(update, context, e, init_message_task, flag_key):
+async def handle_exception(update, context, e, init_message_task):
 	logger.error(
 		f"==================================================ERROR START==================================================================")
 	# 记录异常信息
@@ -273,24 +252,29 @@ async def handle_exception(update, context, e, init_message_task, flag_key):
 	traceback.print_exc()
 	logger.error(
 		f"==================================================ERROR END====================================================================")
-	if flag_key:
-		context.user_data[flag_key] = False
 	error_message = str(e)
 	if 'at byte offset' in error_message:
-		await exception_message_handler(update, context, init_message_task, '缺少结束标记!')
+		init_text = '缺少结束标记!\n\n'
 	elif 'content_filter' in error_message:
-		await exception_message_handler(update, context, init_message_task,
-		                                "The response was filtered due to the prompt triggering Azure OpenAI's content management policy. Please modify your prompt and retry!")
+		init_text = '内容被过滤!\n\n'
 	elif '504 Gateway Time-out' in error_message:
-		await exception_message_handler(update, context, init_message_task, '网关超时!')
+		init_text = '网关超时!\n\n'
 	else:
-		match = re.search(r"message': '(.+?) \(request id:", error_message)
-		if match:
-			clean_message = match.group(1)
-			text = f'Exception occurred:: \n\n{clean_message}'
+		init_text = ''
+	try:
+		if e.body:
+			try:
+				text = init_text + e.body['message'].split('(request', 1)[0]
+			except:
+				text = init_text + str(e.body)
 		else:
-			text = f'Exception occurred: \n\n{e}'
-		await exception_message_handler(update, context, init_message_task, text)
+			try:
+				text = init_text + json.loads(e.args[0])['error']['message']
+			except:
+				text = init_text + json.loads(e.args[0])
+	except:
+		text = init_text + e.args[0]
+	await exception_message_handler(update, context, init_message_task, text)
 
 
 async def exception_message_handler(update, context, init_message_task, text):
@@ -303,27 +287,17 @@ async def exception_message_handler(update, context, init_message_task, text):
 
 @auth
 async def balance_handler(update: Update, context: CallbackContext):
-	flag_key = update.message.message_id
-	# 启动一个异步任务来发送 typing 状态
-	context.user_data[flag_key] = True
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
-	
+	await bot_util.send_typing(update)
 	if 'platform' not in context.user_data:
 		context.user_data['platform'] = instantiate_platform()
 	# 使用平台内置的方法查询余额
 	platform: Platform = context.user_data['platform']
 	try:
-		# 不同平台有不同的结果
 		balance_result = await platform.query_balance()
-		context.user_data[flag_key] = False
-		await update.message.reply_text(balance_result, reply_to_message_id=update.message.message_id)
+		await bot_util.send_message(update, balance_result)
 	except Exception as e:
 		traceback.print_exc()
-		context.user_data[flag_key] = False
 		await update.message.reply_text(f'余额查询失败:\n\n {str(e)}', reply_to_message_id=update.message.message_id)
-	finally:
-		if not typing_task.done():
-			typing_task.cancel()
 
 
 @auth
@@ -355,7 +329,7 @@ async def restore_context_handler(update: Update, context: CallbackContext):
 	# 检查按钮的回调数据
 	if query.data == 'restore_context':
 		task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
-		context.user_data['chat'].recover_messages(context)
+		context.user_data['platform'].chat.recover_messages(context)
 		await task
 
 

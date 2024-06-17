@@ -1,9 +1,7 @@
-import asyncio
-import os
 from json import dumps as jsonDumps
 from json import loads as jsonLoads
 from pathlib import Path
-from typing import List, Literal, Union, Dict, AsyncGenerator
+from typing import List
 
 from openai import AsyncOpenAI
 from telegram.ext import CallbackContext
@@ -121,26 +119,18 @@ class Chat:
 	recently_request_data: dict  # 最近一次请求所用的参数
 	
 	def __init__(self,
-	             # kwargs
 	             api_key: str | AKPool,
 	             base_url: str = None,  # base_url 参数用于修改基础URL
 	             timeout=None,
 	             max_retries=None,
 	             http_client=None,
-	             # request_kwargs
-	             model: Literal['gpt-3.5-turbo-0125', 'gpt-4o-n', 'gpt-4-turbo-2024-04-09'] = "gpt-3.5-turbo-0125",
-	             # Chat
 	             msg_max_count: int = None,
-	             # 是否为免费key
-	             is_free: bool = False,
-	             # kwargs
 	             **kwargs,
 	             ):
 		api_base = kwargs.pop('api_base', None)
 		base_url = base_url or api_base
 		MsgMaxCount = kwargs.pop('MsgMaxCount', None)
 		msg_max_count = msg_max_count or MsgMaxCount
-		self.is_free = is_free
 		if base_url: kwargs["base_url"] = base_url
 		if timeout: kwargs["timeout"] = timeout
 		if max_retries: kwargs["max_retries"] = max_retries
@@ -156,84 +146,6 @@ class Chat:
 			self._akpool = api_key
 		else:
 			self._akpool = AKPool([api_key])
-	
-	async def async_request(self, content: Union[str, List, Dict] = None, **kwargs) -> str:
-		messages_task = asyncio.create_task(self._prepare_messages(content, self.openai_client))
-		if kwargs.get('model') == "dall-e-3":
-			messages = await messages_task
-			# 需要生成图像
-			generate_res = await self.openai_client.images.generate(**{
-				"prompt": messages[0]['content'],
-				"model": kwargs.get('model'),
-				"style": "natural",
-				"quality": "hd",
-				"size": "1024x1024"
-			})
-			answer = generate_res.data[0].url
-			yield answer
-		else:
-			messages = await messages_task
-			completion = await self.openai_client.chat.completions.create(**{
-				"messages": kwargs.pop('messages', []) + list(self._messages + messages),
-				"stream": False,
-				**kwargs
-			})
-			answer: str = completion.choices[0].message.content
-			yield answer
-			self._messages.add_many(*messages, {"role": "assistant", "content": answer})
-	
-	async def async_stream_request(self, content: Union[str, List, Dict] = None, is_free=False,
-	                               **kwargs) -> AsyncGenerator[str, None]:
-		messages_task = asyncio.create_task(self._prepare_messages(content, self.openai_client))
-		if kwargs.get('model') == "dall-e-3":
-			messages = await messages_task
-			# 需要生成图像
-			generate_res = await self.openai_client.images.generate(**{
-				"prompt": messages[0]['content'],
-				"model": kwargs.get('model'),
-				"style": "natural",
-				"quality": "hd",
-				"size": "1024x1024"
-			})
-			answer = generate_res.data[0].url
-			yield 'finished', answer
-		else:
-			messages = await messages_task
-			completion = await self.openai_client.chat.completions.create(**{
-				"messages": kwargs.pop('messages', []) + list(self._messages + messages),
-				"stream": True,
-				**kwargs
-			})
-			answer: str = ""
-			async for chunk_iter in completion:
-				if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
-					answer += chunk
-					yield 'not_finished', answer
-			yield 'finished', answer
-			if not is_free:
-				self._messages.add_many(*messages, {"role": "assistant", "content": answer})
-	
-	async def _prepare_messages(self, content: Union[str, List, Dict], openai_client: AsyncOpenAI) -> List[
-		Dict[str, str]]:
-		if isinstance(content, dict) and content.get('type') == "audio":
-			return await self._handle_audio_content(content['audio_path'], openai_client)
-		return [{"role": "user", "content": content}]
-	
-	async def _handle_audio_content(self, audio_path: str, openai_client: AsyncOpenAI) -> List[Dict[str, str]]:
-		try:
-			with open(audio_path, "rb") as audio_file:
-				transcript = await openai_client.audio.transcriptions.create(
-					file=audio_file,
-					model='whisper-1',
-					language='zh'
-				)
-				transcribed_text = transcript.text
-			return [{"role": "user", "content": transcribed_text}]
-		except Exception as e:
-			raise RuntimeError(e)
-		finally:
-			if os.path.exists(audio_path):
-				os.remove(audio_path)
 	
 	def rollback(self, n=1):
 		'''
@@ -272,6 +184,12 @@ class Chat:
 			new_queue.add_many(*clear_messages)
 			new_queue.add_many(*list(self._messages))
 			self._messages = new_queue
+	
+	def append_messages(self, answer, *messages):
+		self._messages.add_many(*messages, {"role": "assistant", "content": answer})
+	
+	def combine_messages(self, *messages, **kwargs):
+		return kwargs.pop('messages', []) + list(self._messages + messages), kwargs
 	
 	def clear_messages(self, context: CallbackContext):
 		"""
