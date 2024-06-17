@@ -545,7 +545,12 @@ async def shop_handler(update: Update, context: CallbackContext):
 		if 'platform' not in context.user_data:
 			context.user_data['platform'] = instantiate_platform()
 		platform = context.user_data['platform']
-		webbrowser.open(platform.payment_url)
+		# 创建一个包含 URL 按钮的键盘
+		keyboard = [[InlineKeyboardButton("Visit Shop", url=platform.payment_url)]]
+		reply_markup = InlineKeyboardMarkup(keyboard)
+		
+		# 发送带有图片、描述和 URL 按钮的消息
+		await update.message.reply_text(text='Click the button below to visit the shop:', reply_markup=reply_markup)
 
 
 def handlers():
