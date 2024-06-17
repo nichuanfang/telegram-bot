@@ -36,12 +36,13 @@ with open(os.path.join(os.path.dirname(__file__), 'config', 'masks.json'), encod
 
 async def start(update: Update, context: CallbackContext) -> None:
 	start_message = (
-		"欢迎使用！以下是您可以使用的命令列表：\n"
-		"  /clear - 清除聊天\n"
-		"  /masks - 切换面具\n"
-		"  /model - 切换模型\n"
-		"  /balance - 余额查询\n\n"
-		"如需进一步帮助，请随时输入相应的命令。"
+		"欢迎使用！以下是您可以使用的命令列表：\n\n"
+		"/clear - 清除聊天\n"
+		"/masks - 切换面具\n"
+		"/model - 切换模型\n"
+		"/balance - 余额查询\n"
+		"/platform - 切换平台\n"
+		"/shop - 充值\n\n"
 	)
 	await update.message.reply_text(start_message)
 
@@ -540,7 +541,7 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
 
 async def shop_handler(update: Update, context: CallbackContext):
 	user_id = update.effective_user.id
-	if str(user_id) not in bot_util.ALLOWED_TELEGRAM_USER_IDS:
+	if str(user_id) in bot_util.ALLOWED_TELEGRAM_USER_IDS:
 		if 'platform' not in context.user_data:
 			context.user_data['platform'] = instantiate_platform()
 		platform = context.user_data['platform']
