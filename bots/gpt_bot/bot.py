@@ -485,7 +485,6 @@ async def platform_handler(update: Update, context: CallbackContext):
 	if 'platform' not in context.user_data:
 		context.user_data['platform'] = instantiate_platform()
 	current_platform: Platform = context.user_data['platform']
-	# current_mask_key = next(key for key, value in masks.items() if value == current_platform.name_zh)
 	# 生成内联键盘
 	keyboard = generate_platform_keyboard(update, bot_util.platforms, current_platform.name)
 	
@@ -506,13 +505,18 @@ def generate_platform_keyboard(update, platforms, current_platform_key):
 			if key == current_platform_key:
 				name = "* " + name
 			row.append(InlineKeyboardButton(name, callback_data=key))
-			if (i + 1) % 3 == 0:
+			if (i + 1) % 2 == 0:
 				keyboard.append(row)
 				row = []
 		if row:
 			keyboard.append(row)
 	else:
-		row.append(InlineKeyboardButton('* 免费', callback_data='free'))
+		if current_platform_key == 'free_1':
+			row.append(InlineKeyboardButton('* 免费_1', callback_data='free_1'))
+			row.append(InlineKeyboardButton('免费_2', callback_data='free_2'))
+		elif current_platform_key == 'free_2':
+			row.append(InlineKeyboardButton('免费_1', callback_data='free_1'))
+			row.append(InlineKeyboardButton('* 免费_2', callback_data='free_2'))
 		keyboard.append(row)
 	return InlineKeyboardMarkup(keyboard)
 
@@ -531,7 +535,7 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
 	# 应用选择的平台
 	context.user_data['platform'] = bot_util.instantiate_platform(selected_platform_key)
 	curr_platform: Platform = context.user_data['platform']
-	switch_message = f'平台已切换至[{curr_platform.name_zh}]({curr_platform.index_url}) '
+	switch_message = f'平台已切换至[{bot_util.escape_markdown_v2(curr_platform.name_zh)}]({bot_util.escape_markdown_v2(curr_platform.index_url)}) '
 	await query.edit_message_text(
 		text=switch_message,
 		parse_mode=ParseMode.MARKDOWN_V2,
@@ -566,7 +570,7 @@ def handlers():
 		                     pattern='^(common|github_copilot|image_generator|image_analyzer|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
 		CallbackQueryHandler(restore_context_handler, pattern='^(restore_context)$'),
-		CallbackQueryHandler(platform_selection_handler, pattern='^(free|chatanywhere|bianxieai)$'),
+		CallbackQueryHandler(platform_selection_handler, pattern='^(free_1|free_2|chatanywhere|bianxieai)$'),
 		MessageHandler(
 			filters.TEXT & ~filters.COMMAND | filters.ATTACHMENT, answer)
 	]

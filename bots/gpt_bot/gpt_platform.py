@@ -12,9 +12,6 @@ import platform
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
 
-# 最大历史消息数
-MSG_MAX_COUNT = 5
-
 
 def gpt_platform(cls):
 	"""
@@ -43,6 +40,7 @@ class Platform(metaclass=ABCMeta):
 			openai_api_key,
 			index_url: str,
 			payment_url: str,
+			msg_max_count: int
 	):
 		# 平台名称(英文)
 		self.name = name
@@ -60,12 +58,15 @@ class Platform(metaclass=ABCMeta):
 		self.index_url = index_url
 		# 平台充值页面
 		self.payment_url = payment_url
+		# 最大历史消息容量
+		self.msg_max_count = msg_max_count
+		# 初始化参数
 		chat_init_params = {
 			"api_key": openai_api_key,
 			"base_url": self.openai_base_url,
 			"max_retries": openai.DEFAULT_MAX_RETRIES,
 			"timeout": openai.DEFAULT_TIMEOUT,
-			"msg_max_count": MSG_MAX_COUNT
+			"msg_max_count": msg_max_count
 		}
 		
 		self.chat = Chat(**chat_init_params)
@@ -135,8 +136,7 @@ class Platform(metaclass=ABCMeta):
 			})
 			answer: str = completion.choices[0].message.content
 			yield answer
-		if self.name != 'free':
-			self.chat.append_messages(answer, *messages)
+		self.chat.append_messages(answer, *messages)
 	
 	async def prepare_messages(self, content: Union[str, List, Dict]) -> List[
 		Dict[str, str]]:

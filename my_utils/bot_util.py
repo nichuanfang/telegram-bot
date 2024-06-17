@@ -19,9 +19,11 @@ values = validate('ALLOWED_TELEGRAM_USER_IDS')
 # 允许访问的用户列表 逗号分割并去除空格
 ALLOWED_TELEGRAM_USER_IDS = [user_id.strip() for user_id in values[0].split(',')]
 # 默认平台
-DEFAULT_PLATFORM: str = os.getenv('DEFAULT_PLATFORM', 'bianxieai')
+DEFAULT_PLATFORM: str = os.getenv('DEFAULT_PLATFORM', 'free_1')
 # 模型注册表
 PLATFORMS_REGISTRY = {}
+# 最大历史消息数
+MSG_MAX_COUNT = 5
 
 
 def load_platforms():
@@ -70,7 +72,8 @@ def instantiate_platform(platform_name: str = DEFAULT_PLATFORM):
 		'foreign_openai_base_url': platform['foreign_openai_base_url'],
 		'openai_api_key': platform['openai_api_key'],
 		'index_url': platform['index_url'],
-		'payment_url': platform['payment_url']
+		'payment_url': platform['payment_url'],
+		'msg_max_count': 2 if platform_name.startswith('free') else MSG_MAX_COUNT
 	}
 	logger.info(f'当前使用的openai代理平台为{platform_name}.')
 	return PLATFORMS_REGISTRY[platform_name](**platform_init_params)
@@ -97,7 +100,7 @@ def auth(func):
 			if context.bot.first_name == 'GPTBot':
 				logger.info(f'=================user {user_id} access the GPTbot for free===================')
 				if 'platform' not in context.user_data:
-					context.user_data['platform'] = instantiate_platform('free')
+					context.user_data['platform'] = instantiate_platform('free_1')
 			else:
 				logger.warn(f"======================user {user_id}'s  access has been filtered====================")
 				await update.message.reply_text('You are not authorized to use this bot.')
