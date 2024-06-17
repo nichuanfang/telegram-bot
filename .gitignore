@@ -3,5 +3,6 @@ __pycache__
 .env
 .DS_Store
 /usage_logs
-venv
+.venv
 /.cache
+bots/gpt_bot/config/platforms.json

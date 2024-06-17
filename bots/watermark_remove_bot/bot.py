@@ -25,27 +25,18 @@ async def watermark_remove_uumvp(update: Update, context: CallbackContext):
 		update:  更新对象
 		context:  上下文
 	"""
-	flag_key = update.message.message_id
-	# 启动一个异步任务来发送 typing 状态
-	context.user_data[flag_key] = True
-	typing_task = asyncio.create_task(bot_util.send_typing_action(update, context, flag_key))
+	await bot_util.send_typing(update)
 	try:
 		req = UuMvpHttpRequest()
 		response = await req.query(update.message.text)
 		if response['code'] == 100:
 			pics = response['data']['pics']
-			context.user_data[flag_key] = False
 			for pic in pics:
 				await update.message.reply_photo(pic, reply_to_message_id=update.message.message_id)
 		else:
-			context.user_data[flag_key] = False
 			await update.message.reply_text(f'{update.message.text}解析失败!')
 	except Exception:
-		context.user_data[flag_key] = False
 		await update.message.reply_text(f'{update.message.text}解析失败')
-	finally:
-		if not typing_task.done():
-			typing_task.cancel()
 
 
 async def default_handler(update: Update, context: CallbackContext):
