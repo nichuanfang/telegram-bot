@@ -124,13 +124,11 @@ class Chat:
 	             timeout=None,
 	             max_retries=None,
 	             http_client=None,
-	             msg_max_count: int = None,
+	             max_message_count: int = 0,
 	             **kwargs,
 	             ):
 		api_base = kwargs.pop('api_base', None)
 		base_url = base_url or api_base
-		MsgMaxCount = kwargs.pop('MsgMaxCount', None)
-		msg_max_count = msg_max_count or MsgMaxCount
 		if base_url: kwargs["base_url"] = base_url
 		if timeout: kwargs["timeout"] = timeout
 		if max_retries: kwargs["max_retries"] = max_retries
@@ -139,7 +137,11 @@ class Chat:
 		self.reset_api_key(api_key)
 		self.openai_client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
 		                                 max_retries=max_retries)
-		self._messages = Temque(maxlen=msg_max_count)
+		self._messages = Temque(maxlen=max_message_count)
+	
+	def set_max_message_count(self, max_count):
+		# 设置最大历史消息数
+		self._messages.maxlen = max_count
 	
 	def reset_api_key(self, api_key: str | AKPool):
 		if isinstance(api_key, AKPool):
