@@ -4,7 +4,6 @@ import json
 import os
 import re
 import traceback
-import webbrowser
 
 import httpx
 import telegram.helpers
@@ -19,19 +18,11 @@ from my_utils.bot_util import auth, instantiate_platform
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
 # 默认面具
-DEFAULT_MASK: str = os.getenv('DEFAULT_MASK', 'common')
+DEFAULT_MASK: str = bot_util.DEFAULT_MASK
+# 面具列表
+masks = bot_util.masks
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
-# openai相关参数
-OPENAI_COMPLETION_OPTIONS = {
-	"temperature": 0.5,  # 更低的温度提高了一致性
-	"top_p": 0.9,  # 采样更加多样化
-	"frequency_penalty": 0.5,  # 增加惩罚以减少重复
-	"presence_penalty": 0.6,  # 增加惩罚以提高新信息的引入
-}
-# 加载面具
-with open(os.path.join(os.path.dirname(__file__), 'config', 'masks.json'), encoding='utf-8') as masks_file:
-	masks = json.load(masks_file)
 
 
 async def start(update: Update, context: CallbackContext) -> None:
@@ -85,17 +76,18 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 		else:
 			raise ValueError('不支持的输入类型!')
 		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
-		OPENAI_COMPLETION_OPTIONS.update({
-			'messages': curr_mask['mask'],
-			'model': context.user_data.get('current_model', curr_mask['default_model'])
-		})
 		if 'platform' not in context.user_data:
-			context.user_data['platform'] = instantiate_platform()
+			context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 		content_result = await content_task
+		curr_mask['openai_completion_options'].update({
+			"model": context.user_data.get('current_model', curr_mask['default_model'])
+		})
 		if ENABLE_STREAM:
-			await handle_stream_response(update, context, content_result, is_image_generator, init_message_task)
+			await handle_stream_response(update, context, content_result, is_image_generator, init_message_task,
+			                             **curr_mask['openai_completion_options'])
 		else:
-			await handle_response(update, context, content_result, is_image_generator)
+			await handle_response(update, context, content_result, is_image_generator,
+			                      **curr_mask['openai_completion_options'])
 	except Exception as e:
 		await handle_exception(update, context, e, init_message_task)
 
@@ -124,9 +116,9 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 async def handle_photo(update: Update, context: CallbackContext, max_length):
 	content = []
 	current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
-	if current_mask['name'] != '图像解析助手':
-		raise ValueError(
-			f'请将面具切换为"图像解析助手"!')
+	current_model: str = context.user_data.get('current_model', current_mask['default_model'])
+	if current_model != 'gpt-4o':
+		raise ValueError(f'当前模型: {current_model}不支持图片解析!')
 	
 	handle_result = await asyncio.gather(handle_caption(update, max_length),
 	                                     handle_photo_download(update, context))
@@ -185,7 +177,7 @@ async def handle_text(update, max_length):
 
 
 async def handle_stream_response(update: Update, context: CallbackContext, content: str, is_image_generator: bool,
-                                 init_message_task):
+                                 init_message_task, **openai_completion_options):
 	prev_answer = ''
 	current_message_length = 0
 	max_message_length = 4096
@@ -193,7 +185,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 	gpt_platform: Platform = context.user_data['platform']
 	init_message: Message = await init_message_task
 	current_message_id = init_message.message_id
-	async for status, curr_answer in gpt_platform.async_stream_request(content, **OPENAI_COMPLETION_OPTIONS):
+	async for status, curr_answer in gpt_platform.async_stream_request(content, **openai_completion_options):
 		if is_image_generator:
 			async with httpx.AsyncClient() as client:
 				img_response = await client.get(curr_answer)
@@ -221,10 +213,10 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 		prev_answer = curr_answer
 
 
-async def handle_response(update, context, content, is_image_generator):
+async def handle_response(update, context, content, is_image_generator, **openai_completion_options):
 	await bot_util.send_typing(update)
 	gpt_platform: Platform = context.user_data['platform']
-	async for res in gpt_platform.async_request(content, **OPENAI_COMPLETION_OPTIONS):
+	async for res in gpt_platform.async_request(content, **openai_completion_options):
 		if res is None or len(res) == 0:
 			continue
 		if is_image_generator:
@@ -288,7 +280,8 @@ async def exception_message_handler(update, context, init_message_task, text):
 async def balance_handler(update: Update, context: CallbackContext):
 	await bot_util.send_typing(update)
 	if 'platform' not in context.user_data:
-		context.user_data['platform'] = instantiate_platform()
+		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+		context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 	# 使用平台内置的方法查询余额
 	platform: Platform = context.user_data['platform']
 	try:
@@ -308,7 +301,8 @@ async def clear_handler(update: Update, context: CallbackContext):
 		context:  上下文对象
 	"""
 	if 'platform' not in context.user_data:
-		context.user_data['platform'] = instantiate_platform()
+		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+		context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 	# 创建内联按钮
 	keyboard = [
 		[InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
@@ -395,12 +389,13 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
 	
 	# 根据选择的面具进行相应的处理
 	switch_success_message_task = asyncio.create_task(query.edit_message_text(
-		text=f'面具已切换至*{selected_mask["name"]}*',
+		text=bot_util.escape_markdown_v2(selected_mask['introduction']),
 		parse_mode=ParseMode.MARKDOWN_V2
 	))
 	if 'platform' not in context.user_data:
-		context.user_data['platform'] = instantiate_platform()
+		context.user_data['platform'] = instantiate_platform(max_message_count=selected_mask['max_message_count'])
 	else:
+		context.user_data['platform'].chat.set_max_message_count(selected_mask['max_message_count'])
 		# 切换面具后清除上下文
 		context.user_data['platform'].chat.clear_messages(context)
 	await switch_success_message_task
@@ -466,7 +461,8 @@ async def model_selection_handler(update: Update, context: CallbackContext):
 		parse_mode=ParseMode.MARKDOWN_V2
 	))
 	if 'platform' not in context.user_data:
-		context.user_data['platform'] = instantiate_platform()
+		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+		context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 	else:
 		# 切换模型后清除上下文
 		context.user_data['platform'].chat.clear_messages(context)
@@ -483,10 +479,11 @@ async def platform_handler(update: Update, context: CallbackContext):
 	"""
 	await bot_util.send_typing(update)
 	if 'platform' not in context.user_data:
-		context.user_data['platform'] = instantiate_platform()
+		curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+		context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 	current_platform: Platform = context.user_data['platform']
 	# 生成内联键盘
-	keyboard = generate_platform_keyboard(update, bot_util.platforms, current_platform.name)
+	keyboard = generate_platform_keyboard(update, context, bot_util.platforms, current_platform.name)
 	
 	await update.message.reply_text(
 		'请选择一个平台:',
@@ -494,11 +491,10 @@ async def platform_handler(update: Update, context: CallbackContext):
 	)
 
 
-def generate_platform_keyboard(update, platforms, current_platform_key):
-	user_id = update.effective_user.id
+def generate_platform_keyboard(update, context, platforms, current_platform_key):
 	keyboard = []
 	row = []
-	if str(user_id) in bot_util.ALLOWED_TELEGRAM_USER_IDS:
+	if context.user_data['identity'] == 'user':
 		for i, (key, platform) in enumerate(platforms.items()):
 			# 如果是当前选择的面具，添加标记
 			name = platform["name"]
@@ -533,7 +529,9 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
 	# 获取用户选择的平台
 	selected_platform_key = query.data
 	# 应用选择的平台
-	context.user_data['platform'] = bot_util.instantiate_platform(selected_platform_key)
+	curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+	context.user_data['platform'] = instantiate_platform(platform_name=selected_platform_key,
+	                                                     max_message_count=curr_mask['max_message_count'])
 	curr_platform: Platform = context.user_data['platform']
 	switch_message = f'平台已切换至[{bot_util.escape_markdown_v2(curr_platform.name_zh)}]({bot_util.escape_markdown_v2(curr_platform.index_url)}) '
 	await query.edit_message_text(
@@ -543,11 +541,12 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
 	context.user_data['platform'].chat.clear_messages(context)
 
 
+@auth
 async def shop_handler(update: Update, context: CallbackContext):
-	user_id = update.effective_user.id
-	if str(user_id) in bot_util.ALLOWED_TELEGRAM_USER_IDS:
+	if context.user_data['identity'] == 'user':
 		if 'platform' not in context.user_data:
-			context.user_data['platform'] = instantiate_platform()
+			curr_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+			context.user_data['platform'] = instantiate_platform(max_message_count=curr_mask['max_message_count'])
 		platform = context.user_data['platform']
 		# 创建一个包含 URL 按钮的键盘
 		keyboard = [[InlineKeyboardButton("Visit Shop", url=platform.payment_url)]]
@@ -567,7 +566,7 @@ def handlers():
 		CommandHandler('platform', platform_handler),
 		CommandHandler('shop', shop_handler),
 		CallbackQueryHandler(mask_selection_handler,
-		                     pattern='^(common|github_copilot|image_generator|image_analyzer|travel_guide|song_recommender|movie_expert|doctor)$'),
+		                     pattern='^(common|compressed|github_copilot|image_generator|travel_guide|song_recommender|movie_expert|doctor)$'),
 		CallbackQueryHandler(model_selection_handler, pattern='^(gpt-|dall)'),
 		CallbackQueryHandler(restore_context_handler, pattern='^(restore_context)$'),
 		CallbackQueryHandler(platform_selection_handler, pattern='^(free_1|free_2|chatanywhere|bianxieai)$'),

@@ -2,6 +2,7 @@
 
 ---
 **内容目录**
+
 - [Dogyun机器人⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
 - [Github工作流机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
 - [Tmdb机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
@@ -76,15 +77,15 @@ Chatgpt聊天机器人telegram端! 强大的AI工具~
 
 - [x] **流式响应**和**非流式响应**都支持.默认采用**流式响应**
 - [x] 支持**切换模型**功能.不同的面具具备不同的模型选择列表和默认模型
-- [x] 支持**面具切换**功能.自带有八个面具: 
-  - **通用助手**
-  - **代码助手**
-  - **图像解析助手**
-  - **图像生成助手**
-  - **旅游助手**
-  - **歌曲推荐人**
-  - **电影专家**
-  - **医生**
+- [x] 支持**面具切换**功能.自带有八个面具:
+    - **通用助手**
+    - **简明助手**
+    - **代码助手**
+    - **图像生成助手**
+    - **旅游助手**
+    - **歌曲推荐人**
+    - **电影专家**
+    - **医生**
 - [x] 支持**清除聊天上下文**和**恢复上下文**功能,可以开启新的会话
 - [x] 支持**余额查询**
 - [x] 控制**历史对话长度**
@@ -97,4 +98,3 @@ Chatgpt聊天机器人telegram端! 强大的AI工具~
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3BjcDNxMzRwMWQ1eGk0bHk3bTh0MTU3MHM3cmw5MTllYTg1bjh4OCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/euKdZ5seD4tmDRlG8E/giphy.gif" />
   <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnZoeXYyZWtrYjJpeGI0azB1d3M2amk3c3AzZnl2MTJqOHM0MDFsayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/17g3e0IUCekPQgGJoj/giphy.gif" />
 </p>
-

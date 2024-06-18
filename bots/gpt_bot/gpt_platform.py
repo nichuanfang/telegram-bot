@@ -40,7 +40,7 @@ class Platform(metaclass=ABCMeta):
 			openai_api_key,
 			index_url: str,
 			payment_url: str,
-			msg_max_count: int
+			max_message_count: int,
 	):
 		# 平台名称(英文)
 		self.name = name
@@ -59,14 +59,14 @@ class Platform(metaclass=ABCMeta):
 		# 平台充值页面
 		self.payment_url = payment_url
 		# 最大历史消息容量
-		self.msg_max_count = msg_max_count
+		self.max_message_count = max_message_count
 		# 初始化参数
 		chat_init_params = {
 			"api_key": openai_api_key,
 			"base_url": self.openai_base_url,
 			"max_retries": openai.DEFAULT_MAX_RETRIES,
 			"timeout": openai.DEFAULT_TIMEOUT,
-			"msg_max_count": msg_max_count
+			"max_message_count": max_message_count
 		}
 		
 		self.chat = Chat(**chat_init_params)
