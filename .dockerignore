@@ -28,7 +28,7 @@ _.orig
 .cache/
 .pytest_cache/
 .mypy_cache/
-.env
+# .env
 .venv
 env/
 venv/

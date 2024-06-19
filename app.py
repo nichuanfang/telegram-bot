@@ -1,16 +1,13 @@
-from bots.dogyun_bot import scheduled_task
 from my_utils import my_logging, validation_util
-from telegram.ext import ApplicationBuilder, ContextTypes
-from telegram import Bot
-import asyncio
-import multiprocessing
-import os
-import platform
-import traceback
-
-import aiocron
 import dotenv
-
+import aiocron
+import traceback
+import platform
+import os
+import multiprocessing
+import asyncio
+from telegram import Bot
+from telegram.ext import ApplicationBuilder, ContextTypes
 dotenv.load_dotenv(override=True)
 
 
@@ -22,17 +19,19 @@ bot_directories = [d for d in os.listdir(
 
 
 async def add_scheduled_tasks(bot):
+    from bots.dogyun_bot.scheduled_task import get_traffic_packet as gtp, lucky_draw_notice, balance_lack_notice
+
     @aiocron.crontab('0 0 7 * *')  # 每月7号
     async def get_traffic_packet():
-        await scheduled_task.get_traffic_packet(bot)
+        await gtp(bot)
 
     @aiocron.crontab('0 9 * * *')  # 每天9点
     async def lucky_draw_task():
-        await scheduled_task.lucky_draw_notice(bot)
+        await lucky_draw_notice(bot)
 
     @aiocron.crontab('0 9 * * *')  # 每天9点
     async def balance_lack_task():
-        await scheduled_task.balance_lack_notice(bot)
+        await balance_lack_notice(bot)
 
 
 async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:

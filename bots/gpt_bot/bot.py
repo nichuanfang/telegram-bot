@@ -90,7 +90,8 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             content_task = asyncio.create_task(handle_video(update, context))
         else:
             raise ValueError('不支持的输入类型!')
-        curr_mask =context.user_data.get('current_mask', DEFAULT_MASK_KEY)
+        curr_mask = context.user_data.get(
+            'current_mask', MASKS[DEFAULT_MASK_KEY])
         content_result = await content_task
         curr_mask['openai_completion_options'].update({
             "model": context.user_data.get('current_model', curr_mask['default_model'])
@@ -129,7 +130,8 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 
 async def handle_photo(update: Update, context: CallbackContext, max_length):
     content = []
-    current_mask = context.user_data.get('current_mask', MASKS[DEFAULT_MASK_KEY])
+    current_mask = context.user_data.get(
+        'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
     if current_model != 'gpt-4o':
@@ -348,15 +350,27 @@ def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
     keyboard = []
     row = []
     if is_free:
-        for i, mask_key in enumerate(masks):
-            # 如果是当前选择的面具，添加标记
-            name = MASKS[mask_key]['name']
-            if mask_key == current_mask_key:
-                name = "* " + name
-            row.append(InlineKeyboardButton(name, callback_data=mask_key))
-            if (i + 1) % 2 == 0:
-                keyboard.append(row)
-                row = []
+        if current_mask_key not in masks:
+            for i, mask_key in enumerate(masks):
+                # 如果是当前选择的面具，添加标记
+                name = MASKS[mask_key]['name']
+                if i == 0:
+                    name = "* " + name
+                row.append(InlineKeyboardButton(name, callback_data=mask_key))
+                if (i + 1) % 2 == 0:
+                    keyboard.append(row)
+                    row = []
+        else:
+            for i, mask_key in enumerate(masks):
+                # 如果是当前选择的面具，添加标记
+                name = MASKS[mask_key]['name']
+                if mask_key == current_mask_key:
+                    name = "* " + name
+                    flag = True
+                row.append(InlineKeyboardButton(name, callback_data=mask_key))
+                if (i + 1) % 2 == 0:
+                    keyboard.append(row)
+                    row = []
     else:
         for i, (key, mask) in enumerate(masks.items()):
             # 如果是当前选择的面具，添加标记
@@ -392,7 +406,8 @@ async def masks_handler(update: Update, context: CallbackContext):
     current_platform_key = current_platform.name
     if current_platform_key.startswith('free'):
         is_free = True
-        masks = PLATFORMS[current_platform_key]['mask_model_mapping'].keys()
+        masks = list(PLATFORMS[current_platform_key]
+                     ['mask_model_mapping'].keys())
     else:
         masks = MASKS
         is_free = False
@@ -609,8 +624,8 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
         if current_platform_key.startswith('free'):
             mask_model_mapping = PLATFORMS[current_platform_key]['mask_model_mapping']
             # todo 如果面具不支持 就设置为第一个面具
-            if current_mask['mask_key'] not in mask_model_mapping:
-                default_mask_key = mask_model_mapping.keys()[0]
+            if current_mask['mask_key'] not in mask_model_mapping.keys():
+                default_mask_key = list(mask_model_mapping.keys())[0]
                 current_mask = context.user_data['current_mask'] = MASKS[default_mask_key]
         else:
             # 剩余的都是收费的平台 支持所有面具
