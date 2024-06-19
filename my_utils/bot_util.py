@@ -12,6 +12,7 @@ from fake_useragent import UserAgent
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
+from bots.gpt_bot.gpt_platform import Platform
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 
@@ -37,7 +38,7 @@ else:
     raise RuntimeError('platforms.json不存在,无法加载平台数据!')
 
 # 默认平台
-DEFAULT_PLATFORM: str = os.getenv('DEFAULT_PLATFORM', 'free_1')
+DEFAULT_PLATFORM_KEY: str = os.getenv('DEFAULT_PLATFORM_KEY', 'free_1')
 # 模型注册表
 PLATFORMS_REGISTRY = {}
 platforms_path = os.path.abspath(os.path.join('bots', 'gpt_bot', 'platforms'))
@@ -49,11 +50,11 @@ for file in os.listdir(platforms_path):
     for attr_name in dir(platform_module):
         attr = getattr(platform_module, attr_name)
         if isinstance(attr, type) and getattr(attr, '_is_gpt_platform', False):
-            platform_name = attr._platform_name()
-            PLATFORMS_REGISTRY[platform_name] = attr
+            platform_key = attr._platform_key()
+            PLATFORMS_REGISTRY[platform_key] = attr
 
 
-def instantiate_platform(platform_name: str = DEFAULT_PLATFORM, max_message_count: int = 4):
+def instantiate_platform():
     """
     初始化平台
     @param platform_name: 平台名称(英文)
@@ -61,7 +62,7 @@ def instantiate_platform(platform_name: str = DEFAULT_PLATFORM, max_message_coun
     @return:  平台对象
     """
     # 默认平台
-    platform = platforms[platform_name]
+    platform = platforms[DEFAULT_PLATFORM_KEY]
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in platform:
@@ -74,17 +75,59 @@ def instantiate_platform(platform_name: str = DEFAULT_PLATFORM, max_message_coun
         openai_api_key = platform['openai_api_key']
     # 平台初始化参数
     platform_init_params = {
-        'name': platform_name,
+        'name': DEFAULT_PLATFORM_KEY,
         'name_zh': platform['name'],
         'domestic_openai_base_url': platform['domestic_openai_base_url'],
         'foreign_openai_base_url': platform['foreign_openai_base_url'],
         'openai_api_key': openai_api_key,
         'index_url': platform['index_url'],
         'payment_url': platform['payment_url'],
-        'max_message_count': 4 if platform_name.startswith('free') else max_message_count
+        'max_message_count': 4 if DEFAULT_PLATFORM_KEY.startswith('free') else masks[DEFAULT_MASK_KEY]['max_message_count']
     }
-    logger.info(f'当前使用的openai代理平台为{platform_name}.')
-    return PLATFORMS_REGISTRY[platform_name](**platform_init_params)
+    logger.info(f'当前使用的openai代理平台为{platform["name"]}.')
+    return PLATFORMS_REGISTRY[DEFAULT_PLATFORM_KEY](**platform_init_params)
+
+
+def migrate_platform(from_platform: Platform, to_platform_key: str, max_message_count: int):
+    """
+    迁移平台
+    @param from_platform 原平台对象
+    @param to_platform_key: 要迁移到的平台key
+    @param   max_message_count 最大消息数
+    @return:  平台对象
+    """
+    # 迁移到的平台
+    to_platform: dict = platforms[to_platform_key]
+
+    # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
+    if 'openai_api_key' not in to_platform:
+        url, code = generate_code(
+            to_platform['index_url'], to_platform['username'], to_platform['password'])
+        to_platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
+        to_platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
+        openai_api_key = f'nk-{code}'
+    else:
+        openai_api_key = to_platform['openai_api_key']
+    # 修改参数
+    platform_init_params = {
+        'name': to_platform_key,
+        'name_zh': to_platform['name'],
+        'domestic_openai_base_url': to_platform['domestic_openai_base_url'],
+        'foreign_openai_base_url': to_platform['foreign_openai_base_url'],
+        'openai_api_key': openai_api_key,
+        'index_url': to_platform['index_url'],
+        'payment_url': to_platform['payment_url'],
+        'max_message_count': 4 if to_platform_key.startswith('free') else max_message_count
+    }
+    logger.info(f'当前使用的openai代理平台为{to_platform["name"]}.')
+    # 新平台
+    new_platform: Platform = PLATFORMS_REGISTRY[to_platform_key](
+        **platform_init_params)
+    # 恢复历史消息
+    new_platform.chat._messages.core = from_platform.chat._messages.core
+    # 修剪历史消息
+    new_platform.chat._messages._trim()
+    return new_platform
 
 
 # =====================================授权相关====================================
@@ -117,19 +160,17 @@ def auth(func):
                 if context.bot.first_name == 'GPTBot':
                     logger.info(
                         f'=================user {user_id} access the GPTbot for free===================')
-                    if 'platform' not in context.user_data:
-                        context.user_data['platform'] = instantiate_platform(
-                            'free_1', max_message_count=2)
+                    context.user_data['current_platform'] = instantiate_platform(
+                    )
                 else:
                     logger.warn(
                         f"======================user {user_id}'s  access has been filtered====================")
                     await update.message.reply_text('You are not authorized to use this bot.')
                     return
             else:
-                context.user_data['platform'] = instantiate_platform()
+                context.user_data['current_platform'] = instantiate_platform()
                 context.user_data['identity'] = 'user'
         await func(*args, **kwargs)
-
     return wrapper
 
 
@@ -164,6 +205,7 @@ def generate_code(url: str, username: str, password: str):
 # =====================================消息相关====================================
 
 async def send_message(update: Update, text):
+    assert update.message
     try:
         escaped_text = escape_markdown_v2(text)  # 转义特殊字符
         return await update.message.reply_text(escaped_text,
@@ -180,38 +222,47 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
         # 等流式响应完全结束再尝试markdown格式 加快速度
         if stream_ended:
             escaped_text = escape_markdown_v2(text)
-            await context.bot.edit_message_text(
-                text=escaped_text,
-                chat_id=update.message.chat_id,
-                message_id=message_id,
-                disable_web_page_preview=True,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            chat_id = update.message.chat_id if update and update.message else None
+            if chat_id is not None:
+                await context.bot.edit_message_text(
+                    text=escaped_text,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
         else:
-            await context.bot.edit_message_text(
-                text=text,
-                chat_id=update.message.chat_id,
-                message_id=message_id,
-                disable_web_page_preview=True
-            )
+            chat_id = update.message.chat_id if update and update.message else None
+            if chat_id is not None:
+                await context.bot.edit_message_text(
+                    text=text,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True
+                )
     except Exception:
         try:
-            await context.bot.edit_message_text(
-                text=text,
-                chat_id=update.message.chat_id,
-                message_id=message_id, disable_web_page_preview=True)
+            chat_id = update.message.chat_id if update and update.message else None
+            if chat_id is not None:
+                await context.bot.edit_message_text(
+                    text=text,
+                    chat_id=chat_id,
+                    message_id=message_id, disable_web_page_preview=True)
         except Exception:
             pass
 
 
 async def send_typing(update: Update):
-    await update.message.reply_chat_action(action='typing')
+    if update.message is not None:
+        await update.message.reply_chat_action(action='typing')
 
 
 async def send_typing_action(update: Update, context: CallbackContext, flag_key):
-    while context.user_data.get(flag_key, False):
-        await update.message.reply_chat_action(action='typing')
-        await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
+    if context.user_data is not None:
+        while context.user_data.get(flag_key, False):
+            if update.message is not None:
+                await update.message.reply_chat_action(action='typing')
+            await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
 
 
 def escape_markdown_v2(text: str) -> str:

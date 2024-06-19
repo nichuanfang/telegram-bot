@@ -61,8 +61,8 @@ def start_bot(bot_name, token, command_handlers=None):
         .get_updates_write_timeout(60) \
         .get_updates_connect_timeout(10) \
         .build()
-
-    application.add_handlers(command_handlers)
+    if command_handlers:
+        application.add_handlers(command_handlers)
     application.add_error_handler(error_handler)
 
     if platform.system().lower() == 'windows':

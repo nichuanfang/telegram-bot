@@ -13,14 +13,18 @@ from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandH
 
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
-from my_utils.bot_util import auth, instantiate_platform
+from my_utils.bot_util import auth, migrate_platform
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
 # 默认面具
 DEFAULT_MASK_KEY: str = bot_util.DEFAULT_MASK_KEY
+# 默认平台
+DEFAULT_PLATFORM_KEY = bot_util.DEFAULT_PLATFORM_KEY
 # 面具列表
-masks = bot_util.masks
+MASKS = bot_util.masks
+# 平台列表(非平台对象列表)
+PLATFORMS = bot_util.platforms
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 
@@ -60,10 +64,9 @@ def compress_question(question):
 
 @auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return  # 无用消息
+    assert update.message and context.user_data
     is_image_generator = context.user_data.get(
-        'current_mask', masks[DEFAULT_MASK])['name'] == '图像生成助手'
+        'current_mask', MASKS[DEFAULT_MASK_KEY])['name'] == '图像生成助手'
     init_message_task = None
     if ENABLE_STREAM:
         message_text = '正在生成图片，请稍候...' if is_image_generator else '正在输入...'
@@ -87,7 +90,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             content_task = asyncio.create_task(handle_video(update, context))
         else:
             raise ValueError('不支持的输入类型!')
-        curr_mask = masks[context.user_data.get('current_mask', DEFAULT_MASK)]
+        curr_mask =context.user_data.get('current_mask', DEFAULT_MASK_KEY)
         content_result = await content_task
         curr_mask['openai_completion_options'].update({
             "model": context.user_data.get('current_model', curr_mask['default_model'])
@@ -126,7 +129,7 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 
 async def handle_photo(update: Update, context: CallbackContext, max_length):
     content = []
-    current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
+    current_mask = context.user_data.get('current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
     if current_model != 'gpt-4o':
@@ -196,7 +199,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     current_message_length = 0
     max_message_length = 4096
     message_content = ''
-    gpt_platform: Platform = context.user_data['platform']
+    gpt_platform: Platform = context.user_data['current_platform']
     init_message: Message = await init_message_task
     current_message_id = init_message.message_id
     async for status, curr_answer in gpt_platform.async_stream_request(content, **openai_completion_options):
@@ -230,7 +233,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
 
 async def handle_response(update, context, content, is_image_generator, **openai_completion_options):
     await bot_util.send_typing(update)
-    gpt_platform: Platform = context.user_data['platform']
+    gpt_platform: Platform = context.user_data['current_platform']
     async for res in gpt_platform.async_request(content, **openai_completion_options):
         if res is None or len(res) == 0:
             continue
@@ -261,7 +264,8 @@ async def handle_exception(update, context, e, init_message_task):
     error_message = str(e)
     if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
         # free_1可能授权码失效了
-        context.user_data['platform'] = bot_util.instantiate_platform('free_1')
+        context.user_data['current_platform'] = migrate_platform(
+            context.user_data['current_platform'], 'free_1', 4)
         init_text = 'free_1授权码已更新\n\n'
     elif 'at byte offset' in error_message:
         init_text = '缺少结束标记!\n\n'
@@ -272,7 +276,7 @@ async def handle_exception(update, context, e, init_message_task):
     else:
         init_text = ''
     try:
-        if e.body and context.user_data['platform'].name != 'free_1':
+        if e.body and context.user_data['current_platform'].name != 'free_1':
             try:
                 text = init_text + e.body['message'].split('(request', 1)[0]
             except:
@@ -299,7 +303,7 @@ async def exception_message_handler(update, context, init_message_task, text):
 async def balance_handler(update: Update, context: CallbackContext):
     await bot_util.send_typing(update)
     # 使用平台内置的方法查询余额
-    platform: Platform = context.user_data['platform']
+    platform: Platform = context.user_data['current_platform']
     try:
         balance_result = await platform.query_balance()
         await bot_util.send_message(update, balance_result)
@@ -324,49 +328,35 @@ async def clear_handler(update: Update, context: CallbackContext):
     task = asyncio.create_task(update.message.reply_text(
         '上下文已清除', reply_markup=reply_markup))
     # 清空历史消息
-    context.user_data['platform'].chat.clear_messages(context)
+    context.user_data['current_platform'].chat.clear_messages(context)
     await task
 
-
 # 处理按钮点击事件
+
+
 async def restore_context_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-
     # 检查按钮的回调数据
     if query.data == 'restore_context':
         task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
-        context.user_data['platform'].chat.recover_messages(context)
+        context.user_data['current_platform'].chat.recover_messages(context)
         await task
 
 
-def generate_mask_keyboard(masks, current_mask_key, context: CallbackContext):
+def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
     keyboard = []
     row = []
-    platform_name = context.user_data['platform'].name
-    if platform_name.startswith('free'):
-        platform_config = bot_util.platforms[platform_name]
-        if current_mask_key not in platform_config['mask_model_mapping']:
-            for i, (mask_key, models) in enumerate(platform_config['mask_model_mapping'].items()):
-                name = masks[mask_key]["name"]
-                if i == 0:
-                    name = "* " + name
-                    context.user_data['current_mask'] = masks[mask_key]
-                    # 更新模型为当前mask支持的模型
-                    context.user_data['current_model'] = models[0]
-                row.append(InlineKeyboardButton(name, callback_data=mask_key))
-                if (i + 1) % 2 == 0:
-                    keyboard.append(row)
-                    row = []
-        else:
-            for i, (mask_key, models) in enumerate(platform_config['mask_model_mapping'].items()):
-                name = masks[mask_key]["name"]
-                if mask_key == current_mask_key:
-                    name = "* " + name
-                row.append(InlineKeyboardButton(name, callback_data=mask_key))
-                if (i + 1) % 2 == 0:
-                    keyboard.append(row)
-                    row = []
+    if is_free:
+        for i, mask_key in enumerate(masks):
+            # 如果是当前选择的面具，添加标记
+            name = MASKS[mask_key]['name']
+            if mask_key == current_mask_key:
+                name = "* " + name
+            row.append(InlineKeyboardButton(name, callback_data=mask_key))
+            if (i + 1) % 2 == 0:
+                keyboard.append(row)
+                row = []
     else:
         for i, (key, mask) in enumerate(masks.items()):
             # 如果是当前选择的面具，添加标记
@@ -392,11 +382,23 @@ async def masks_handler(update: Update, context: CallbackContext):
     """
     await bot_util.send_typing(update)
     # 获取当前选择的面具
-    current_mask = context.user_data.get('current_mask', masks[DEFAULT_MASK])
-    current_mask_key = next(
-        key for key, value in masks.items() if value == current_mask)
+    current_mask = context.user_data.get(
+        'current_mask', MASKS[DEFAULT_MASK_KEY])
+    current_mask_key = current_mask['mask_key']
+
+    # 免费的模型和收费的模型 masks不同
+    current_platform: Platform = context.user_data['current_platform']
+    # 当前的平台key
+    current_platform_key = current_platform.name
+    if current_platform_key.startswith('free'):
+        is_free = True
+        masks = PLATFORMS[current_platform_key]['mask_model_mapping'].keys()
+    else:
+        masks = MASKS
+        is_free = False
     # 生成内联键盘
-    keyboard = generate_mask_keyboard(masks, current_mask_key, context)
+    keyboard = generate_mask_keyboard(
+        masks, current_mask_key, is_free)
     await update.message.reply_text(
         '请选择一个面具:',
         reply_markup=keyboard
@@ -412,23 +414,23 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     """
     query = update.callback_query
     await query.answer()
-
     # 获取用户选择的面具
-    selected_mask = query.data
-    # selected_mask = masks[selected_mask_key]
-    # 应用选择的面具
-    context.user_data['current_mask'] = selected_mask
+    selected_mask_key = query.data
+    # 面具实体 应用选择的面具
+    selected_mask = context.user_data['current_mask'] = MASKS[selected_mask_key]
+    # 选择当前模型
     current_model = context.user_data.get('current_model')
+    #     'current_model', selected_mask['default_model'])
     # 当前平台
-    curr_platform: Platform = context.user_data['platform']
+    curr_platform: Platform = context.user_data['current_platform']
     # 获取当前模型  如果当前模型兼容选择的面具 则无需切换模型; 如果不兼容 则需切换到该面具的默认模型
     if curr_platform.name.startswith('free'):
-        free_models = bot_util.platforms[curr_platform.name]['mask_model_mapping'][selected_mask]
+        supported_models = PLATFORMS[curr_platform.name]['supported_models']
         if current_model:
-            if current_model not in free_models:
-                context.user_data['current_model'] = free_models[0]
+            if current_model not in supported_models:
+                context.user_data['current_model'] = supported_models[0]
         else:
-            context.user_data['current_model'] = free_models[0]
+            context.user_data['current_model'] = supported_models[0]
     else:
         if current_model:
             if current_model not in selected_mask['supported_models']:
@@ -444,7 +446,6 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     curr_platform.chat.set_max_message_count(
         4 if curr_platform.name.startswith('free') else selected_mask['max_message_count'])
     # 切换面具后清除上下文
-    curr_platform.chat.clear_messages(context)
     await switch_success_message_task
 
 
@@ -477,13 +478,11 @@ async def model_handler(update: Update, context: CallbackContext):
     """
     await bot_util.send_typing(update)
     # 获取当前的面具
-    current_mask = context.user_data.get('current_mask', masks['common'])
-    platform = context.user_data['platform']
+    current_mask = context.user_data.get(
+        'current_mask', MASKS[DEFAULT_MASK_KEY])
+    platform: Platform = context.user_data['current_platform']
     if platform.name.startswith('free'):
-        # 当前的mask_key
-        current_mask_key = next(
-            key for key, value in masks.items() if value == current_mask)
-        supported_models = bot_util.platforms[platform.name]['mask_model_mapping'][current_mask_key]
+        supported_models = PLATFORMS[platform.name]['supported_models']
         current_model = context.user_data.get(
             'current_model', supported_models[0])
         if current_model not in supported_models:
@@ -515,7 +514,6 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     """
     query = update.callback_query
     await query.answer()
-
     # 获取用户选择的模型
     selected_model = query.data
     # 应用选择的面具
@@ -526,7 +524,7 @@ async def model_selection_handler(update: Update, context: CallbackContext):
         parse_mode=ParseMode.MARKDOWN_V2
     ))
     # 切换模型后清除上下文
-    context.user_data['platform'].chat.clear_messages(context)
+    context.user_data['current_platform'].chat.clear_messages(context)
     await switch_model_task
 
 
@@ -539,25 +537,25 @@ async def platform_handler(update: Update, context: CallbackContext):
             context:  上下文对象
     """
     await bot_util.send_typing(update)
-    current_platform: Platform = context.user_data['platform']
+    current_platform: Platform = context.user_data['current_platform']
     # 生成内联键盘
     keyboard = generate_platform_keyboard(
-        update, context, bot_util.platforms, current_platform.name)
+        update, context, current_platform)
 
-    await update.message.reply_text(
+    await update.message.reply_text(  # type: ignore
         '请选择一个平台:',
         reply_markup=keyboard
     )
 
 
-def generate_platform_keyboard(update, context, platforms, current_platform_key):
+def generate_platform_keyboard(update, context, current_platform: Platform):
     keyboard = []
     row = []
     if context.user_data['identity'] == 'user':
-        for i, (key, platform) in enumerate(platforms.items()):
+        for i, (key, platform) in enumerate(bot_util.platforms.items()):
             # 如果是当前选择的面具，添加标记
             name = platform["name"]
-            if key == current_platform_key:
+            if key == current_platform.name:
                 name = "* " + name
             row.append(InlineKeyboardButton(name, callback_data=key))
             if (i + 1) % 3 == 0:
@@ -566,15 +564,15 @@ def generate_platform_keyboard(update, context, platforms, current_platform_key)
         if row:
             keyboard.append(row)
     else:
-        if current_platform_key == 'free_1':
+        if current_platform.name == 'free_1':
             row.append(InlineKeyboardButton('* 免费_1', callback_data='free_1'))
             row.append(InlineKeyboardButton('免费_2', callback_data='free_2'))
             row.append(InlineKeyboardButton('免费_3', callback_data='free_3'))
-        elif current_platform_key == 'free_2':
+        elif current_platform.name == 'free_2':
             row.append(InlineKeyboardButton('免费_1', callback_data='free_1'))
             row.append(InlineKeyboardButton('* 免费_2', callback_data='free_2'))
             row.append(InlineKeyboardButton('免费_3', callback_data='free_3'))
-        elif current_platform_key == 'free_3':
+        elif current_platform.name == 'free_3':
             row.append(InlineKeyboardButton('免费_1', callback_data='free_1'))
             row.append(InlineKeyboardButton('免费_2', callback_data='free_2'))
             row.append(InlineKeyboardButton('* 免费_3', callback_data='free_3'))
@@ -593,41 +591,61 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的平台
     selected_platform_key = query.data
-    curr_platform: Platform = context.user_data['platform']
-    platform_name = curr_platform.name
-    platform_config = bot_util.platforms[platform_name]
-    # 应用选择的平台
-    # todo 解决切换平台可能带来的问题 比如当前面具在当前平台还在不在 ;  当前模型在当前平台可不可用
+    current_platform: Platform = context.user_data['current_platform']
+    # 当前的平台key
+    current_platform_key = current_platform.name
+    if selected_platform_key == current_platform_key:
+        await query.edit_message_text(
+            text=f'平台已切换至*{telegram.helpers.escape_markdown(current_platform.name_zh, version=2)}*',
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        return
+    # 解决切换平台可能带来的问题 比如当前面具在当前平台还在不在 ;  当前模型在当前平台可不可用
     if 'current_mask' not in context.user_data:
-        # 设置默认面具
-        curr_mask = masks[DEFAULT_MASK_KEY]
+        current_mask = context.user_data['current_mask'] = MASKS[DEFAULT_MASK_KEY]
     else:
-        current_mask_key = context.user_data['current_mask_key']
+        current_mask = context.user_data['current_mask']
         # 判断当前平台是否支持这些面具
-        if platform_name.startswith('free'):
-            mask_model_mapping = platform_config['mask_model_mapping']
+        if current_platform_key.startswith('free'):
+            mask_model_mapping = PLATFORMS[current_platform_key]['mask_model_mapping']
             # todo 如果面具不支持 就设置为第一个面具
-            if current_mask_key not in mask_model_mapping:
-                current_mask = masks(context.user_data['current_mask_key'])
+            if current_mask['mask_key'] not in mask_model_mapping:
+                default_mask_key = mask_model_mapping.keys()[0]
+                current_mask = context.user_data['current_mask'] = MASKS[default_mask_key]
         else:
-            # 剩余的都是收费的平台 面具都支持
-            curr_mask = context.user_data['current_mask']
+            # 剩余的都是收费的平台 支持所有面具
+            current_mask = context.user_data['current_mask']
 
-    context.user_data['platform'] = instantiate_platform(platform_name=selected_platform_key,
-                                                         max_message_count=curr_mask['max_message_count'])
-    switch_message = f'平台已切换至[{bot_util.escape_markdown_v2(curr_platform.name_zh)}]({bot_util.escape_markdown_v2(curr_platform.index_url)}) '
+    # 处理模型切换
+    if 'current_model' not in context.user_data:
+        # 如果此时会话中未存储当前模型 初始化一个当前面具的默认模型
+        current_model = context.user_data['current_model'] = current_mask['default_model']
+    else:
+        # 当前模型
+        current_model = context.user_data['current_model']
+        # 判断当前平台是否支持这个模型
+        if current_platform_key.startswith('free'):
+            supported_models = PLATFORMS[current_platform_key]['supported_models']
+            # todo 如果模型不支持 就设置为第一个模型
+            if current_model not in supported_models:
+                default_model = supported_models[0]
+                context.user_data['current_model'] = default_model
+
+    # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
+    new_platform = context.user_data['current_platform'] = migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
+                                                                            max_message_count=current_mask['max_message_count'])
+    switch_message = f'平台已切换至[{bot_util.escape_markdown_v2(new_platform.name_zh)}]({bot_util.escape_markdown_v2(new_platform.index_url)}) '
+
     await query.edit_message_text(
         text=switch_message,
         parse_mode=ParseMode.MARKDOWN_V2,
     )
 
-    context.user_data['platform'].chat.clear_messages(context)
-
 
 @auth
 async def shop_handler(update: Update, context: CallbackContext):
     if context.user_data['identity'] == 'user':
-        platform = context.user_data['platform']
+        platform = context.user_data['current_platform']
         # 创建一个包含 URL 按钮的键盘
         keyboard = [[InlineKeyboardButton(
             "Visit Shop", url=platform.payment_url)]]
