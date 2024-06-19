@@ -1,8 +1,41 @@
+# Ignore PyCharm project files
+
+.idea/
+
+# Ignore VSCode project files
+
+.vscode/
+\*.code-workspace
+
+# Other common ignores
+
+\*_/**pycache**/
+_.py[cod]
+_.pyo
+_.pyd
+_.so
+_.egg-info/
+dist/
+build/
+_.log
+_.tmp
+_.swp
+_.bak
+_.orig
+.DS_Store
+.coverage
+.coverage._
+.cache/
+.pytest_cache/
+.mypy_cache/
 .env
+.venv
+env/
+venv/
+bots/gpt_bot/config/platforms.json
+
+# Docker-specific ignores
+
 .dockerignore
-.github
-.gitignore
 docker-compose.yml
 Dockerfile
-.venv
-bots/gpt_bot/config/platforms.json
