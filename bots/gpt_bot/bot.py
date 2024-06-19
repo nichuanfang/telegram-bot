@@ -339,11 +339,9 @@ async def clear_handler(update: Update, context: CallbackContext):
 async def restore_context_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    # 检查按钮的回调数据
-    if query.data == 'restore_context':
-        task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
-        context.user_data['current_platform'].chat.recover_messages(context)
-        await task
+    task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
+    context.user_data['current_platform'].chat.recover_messages(context)
+    await task
 
 
 def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
@@ -356,7 +354,8 @@ def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
                 name = MASKS[mask_key]['name']
                 if i == 0:
                     name = "* " + name
-                row.append(InlineKeyboardButton(name, callback_data=mask_key))
+                row.append(InlineKeyboardButton(
+                    name, callback_data=f'mask_key:{mask_key}'))
                 if (i + 1) % 2 == 0:
                     keyboard.append(row)
                     row = []
@@ -367,7 +366,8 @@ def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
                 if mask_key == current_mask_key:
                     name = "* " + name
                     flag = True
-                row.append(InlineKeyboardButton(name, callback_data=mask_key))
+                row.append(InlineKeyboardButton(
+                    name, callback_data=f'mask_key:{mask_key}'))
                 if (i + 1) % 2 == 0:
                     keyboard.append(row)
                     row = []
@@ -377,7 +377,8 @@ def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
             name = mask["name"]
             if key == current_mask_key:
                 name = "* " + name
-            row.append(InlineKeyboardButton(name, callback_data=key))
+            row.append(InlineKeyboardButton(
+                name, callback_data=f'mask_key:{key}'))
             if (i + 1) % 2 == 0:
                 keyboard.append(row)
                 row = []
@@ -429,8 +430,8 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     """
     query = update.callback_query
     await query.answer()
-    # 获取用户选择的面具
-    selected_mask_key = query.data
+    # 获取用户选择的面具 mask_key:{mask_key}
+    selected_mask_key = query.data[9:]
     # 面具实体 应用选择的面具
     selected_mask = context.user_data['current_mask'] = MASKS[selected_mask_key]
     # 选择当前模型
@@ -461,6 +462,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     curr_platform.chat.set_max_message_count(
         4 if curr_platform.name.startswith('free') else selected_mask['max_message_count'])
     # 切换面具后清除上下文
+    curr_platform.chat.clear_messages(context)
     await switch_success_message_task
 
 
@@ -474,7 +476,8 @@ def generate_model_keyboard(models, current_model):
         name = model
         if model == current_model:
             name = "* " + name
-        row.append(InlineKeyboardButton(name, callback_data=model))
+        row.append(InlineKeyboardButton(
+            name, callback_data=f'model_key:{model}'))
         if (i + 1) % 2 == 0:
             keyboard.append(row)
             row = []
@@ -529,8 +532,8 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     """
     query = update.callback_query
     await query.answer()
-    # 获取用户选择的模型
-    selected_model = query.data
+    # 获取用户选择的模型  model_key:
+    selected_model = query.data[10:]
     # 应用选择的面具
     context.user_data['current_model'] = selected_model
     # 根据选择的模型进行相应的处理
@@ -567,12 +570,13 @@ def generate_platform_keyboard(update, context, current_platform: Platform):
     keyboard = []
     row = []
     if context.user_data['identity'] == 'user':
-        for i, (key, platform) in enumerate(bot_util.platforms.items()):
+        for i, (key, platform) in enumerate(PLATFORMS.items()):
             # 如果是当前选择的面具，添加标记
             name = platform["name"]
             if key == current_platform.name:
                 name = "* " + name
-            row.append(InlineKeyboardButton(name, callback_data=key))
+            row.append(InlineKeyboardButton(
+                name, callback_data=f'platform_key:{key}'))
             if (i + 1) % 3 == 0:
                 keyboard.append(row)
                 row = []
@@ -580,17 +584,26 @@ def generate_platform_keyboard(update, context, current_platform: Platform):
             keyboard.append(row)
     else:
         if current_platform.name == 'free_1':
-            row.append(InlineKeyboardButton('* 免费_1', callback_data='free_1'))
-            row.append(InlineKeyboardButton('免费_2', callback_data='free_2'))
-            row.append(InlineKeyboardButton('免费_3', callback_data='free_3'))
+            row.append(InlineKeyboardButton(
+                '* 免费_1', callback_data='platform_key:free_1'))
+            row.append(InlineKeyboardButton(
+                '免费_2', callback_data='platform_key:free_2'))
+            row.append(InlineKeyboardButton(
+                '免费_3', callback_data='platform_key:free_3'))
         elif current_platform.name == 'free_2':
-            row.append(InlineKeyboardButton('免费_1', callback_data='free_1'))
-            row.append(InlineKeyboardButton('* 免费_2', callback_data='free_2'))
-            row.append(InlineKeyboardButton('免费_3', callback_data='free_3'))
+            row.append(InlineKeyboardButton(
+                '免费_1', callback_data='platform_key:free_1'))
+            row.append(InlineKeyboardButton(
+                '* 免费_2', callback_data='platform_key:free_2'))
+            row.append(InlineKeyboardButton(
+                '免费_3', callback_data='platform_key:free_3'))
         elif current_platform.name == 'free_3':
-            row.append(InlineKeyboardButton('免费_1', callback_data='free_1'))
-            row.append(InlineKeyboardButton('免费_2', callback_data='free_2'))
-            row.append(InlineKeyboardButton('* 免费_3', callback_data='free_3'))
+            row.append(InlineKeyboardButton(
+                '免费_1', callback_data='platform_key:free_1'))
+            row.append(InlineKeyboardButton(
+                '免费_2', callback_data='platform_key:free_2'))
+            row.append(InlineKeyboardButton(
+                '* 免费_3', callback_data='platform_key:free_3'))
         keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
@@ -604,8 +617,8 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     """
     query = update.callback_query
     await query.answer()
-    # 获取用户选择的平台
-    selected_platform_key = query.data
+    # 获取用户选择的平台 platform_key:
+    selected_platform_key = query.data[13:]
     current_platform: Platform = context.user_data['current_platform']
     # 当前的平台key
     current_platform_key = current_platform.name
@@ -620,9 +633,9 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
         current_mask = context.user_data['current_mask'] = MASKS[DEFAULT_MASK_KEY]
     else:
         current_mask = context.user_data['current_mask']
-        # 判断当前平台是否支持这些面具
-        if current_platform_key.startswith('free'):
-            mask_model_mapping = PLATFORMS[current_platform_key]['mask_model_mapping']
+        # 判断所选平台是否支持这些面具
+        if selected_platform_key.startswith('free'):
+            mask_model_mapping = PLATFORMS[selected_platform_key]['mask_model_mapping']
             # todo 如果面具不支持 就设置为第一个面具
             if current_mask['mask_key'] not in mask_model_mapping.keys():
                 default_mask_key = list(mask_model_mapping.keys())[0]
@@ -639,8 +652,8 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
         # 当前模型
         current_model = context.user_data['current_model']
         # 判断当前平台是否支持这个模型
-        if current_platform_key.startswith('free'):
-            supported_models = PLATFORMS[current_platform_key]['supported_models']
+        if selected_platform_key.startswith('free'):
+            supported_models = PLATFORMS[selected_platform_key]['supported_models']
             # todo 如果模型不支持 就设置为第一个模型
             if current_model not in supported_models:
                 default_model = supported_models[0]
@@ -680,13 +693,13 @@ def handlers():
         CommandHandler('platform', platform_handler),
         CommandHandler('shop', shop_handler),
         CallbackQueryHandler(mask_selection_handler,
-                             pattern='^(common|compressed|github_copilot|image_generator|travel_guide|song_recommender|movie_expert|doctor)$'),
+                             pattern='^mask_key:'),
         CallbackQueryHandler(model_selection_handler,
-                             pattern='^(gpt-|dall|claude)'),
+                             pattern='^model_key:'),
         CallbackQueryHandler(restore_context_handler,
-                             pattern='^(restore_context)$'),
+                             pattern='^restore_context$'),
         CallbackQueryHandler(platform_selection_handler,
-                             pattern='^(free_1|free_2|free_3|chatanywhere|bianxieai)$'),
+                             pattern='^platform_key:'),
         MessageHandler(
             filters.TEXT & ~filters.COMMAND | filters.ATTACHMENT, answer)
     ]
