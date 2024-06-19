@@ -4,7 +4,7 @@ from bots.gpt_bot.gpt_platform import gpt_platform
 
 
 @gpt_platform
-class Free_2(Platform):
+class Free_3(Platform):
 	
 	async def query_balance(self):
 		"""

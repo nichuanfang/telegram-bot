@@ -1,0 +1,124 @@
+{
+  "bianxieai": {
+    "name": "便携AI",
+    "domestic_openai_base_url": "https://api.bianxieai.com/v1",
+    "foreign_openai_base_url": "https://api.bianxieai.com/v1",
+    "index_url": "https://api.bianxieai.com",
+    "payment_url": "https://shop.bianxieai.com/",
+    "openai_api_key": ""
+  },
+  "chatanywhere": {
+    "name": "ChatAnywhere",
+    "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
+    "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
+    "index_url": "https://api.chatanywhere.tech",
+    "payment_url": "https://peiqishop.me/",
+    "openai_api_key": ""
+  },
+  "free_1": {
+    "name": "免费_1",
+    "index_url": "https://fabu.woyaobaipiao.com/",
+    "payment_url": "https://fabu.woyaobaipiao.com/",
+    "mask_model_mapping": {
+      "common": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "compressed": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "github_copilot": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "travel_guide": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "song_recommender": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "movie_expert": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ],
+      "doctor": [
+        "* gpt-3.5-turbo",
+        "claude-3-haiku-20240307"
+      ]
+    },
+    "username": "用户名",
+    "password": "密码"
+  },
+  "free_2": {
+    "name": "免费_2",
+    "domestic_openai_base_url": "https://free.gpt.ge/v1",
+    "foreign_openai_base_url": "https://free.gpt.ge/v1",
+    "index_url": "https://v3.cm/",
+    "payment_url": "https://v3.cm/",
+    "mask_model_mapping": {
+      "common": [
+        "* gpt-3.5-turbo"
+      ],
+      "compressed": [
+        "* gpt-3.5-turbo"
+      ],
+      "github_copilot": [
+        "* gpt-3.5-turbo"
+      ],
+      "travel_guide": [
+        "* gpt-3.5-turbo"
+      ],
+      "song_recommender": [
+        "* gpt-3.5-turbo"
+      ],
+      "movie_expert": [
+        "* gpt-3.5-turbo"
+      ],
+      "doctor": [
+        "* gpt-3.5-turbo"
+      ]
+    },
+    "openai_api_key": ""
+  },
+  "free_3": {
+    "name": "免费_3",
+    "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
+    "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
+    "index_url": "https://api.chatanywhere.tech",
+    "payment_url": "https://peiqishop.me/",
+    "mask_model_mapping": {
+      "common": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "compressed": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "github_copilot": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "travel_guide": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "song_recommender": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "movie_expert": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "doctor": [
+        "* gpt-3.5-turbo",
+        "gpt-4o"
+      ]
+    },
+    "openai_api_key": ""
+  }
+}

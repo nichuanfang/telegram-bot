@@ -3,10 +3,10 @@
     "name": "通用助手",
     "introduction": "嗨，我是*助手*。我能帮你什么？",
     "supported_models": [
-      "gpt-3.5-turbo-0125",
+      "gpt-3.5-turbo",
       "gpt-4o"
     ],
-    "default_model": "gpt-3.5-turbo-0125",
+    "default_model": "gpt-3.5-turbo",
     "max_message_count": 6,
     "openai_completion_options": {
       "temperature": 0.5,
@@ -25,10 +25,10 @@
     "name": "简洁助手",
     "introduction": "你好，我是*简洁助手*。我总是简洁而精确地回答。我能帮你什么？",
     "supported_models": [
-      "gpt-3.5-turbo-0125",
+      "gpt-3.5-turbo",
       "gpt-4o"
     ],
-    "default_model": "gpt-3.5-turbo-0125",
+    "default_model": "gpt-3.5-turbo",
     "max_message_count": 3,
     "openai_completion_options": {
       "temperature": 0.3,

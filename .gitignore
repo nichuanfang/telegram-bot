@@ -1,8 +1,49 @@
-__pycache__
-/.idea
-.env
-.DS_Store
+# Ignore usage logs
 /usage_logs
+
+# Ignore PyCharm project files
+.idea/
+
+# Ignore VSCode project files
+.vscode/
+*.code-workspace
+
+# Ignore Python bytecode and cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Ignore Python distribution/build directories
+*.egg-info/
+dist/
+build/
+
+# Ignore log, temporary, and backup files
+*.log
+*.tmp
+*.swp
+*.bak
+*.orig
+
+# Ignore macOS specific files
+*.DS_Store
+
+# Ignore coverage reports
+*.coverage
+.coverage.*
+
+# Ignore cache directories
+.cache/
+*.pytest_cache/
+*.mypy_cache/
+
+# Ignore environment directories
+.env
 .venv
-/.cache
+env/
+venv/
+
+# Ignore specific configuration file
 bots/gpt_bot/config/platforms.json
