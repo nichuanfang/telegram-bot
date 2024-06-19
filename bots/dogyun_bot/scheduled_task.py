@@ -8,7 +8,6 @@ from telegram import Bot
 
 from my_utils import my_logging
 from my_utils.validation_util import validate
-
 # 获取日志
 logger = my_logging.get_logger('dogyun_bot')
 

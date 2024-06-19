@@ -129,7 +129,7 @@ class Platform(metaclass=ABCMeta):
             })
             answer: str = ""
             async for chunk_iter in completion:
-                if chunk_iter.choices and (chunk := chunk_iter.choices[0].message.content):
+                if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
                     answer += chunk
                     yield 'not_finished', answer
             yield 'finished', answer
