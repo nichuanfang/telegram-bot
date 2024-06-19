@@ -66,11 +66,16 @@ def instantiate_platform():
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in platform:
-        url, code = generate_code(
-            platform['index_url'], platform['username'], platform['password'])
-        platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
-        platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
-        openai_api_key = f'nk-{code}'
+        try:
+            url, code = generate_code(
+                platform['index_url'], platform['username'], platform['password'])
+            platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
+            platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
+            openai_api_key = f'nk-{code}'
+        except:
+            # 兜底url和code 防止发布站不可用 获取不到目标网站信息
+            url = platform['reveal _url']
+            code = platform['reveal_code']
     else:
         openai_api_key = platform['openai_api_key']
     # 平台初始化参数
@@ -101,11 +106,15 @@ def migrate_platform(from_platform: Platform, to_platform_key: str, max_message_
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in to_platform:
-        url, code = generate_code(
-            to_platform['index_url'], to_platform['username'], to_platform['password'])
-        to_platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
-        to_platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
-        openai_api_key = f'nk-{code}'
+        try:
+            url, code = generate_code(
+                to_platform['index_url'], to_platform['username'], to_platform['password'])
+            to_platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
+            to_platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
+            openai_api_key = f'nk-{code}'
+        except:
+            url = to_platform['reveal _url']
+            code = to_platform['reveal_code']
     else:
         openai_api_key = to_platform['openai_api_key']
     # 修改参数
