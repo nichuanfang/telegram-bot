@@ -658,6 +658,10 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
             if current_model not in supported_models:
                 default_model = supported_models[0]
                 context.user_data['current_model'] = default_model
+        else:
+            # 有可能免费平台的收费平台不支持 比如'claude-3-haiku-20240307'
+            if current_model not in current_mask['supported_models']:
+                context.user_data['current_model'] = current_mask['default_model']
 
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
     new_platform = context.user_data['current_platform'] = migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
