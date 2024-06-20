@@ -18,13 +18,6 @@ from my_utils.bot_util import auth, migrate_platform
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
-# 常用文件后缀集合
-common_extensions = {
-    'txt', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'svg',
-    'mp3', 'wav', 'ogg', 'flac', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'zip', 'rar', 'tar', 'gz', '7z', 'py', 'java', 'js', 'html', 'css'
-}
-# 构建正则表达式，确保文件名后缀是常用文件后缀之一
-extensions_pattern = '|'.join(common_extensions)
 # 正则
 HASTE_SERVER_HOST_PATTERN = re.compile(
     rf'{re.escape(bot_util.HASTE_SERVER_HOST)}/(?:raw/)?([a-zA-Z]{{10}})(?:\.[a-zA-Z]+)?')
@@ -269,17 +262,18 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                 current_message_length += new_content_length
         await asyncio.sleep(0.05)
         prev_answer = curr_answer
-    # 将剩余数据保存到在线代码分享平台
-    response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'),
-                                      headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
-    if response.status_code == 200:
-        result = response.json()
-        document_id = result.get('key')
-        if document_id:
-            document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
-            await bot_util.send_message(update, text=f'分享成功，请访问：{document_url}')
-        else:
-            await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
+    if not need_notice:
+        # 将剩余数据保存到在线代码分享平台
+        response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'),
+                                          headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
+        if response.status_code == 200:
+            result = response.json()
+            document_id = result.get('key')
+            if document_id:
+                document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
+                await bot_util.send_message(update, text=f'分享成功，请访问：{document_url}')
+            else:
+                await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_response(update: Update, context: CallbackContext, content, is_image_generator, **openai_completion_options):
