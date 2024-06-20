@@ -5,12 +5,12 @@ import os
 import re
 import traceback
 
-import httpx
 import regex
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
+from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
 
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
@@ -18,6 +18,16 @@ from my_utils.bot_util import auth, migrate_platform
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
+# 常用文件后缀集合
+common_extensions = {
+    'txt', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'svg',
+    'mp3', 'wav', 'ogg', 'flac', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'zip', 'rar', 'tar', 'gz', '7z', 'py', 'java', 'js', 'html', 'css'
+}
+# 构建正则表达式，确保文件名后缀是常用文件后缀之一
+extensions_pattern = '|'.join(common_extensions)
+# 正则
+HASTE_SERVER_HOST_PATTERN = re.compile(
+    rf'{re.escape(bot_util.HASTE_SERVER_HOST)}/(?:raw/)?([a-zA-Z]{{10}})(?:\.[a-zA-Z]+)?')
 STOP_WORDS = frozenset({'的', '是', '在', '和', '了', '有',
                        '我', '也', '不', '就', '与', '他', '她', '它'})
 # 默认面具
@@ -73,8 +83,14 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 message_text, reply_to_message_id=update.message.message_id)
         )
     max_length = 3000
+    # 使用re模块搜索第一个匹配的URL
+    match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
     try:
-        if update.message.text:
+        if match:
+            code_id: str = match[1]
+            content_task = asyncio.create_task(
+                handle_code_url(update, code_id))
+        elif update.message.text:
             content_task = asyncio.create_task(
                 handle_text(update, max_length))
         elif update.message.photo:
@@ -108,9 +124,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_caption(update: Update, max_length):
     if update.message.caption:
         handled_question = compress_question(update.message.caption.strip())
-        if len(handled_question) > max_length:
+        if len(handled_question.encode()) > max_length:
             raise ValueError(
-                f'Your question is too long. Please limit it to {max_length} characters.')
+                f'Your question is too long.请通过在线分享平台 {bot_util.HASTE_SERVER_HOST}  提问')
         return handled_question
     return None
 
@@ -133,8 +149,7 @@ def get_mime_type(image_path):
 async def handle_photo_download(update: Update, context: CallbackContext):
     photo = update.message.photo[-2]
     photo_file = await context.bot.get_file(photo.file_id)
-    async with httpx.AsyncClient() as client:
-        photo_response = await client.get(photo_file.file_path)
+    photo_response = await HTTP_CLIENT.get(photo_file.file_path)
     image_data = photo_response.content
     # mime类型
     mime_type = get_mime_type(photo_file.file_path)
@@ -168,8 +183,7 @@ async def handle_photo(update: Update, context: CallbackContext, max_length):
 async def handle_document_download(update: Update, context: CallbackContext):
     document = update.message.document
     file = await context.bot.get_file(document.file_id)
-    async with httpx.AsyncClient() as client:
-        response = await client.get(file.file_path)
+    response = await HTTP_CLIENT.get(file.file_path)
     document_text = response.text
     return f'```{document.mime_type}\n{document_text}\n```\n'
 
@@ -202,10 +216,18 @@ async def handle_video(update, context):
     return "Video processing is not implemented yet."
 
 
+async def handle_code_url(update, code_id):
+    response = await HTTP_CLIENT.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
+    if response.status_code != 200 or len(response.text) == 0:
+        raise ValueError(
+            f'Your question url is Invalid.')
+    return compress_question(response.text)
+
+
 async def handle_text(update, max_length):
     if len(update.message.text.encode()) > 3000:
         raise ValueError(
-            f'Your question is too long.')
+            f'Your question is too long.请通过在线分享平台 {bot_util.HASTE_SERVER_HOST}  提问')
     content_text = update.effective_message.text.strip()
     content_text = compress_question(content_text)
     return content_text
@@ -220,10 +242,10 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     gpt_platform: Platform = context.user_data['current_platform']
     init_message: Message = await init_message_task
     current_message_id = init_message.message_id
+    need_notice = True
     async for status, curr_answer in gpt_platform.async_stream_request(content, **openai_completion_options):
         if is_image_generator:
-            async with httpx.AsyncClient() as client:
-                img_response = await client.get(curr_answer)
+            img_response = await HTTP_CLIENT.get(curr_answer)
             if img_response.content:
                 await asyncio.gather(
                     bot_util.edit_message(
@@ -234,12 +256,12 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
             continue
         new_content = curr_answer[len(prev_answer):]
-        new_content_length = len(new_content.encode('utf-8'))
+        new_content_length = len(new_content)
         if current_message_length + new_content_length > max_message_length:
-            new_init_message = await context.bot.send_message(chat_id=update.message.chat_id, text='正在输入...')
-            current_message_id = new_init_message.message_id
-            current_message_length = 0
-            message_content = ''
+            if need_notice:
+                await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
+                need_notice = False
+            continue
         if new_content:
             message_content += new_content
             if message_content != prev_answer:
@@ -247,28 +269,45 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                 current_message_length += new_content_length
         await asyncio.sleep(0.05)
         prev_answer = curr_answer
+    # 将剩余数据保存到在线代码分享平台
+    response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'),
+                                      headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
+    if response.status_code == 200:
+        result = response.json()
+        document_id = result.get('key')
+        if document_id:
+            document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
+            await bot_util.send_message(update, text=f'分享成功，请访问：{document_url}')
+        else:
+            await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
 
 
-async def handle_response(update, context, content, is_image_generator, **openai_completion_options):
+async def handle_response(update: Update, context: CallbackContext, content, is_image_generator, **openai_completion_options):
     await bot_util.send_typing(update)
     gpt_platform: Platform = context.user_data['current_platform']
     async for res in gpt_platform.async_request(content, **openai_completion_options):
         if res is None or len(res) == 0:
             continue
         if is_image_generator:
-            async with httpx.AsyncClient() as client:
-                # 将res的url下载 返回一个图片
-                img_response = await client.get(res)
+            # 将res的url下载 返回一个图片
+            img_response = await HTTP_CLIENT.get(res)
             if img_response.content:
                 await update.message.reply_photo(photo=img_response.content,
                                                  reply_to_message_id=update.effective_message.message_id)
         else:
-            if len(res) < 4096:
+            if len(res.encode()) < 3000:
                 await bot_util.send_message(update, res)
             else:
-                parts = [res[i:i + 4096] for i in range(0, len(res), 4096)]
-                for part in parts:
-                    await bot_util.send_message(update, part)
+                response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=res.encode('utf-8'),
+                                                  headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
+                if response.status_code == 200:
+                    result = response.json()
+                    document_id = result.get('key')
+                    if document_id:
+                        document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
+                        await bot_util.send_message(update, text=f'消息过长，请通过在线分享平台访问：{document_url}')
+                    else:
+                        await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_exception(update, context, e, init_message_task):

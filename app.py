@@ -1,9 +1,11 @@
+from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
 from my_utils import my_logging, validation_util
 import dotenv
 import aiocron
 import traceback
 import platform
 import os
+import atexit
 import multiprocessing
 import asyncio
 from telegram import Bot
@@ -125,6 +127,7 @@ for bot_directory in bot_directories:
         logger.error(f"Failed to import bot {bot_directory}: {e}")
 
 if __name__ == '__main__':
+    atexit.register(lambda: asyncio.run(HTTP_CLIENT.aclose()))
     for p in processes:
         p.start()
     for p in processes:

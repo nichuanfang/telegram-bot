@@ -15,9 +15,11 @@ from telegram.ext import CallbackContext
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
-
 logger = get_logger('bot_util')
-
+# 代码分享平台的地址
+HASTE_SERVER_HOST = os.getenv('HASTE_SERVER_HOST', None)
+if not HASTE_SERVER_HOST:
+    raise ValueError('请配置代码分享平台的地址!')
 # ====================================加载面具================================
 # 默认面具
 DEFAULT_MASK_KEY: str = os.getenv('DEFAULT_MASK_KEY', 'common')
@@ -26,7 +28,6 @@ masks_path = os.path.abspath(os.path.join(
 # 加载面具
 with open(masks_path, encoding='utf-8') as masks_file:
     masks = json.load(masks_file)
-
 # ====================================注册平台================================
 
 platforms_path = os.path.abspath(os.path.join(
