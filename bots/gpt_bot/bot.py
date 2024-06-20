@@ -271,9 +271,9 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             document_id = result.get('key')
             if document_id:
                 document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
-                await bot_util.send_message(update, text=f'分享成功，请访问：{document_url}')
+                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'分享成功，请访问：{document_url}')
             else:
-                await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
+                await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_response(update: Update, context: CallbackContext, content, is_image_generator, **openai_completion_options):
