@@ -18,6 +18,8 @@ headers = {
 }
 # 创建一个 UserAgent 实例
 ua = UserAgent()
+# 全局客户端
+HTTP_CLIENT = httpx.AsyncClient()
 
 
 class BotHttpRequest:
@@ -34,13 +36,12 @@ class BotHttpRequest:
                 'model': 'whisper-1'
                 # 'language': 'zh'
             }
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    url=f'{openai_base_url}/audio/transcriptions',
-                    files=files,
-                    data=data,
-                    headers=headers
-                )
+            response = await HTTP_CLIENT.post(
+                url=f'{openai_base_url}/audio/transcriptions',
+                files=files,
+                data=data,
+                headers=headers
+            )
         if response.status_code == 200:
             return response.json()['text']
         else:
@@ -53,11 +54,10 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = f'Bearer {openai_api_key}'
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f'{openai_base_url[:-3]}/dashboard/billing/subscription',
-                headers=headers
-            )
+        response = await HTTP_CLIENT.get(
+            f'{openai_base_url[:-3]}/dashboard/billing/subscription',
+            headers=headers
+        )
         return response
 
     # 获取使用信息
@@ -66,11 +66,10 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = f'Bearer {openai_api_key}'
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f'{openai_base_url[:-3]}/dashboard/billing/usage',
-                headers=headers
-            )
+        response = await HTTP_CLIENT.get(
+            f'{openai_base_url[:-3]}/dashboard/billing/usage',
+            headers=headers
+        )
         return response
 
     @staticmethod
@@ -78,11 +77,10 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = openai_api_key
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f'{openai_base_url}/query/balance',
-                headers=headers
-            )
+        response = await HTTP_CLIENT.post(
+            f'{openai_base_url}/query/balance',
+            headers=headers
+        )
         if response.status_code == 200:
 
             return response.json()
