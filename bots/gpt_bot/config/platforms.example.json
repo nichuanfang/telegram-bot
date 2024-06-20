@@ -8,6 +8,15 @@
     "payment_url": "https://shop.bianxieai.com/",
     "openai_api_key": ""
   },
+  "juheai": {
+    "name": "聚合AI",
+    "platform_key": "juheai",
+    "domestic_openai_base_url": "https://api.juheai.top/v1",
+    "foreign_openai_base_url": "https://api.juheai.top/v1",
+    "index_url": "https://one.meithink.com/",
+    "payment_url": "https://one.meithink.com/",
+    "openai_api_key": ""
+  },
   "chatanywhere": {
     "name": "ChatAnywhere",
     "platform_key": "chatanywhere",

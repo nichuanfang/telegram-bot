@@ -116,14 +116,31 @@ async def handle_caption(update: Update, max_length):
     return None
 
 
+def get_mime_type(image_path):
+    if image_path.endswith(".jpg") or image_path.endswith(".jpeg"):
+        return "image/jpeg"
+    elif image_path.endswith(".png"):
+        return "image/png"
+    elif image_path.endswith(".webp"):
+        return "image/webp"
+    elif image_path.endswith(".gif"):
+        return "image/gif"
+    else:
+        print(
+            f"Unsupported image format. Please use a .jpg, .jpeg, .png, .webp, or .gif image file.")
+        exit()
+
+
 async def handle_photo_download(update: Update, context: CallbackContext):
     photo = update.message.photo[-2]
     photo_file = await context.bot.get_file(photo.file_id)
     async with httpx.AsyncClient() as client:
         photo_response = await client.get(photo_file.file_path)
     image_data = photo_response.content
+    # mime类型
+    mime_type = get_mime_type(photo_file.file_path)
     if image_data:
-        return base64.b64encode(image_data).decode("utf-8")
+        return mime_type, base64.b64encode(image_data).decode("utf-8")
     else:
         raise ValueError("Empty image data received.")
 
@@ -134,18 +151,18 @@ async def handle_photo(update: Update, context: CallbackContext, max_length):
         'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
-    if current_model != 'gpt-4o':
+    if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
 
     handle_result = await asyncio.gather(handle_caption(update, max_length),
                                          handle_photo_download(update, context))
     caption_result = handle_result[0]
-    photo_download_result = handle_result[1]
+    mime_type, image_base64 = handle_result[1]
     if caption_result:
         content.append({'type': 'text', 'text': caption_result})
-    if photo_download_result:
+    if image_base64:
         content.append({'type': 'image_url', 'image_url': {
-                       'url': f'data:image/jpeg;base64,{photo_download_result}'}})
+                       'url': f'data:{mime_type};base64,{image_base64}'}})
     return content
 
 
