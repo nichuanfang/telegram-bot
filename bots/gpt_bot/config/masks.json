@@ -5,7 +5,10 @@
     "introduction": "嗨，我是*助手*。我能帮你什么？",
     "supported_models": [
       "gpt-3.5-turbo",
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-3.5-turbo",
     "max_message_count": 6,
@@ -28,7 +31,10 @@
     "introduction": "你好，我是*简洁助手*。我总是简洁而精确地回答。我能帮你什么？",
     "supported_models": [
       "gpt-3.5-turbo",
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-3.5-turbo",
     "max_message_count": 3,
@@ -50,7 +56,10 @@
     "mask_key": "github_copilot",
     "introduction": "嗨，我是*代码开发者*。我怎么能帮助你？",
     "supported_models": [
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-4o",
     "max_message_count": 10,
@@ -94,7 +103,10 @@
     "mask_key": "travel_guide",
     "introduction": "你好，我是*旅游助手*。我可以为你提供有关其旅行目的地的有用信息和建议，包括景点、住宿、交通和当地习俗",
     "supported_models": [
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-4o",
     "max_message_count": 6,
@@ -116,7 +128,10 @@
     "mask_key": "song_recommender",
     "introduction": "你好，我是*歌曲推荐人*。我可以根据你提供的歌曲，创建一个相似歌曲的播放列表",
     "supported_models": [
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-4o",
     "max_message_count": 3,
@@ -138,7 +153,10 @@
     "mask_key": "movie_expert",
     "introduction": "你好，我是*电影专家*。我可以回答有关电影、演员、导演的问题，并根据你的喜好推荐电影",
     "supported_models": [
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-4o",
     "max_message_count": 5,
@@ -160,7 +178,10 @@
     "mask_key": "doctor",
     "introduction": "你好，我是*医生*。我会使用AI工具和传统方法进行诊断",
     "supported_models": [
-      "gpt-4o"
+      "gpt-4o",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
     ],
     "default_model": "gpt-4o",
     "max_message_count": 10,
