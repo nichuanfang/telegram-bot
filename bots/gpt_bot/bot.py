@@ -6,6 +6,7 @@ import re
 import traceback
 
 import httpx
+import regex
 import telegram.helpers
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
@@ -17,6 +18,8 @@ from my_utils.bot_util import auth, migrate_platform
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
+STOP_WORDS = frozenset({'的', '是', '在', '和', '了', '有',
+                       '我', '也', '不', '就', '与', '他', '她', '它'})
 # 默认面具
 DEFAULT_MASK_KEY: str = bot_util.DEFAULT_MASK_KEY
 # 默认平台
@@ -49,16 +52,11 @@ async def start(update: Update, context: CallbackContext) -> None:
 
 
 def compress_question(question):
-    # 去除多余的空格和换行符
-    question = re.sub(r'\s+', ' ', question).strip()
-
-    # 删除停用词（这里只是一个简单示例，可以根据需要扩展）
-    stop_words = {'的', '是', '在', '和', '了', '有',
-                  '我', '也', '不', '就', '与', '他', '她', '它'}
+    # 使用 regex 库替代 re 库进行正则匹配
+    question = regex.sub(r'\s+', ' ', question).strip()
     question_words = question.split()
     compressed_question = ' '.join(
-        [word for word in question_words if word not in stop_words])
-
+        word for word in question_words if word not in STOP_WORDS)
     return compressed_question
 
 
