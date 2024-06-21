@@ -2,7 +2,10 @@ import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
+import io
 import json
+import mimetypes
+from PIL import Image
 import os
 import re
 import traceback
@@ -11,7 +14,7 @@ import numpy as np
 
 import regex
 import telegram.helpers
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
 from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
@@ -136,18 +139,8 @@ async def handle_caption(update: Update, max_length):
 
 
 def get_mime_type(image_path):
-    if image_path.endswith(".jpg") or image_path.endswith(".jpeg"):
-        return "image/jpeg"
-    elif image_path.endswith(".png"):
-        return "image/png"
-    elif image_path.endswith(".webp"):
-        return "image/webp"
-    elif image_path.endswith(".gif"):
-        return "image/gif"
-    else:
-        print(
-            f"Unsupported image format. Please use a .jpg, .jpeg, .png, .webp, or .gif image file.")
-        exit()
+    mime_type, _ = mimetypes.MimeTypes.guess_type(image_path)
+    return mime_type
 
 
 async def handle_photo_download(update: Update, context: CallbackContext):
@@ -156,48 +149,60 @@ async def handle_photo_download(update: Update, context: CallbackContext):
         photo = update.message.sticker.thumbnail
     else:
         photo = update.message.photo[-2]
-    photo_file = await context.bot.get_file(photo.file_id)
-    photo_response = await HTTP_CLIENT.get(photo_file.file_path)
-    image_data = photo_response.content
-    # mime类型
-    mime_type = get_mime_type(photo_file.file_path)
-    if image_data:
-        return mime_type, base64.b64encode(image_data).decode("utf-8")
-    else:
+
+    photo_file: File = await context.bot.get_file(photo.file_id)
+    image_data = await photo_file.download_as_bytearray()
+
+    if not image_data:
         raise ValueError("Empty image data received.")
 
+    # 将图片转换为 WebP 格式
+    image = Image.open(io.BytesIO(image_data))
+    webp_io = io.BytesIO()
+    image.save(webp_io, format='WEBP')
+    webp_data = webp_io.getvalue()
 
-async def handle_photo(update: Update, context: CallbackContext, max_length):
+    return base64.b64encode(webp_data).decode("utf-8")
+
+
+async def handle_photo(update: Update, context: CallbackContext, max_length: int):
     content = []
     current_mask = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
+
     if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
 
-    handle_result = await asyncio.gather(handle_caption(update, max_length),
-                                         handle_photo_download(update, context))
+    # 并行处理 caption 和 photo download
+    handle_result = await asyncio.gather(
+        handle_caption(update, max_length),
+        handle_photo_download(update, context)
+    )
+
     caption_result = handle_result[0]
-    mime_type, image_base64 = handle_result[1]
+    image_base64 = handle_result[1]
+
     if caption_result:
         content.append({'type': 'text', 'text': caption_result})
+
     if image_base64:
         content.append({
             'type': 'image_url',
             'image_url': {
-                'url': f'data:{mime_type};base64,{image_base64}'
+                'url': f'data:image/webp;base64,{image_base64}'
             }
         })
+
     return content
 
 
 async def handle_document_download(update: Update, context: CallbackContext):
     document = update.message.document
-    file = await context.bot.get_file(document.file_id)
-    response = await HTTP_CLIENT.get(file.file_path)
-    document_text = response.text
-    return f'```{document.mime_type}\n{document_text}\n```\n'
+    file: File = await context.bot.get_file(document.file_id)
+    document_bytes = await file.download_as_bytearray()
+    return f'```{document.mime_type}\n{document_bytes.decode(encoding="utf-8")}\n```\n'
 
 
 async def handle_document(update: Update, context: CallbackContext, max_length):
@@ -224,11 +229,11 @@ async def handle_audio(update: Update, context: CallbackContext):
             raise ValueError(e)
 
 
-async def analyse_video(update, context):
+async def analyse_video(update: Update, context: CallbackContext):
     content = []
     content.append({
         'type': 'text',
-        'text': '以下是从视频中提取的关键帧，请提供整个视频的综合分析'
+        'text': '视频关键帧开始'
     })
     current_mask = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])
@@ -236,16 +241,18 @@ async def analyse_video(update, context):
         'current_model', current_mask['default_model'])
     if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
-
-    video_file = await context.bot.get_file(update.message.effective_attachment.file_id)
+    try:
+        video_file = await context.bot.get_file(update.message.effective_attachment.file_id)
+    except:
+        raise RuntimeError('The video is too large!')
     video_path = f"temp/{video_file.file_id}.mp4"
     await video_file.download_to_drive(video_path)
     # Process the video
     key_frames = process_video(video_path)
     # Save key frames
     for _, frame in key_frames:
-        mime_type = 'image/png'
-        _, buffer = cv2.imencode('.png', frame)
+        mime_type = 'image/webp'
+        _, buffer = cv2.imencode('.webp', frame)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
         content.append({
             'type': 'image_url',
@@ -255,6 +262,14 @@ async def analyse_video(update, context):
         })
     # Clean up
     os.remove(video_path)
+    content.append({
+        'type': 'text',
+        'text': '视频关键帧结束'
+    })
+    content.append({
+        'type': 'text',
+        'text': '请提供整个视频的综合分析'
+    })
     return content
 
 
@@ -310,8 +325,8 @@ def process_video(video_path):
     cap.release()
 
     # Determine a dynamic threshold based on the distribution of diff_ratios
-    # For example, use the 95th percentile
-    threshold = np.percentile(diff_ratios, 95)
+    # For example, use the 90th percentile instead of 95th
+    threshold = np.percentile(diff_ratios, 90)
 
     # Extract key frames based on the calculated diff_ratios
     key_frames = []
