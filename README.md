@@ -1,13 +1,14 @@
-# Telegram机器人项目
+# Telegram 机器人项目
 
 ---
+
 **内容目录**
 
-- [Dogyun机器人⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
-- [Github工作流机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
-- [Tmdb机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
-- [去水印机器人⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fwatermarkremovebot)
-- [Chatgpt聊天机器人⭐⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#gptbot)
+- [Dogyun 机器人 ⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fdogyunbot)
+- [Github 工作流机器人 ⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fgithubworkflowbot)
+- [Tmdb 机器人 ⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Ftmdbbot)
+- [去水印机器人 ⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#%EF%B8%8Fwatermarkremovebot)
+- [Chatgpt 聊天机器人 ⭐⭐⭐](https://github.com/nichuanfang/telegram-bot?tab=readme-ov-file#gptbot)
 
 ## ❤️[DogyunBot](https://t.me/DogyunBot)
 
@@ -17,7 +18,7 @@
 
 - [x] 查看服务器各项指标(cpu,内存,今日流量,本月流量)
 - [x] 抽奖
-- [x] 支持手动备份bitwarden
+- [x] 支持手动备份 bitwarden
 - [x] 支持执行命令
 - [x] 定时检查[dogyun](https://www.dogyun.com/)平台购买服务器的余额是否充足
 - [x] 定时检查[dogyun](https://www.dogyun.com/)平台是否有抽奖活动
@@ -29,7 +30,7 @@
 
 ## ❤️[GithubWorkflowBot](https://t.me/github_workflow_action_bot)
 
-该机器人可以手动触发github的工作流
+该机器人可以手动触发 github 的工作流
 
 ### 🌈Features
 
@@ -49,7 +50,7 @@
 - [x] 推荐热门剧集
 - [x] 根据电影名称搜索电影
 - [x] 根据剧集名称搜索剧集
-- [x] 直接在输入框输入内容 搜索电影or剧集
+- [x] 直接在输入框输入内容 搜索电影 or 剧集
 - [ ] 支持行内搜索
 
 <p align="center">
@@ -71,26 +72,29 @@
 
 ## 🔥[GPTBot](https://t.me/ncf_chatgpt_bot)
 
-Chatgpt聊天机器人telegram端! 强大的AI工具~
+Chatgpt 聊天机器人 telegram 端! 强大的 AI 工具~
 
 ### 🌈Features
 
 - [x] **流式响应**和**非流式响应**都支持.默认采用**流式响应**
+- [x] 支持**切换平台**功能
 - [x] 支持**切换模型**功能.不同的面具具备不同的模型选择列表和默认模型
 - [x] 支持**面具切换**功能.自带有八个面具:
-    - **通用助手**
-    - **简明助手**
-    - **代码助手**
-    - **图像生成助手**
-    - **旅游助手**
-    - **歌曲推荐人**
-    - **电影专家**
-    - **医生**
+  - **通用助手**
+  - **简明助手**
+  - **代码助手**
+  - **图像生成助手**
+  - **旅游助手**
+  - **歌曲推荐人**
+  - **电影专家**
+  - **医生**
 - [x] 支持**清除聊天上下文**和**恢复上下文**功能,可以开启新的会话
 - [x] 支持**余额查询**
+- [x] **权限控制**.访客只能用免费的平台
 - [x] 控制**历史对话长度**
 - [x] 支持发送**语音**,使用`whisper-1`模型
 - [x] 可以**分析图像内容**和使用`DALL-E-3`模型生成图片
+- [x] 可以**分析视频内容**
 - [ ] 更多内容开发中...
 
 <p align="center">

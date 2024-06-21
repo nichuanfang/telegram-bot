@@ -1,9 +1,13 @@
 import asyncio
 import base64
+from concurrent.futures import ThreadPoolExecutor
+import heapq
 import json
 import os
 import re
 import traceback
+import cv2
+import numpy as np
 
 import regex
 import telegram.helpers
@@ -86,16 +90,23 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             else:
                 content_task = asyncio.create_task(
                     handle_text(update, max_length))
-        elif update.message.photo:
+        elif update.message.photo or update.message.sticker:
             content_task = asyncio.create_task(
                 handle_photo(update, context, max_length))
-        elif update.message.document:
-            content_task = asyncio.create_task(
-                handle_document(update, context, max_length))
         elif update.message.audio or update.message.voice:
             content_task = asyncio.create_task(handle_audio(update, context))
+        elif update.message.document:
+            # gif虽然会被转为mp4 但是会被归类为document
+            if update.message.document.mime_type.startswith('video'):
+                # 视频处理
+                content_task = asyncio.create_task(
+                    handle_video(update, context, max_length))
+            else:
+                content_task = asyncio.create_task(
+                    handle_document(update, context, max_length))
         elif update.message.video:
-            content_task = asyncio.create_task(handle_video(update, context))
+            content_task = asyncio.create_task(
+                handle_video(update, context, max_length))
         else:
             raise ValueError('不支持的输入类型!')
         curr_mask = context.user_data.get(
@@ -140,7 +151,11 @@ def get_mime_type(image_path):
 
 
 async def handle_photo_download(update: Update, context: CallbackContext):
-    photo = update.message.photo[-2]
+    # 判断是图片还是贴图
+    if update.message.sticker:
+        photo = update.message.sticker.thumbnail
+    else:
+        photo = update.message.photo[-2]
     photo_file = await context.bot.get_file(photo.file_id)
     photo_response = await HTTP_CLIENT.get(photo_file.file_path)
     image_data = photo_response.content
@@ -198,7 +213,7 @@ async def handle_audio(update: Update, context: CallbackContext):
     if audio_file:
         file_id = audio_file.file_id
         new_file = await context.bot.get_file(file_id)
-        ogg_path = os.path.join(f"{file_id}.ogg")
+        ogg_path = os.path.join(f"temp/{file_id}.ogg")
         await new_file.download_to_drive(ogg_path)
         try:
             return {
@@ -209,8 +224,107 @@ async def handle_audio(update: Update, context: CallbackContext):
             raise ValueError(e)
 
 
-async def handle_video(update, context):
-    return "Video processing is not implemented yet."
+async def analyse_video(update, context):
+    content = []
+    content.append({
+        'type': 'text',
+        'text': '以下是从视频中提取的关键帧，请提供整个视频的综合分析'
+    })
+    current_mask = context.user_data.get(
+        'current_mask', MASKS[DEFAULT_MASK_KEY])
+    current_model: str = context.user_data.get(
+        'current_model', current_mask['default_model'])
+    if not current_model.startswith(('gpt-4o', 'claude-3')):
+        raise ValueError(f'当前模型: {current_model}不支持视频解析!')
+
+    video_file = await context.bot.get_file(update.message.effective_attachment.file_id)
+    video_path = f"temp/{video_file.file_id}.mp4"
+    await video_file.download_to_drive(video_path)
+    # Process the video
+    key_frames = process_video(video_path)
+    # Save key frames
+    for _, frame in key_frames:
+        mime_type = 'image/png'
+        _, buffer = cv2.imencode('.png', frame)
+        image_base64 = base64.b64encode(buffer).decode("utf-8")
+        content.append({
+            'type': 'image_url',
+            'image_url': {
+                'url': f'data:{mime_type};base64,{image_base64}'
+            }
+        })
+    # Clean up
+    os.remove(video_path)
+    return content
+
+
+async def handle_video(update: Update, context: CallbackContext, max_length):
+    handled_result = await asyncio.gather(analyse_video(update, context),
+                                          handle_caption(update, max_length))
+    analyse_video_result = handled_result[0]
+    handle_caption_result = handled_result[1]
+    if handle_caption_result:
+        analyse_video_result.append({
+            'type': 'text',
+            'text': handle_caption_result
+        })
+    return analyse_video_result
+
+
+def calculate_diff(prev_frame, frame):
+    diff = cv2.absdiff(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+                       cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY))
+    non_zero_count = np.count_nonzero(diff)
+    total_pixels = diff.size
+    diff_ratio = (non_zero_count / total_pixels) * 100
+    return diff_ratio
+
+
+def process_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    prev_frame = None
+    frame_count = 0
+    diff_ratios = []
+    frames = []
+
+    # Use ThreadPoolExecutor for parallel processing
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = []
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+
+            if prev_frame is not None:
+                futures.append(executor.submit(
+                    calculate_diff, prev_frame, frame))
+                frames.append(frame)
+
+            prev_frame = frame
+            frame_count += 1
+
+        for future in futures:
+            diff_ratios.append(future.result())
+
+    cap.release()
+
+    # Determine a dynamic threshold based on the distribution of diff_ratios
+    # For example, use the 95th percentile
+    threshold = np.percentile(diff_ratios, 95)
+
+    # Extract key frames based on the calculated diff_ratios
+    key_frames = []
+    for i, diff_ratio in enumerate(diff_ratios):
+        if diff_ratio > threshold:
+            if len(key_frames) < 10:
+                heapq.heappush(key_frames, (diff_ratio, frames[i]))
+            else:
+                heapq.heappushpop(key_frames, (diff_ratio, frames[i]))
+
+    # Sort key frames by diff_ratio in descending order
+    key_frames.sort(reverse=True, key=lambda x: x[0])
+    return key_frames
 
 
 async def handle_code_url(update, code_id):
@@ -416,7 +530,6 @@ def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
                 name = MASKS[mask_key]['name']
                 if mask_key == current_mask_key:
                     name = "* " + name
-                    flag = True
                 row.append(InlineKeyboardButton(
                     name, callback_data=f'mask_key:{mask_key}'))
                 if (i + 1) % 2 == 0:

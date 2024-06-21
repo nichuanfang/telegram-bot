@@ -39,3 +39,4 @@ bots/gpt_bot/config/platforms.json
 .dockerignore
 docker-compose.yml
 Dockerfile
+temp/

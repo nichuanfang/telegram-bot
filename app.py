@@ -11,7 +11,9 @@ import asyncio
 from telegram import Bot
 from telegram.ext import ApplicationBuilder, ContextTypes
 dotenv.load_dotenv(override=True)
-
+# 设置临时文件夹
+if not os.path.exists('temp'):
+    os.mkdir('temp')
 
 logger = my_logging.get_logger('app')
 

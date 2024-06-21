@@ -47,3 +47,4 @@ venv/
 
 # Ignore specific configuration file
 bots/gpt_bot/config/platforms.json
+temp/
