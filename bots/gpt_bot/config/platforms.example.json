@@ -24,6 +24,11 @@
     "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
     "index_url": "https://api.chatanywhere.tech",
     "payment_url": "https://peiqishop.me/",
+    "unsupported_models": [
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
+    ],
     "openai_api_key": ""
   },
   "free_1": {
