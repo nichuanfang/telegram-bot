@@ -116,10 +116,10 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_caption(update: Update, max_length):
     if update.message.caption:
-        handled_question = compress_question(update.message.caption.strip())
-        if len(handled_question.encode()) > max_length:
+        if len(update.message.caption.encode()) > max_length:
             raise ValueError(
                 f'Your question is too long.请通过在线分享平台 {bot_util.HASTE_SERVER_HOST}  提问')
+        handled_question = compress_question(update.message.caption.strip())
         return handled_question
     return None
 
@@ -168,8 +168,12 @@ async def handle_photo(update: Update, context: CallbackContext, max_length):
     if caption_result:
         content.append({'type': 'text', 'text': caption_result})
     if image_base64:
-        content.append({'type': 'image_url', 'image_url': {
-                       'url': f'data:{mime_type};base64,{image_base64}'}})
+        content.append({
+            'type': 'image_url',
+            'image_url': {
+                'url': f'data:{mime_type};base64,{image_base64}'
+            }
+        })
     return content
 
 
