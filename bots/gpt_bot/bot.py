@@ -453,9 +453,9 @@ async def handle_exception(update, context, e, init_message_task):
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
             # free_1可能授权码失效了
-            context.user_data['current_platform'] = migrate_platform(
-                context.user_data['current_platform'], 'free_1', 4)
-            init_text = 'free_1授权码已更新\n\n'
+            # context.user_data['current_platform'] = migrate_platform(
+            #     context.user_data['current_platform'], 'free_1', 4)
+            init_text = 'free_1授权码已失效\n\n'
         else:
             init_text = ''
     elif 'at byte offset' in error_message:
