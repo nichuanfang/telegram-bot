@@ -178,8 +178,6 @@ class Chat:
         return list(self._messages)
 
     def drop_last_message(self):
-        if len(self._messages.core) == 0:
-            return
         self._messages.drop_last()
 
     def recover_messages(self, context: CallbackContext):
@@ -197,8 +195,12 @@ class Chat:
             *messages, {"role": "assistant", "content": answer})
 
     def combine_messages(self, *messages, **kwargs):
-        # type: ignore
-        # type: ignore
+        if kwargs['model'].startswith('claude-3'):
+            flag = len(
+                self._messages.core) == self._messages.maxlen and self._messages.core[0]['obj']['role'] == 'user'
+            if flag:
+                # 移除第一个元素
+                self._messages.drop_last()
         return kwargs.pop('messages', []) + list(self._messages + messages), kwargs
 
     def clear_messages(self, context: CallbackContext):
@@ -206,7 +208,6 @@ class Chat:
         清空历史消息
         """
         user_data = context.user_data
-        assert user_data
         if len(self._messages.core) == 0:
             return
         user_data['clear_messages'] = list(self._messages)

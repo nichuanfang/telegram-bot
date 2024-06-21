@@ -231,6 +231,8 @@ async def handle_audio(update: Update, context: CallbackContext):
 
 async def analyse_video(update: Update, context: CallbackContext):
     content = []
+    platform: Platform = context.user_data['current_platform']
+    platform.chat.clear_messages(context)
     content.append({
         'type': 'text',
         'text': '视频关键帧开始'
