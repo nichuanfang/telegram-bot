@@ -406,7 +406,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             result = response.json()
             document_id = result.get('key')
             if document_id:
-                document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
+                document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
                 await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
             else:
                 await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
@@ -434,7 +434,8 @@ async def handle_response(update: Update, context: CallbackContext, content_task
                     result = response.json()
                     document_id = result.get('key')
                     if document_id:
-                        document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
+                        # 谷歌浏览器需安装 Markdown Reader 极大的提升预览体验!
+                        document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
                         await bot_util.send_message(update, text=f'消息过长，请通过在线分享平台访问：{document_url}')
                     else:
                         await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
