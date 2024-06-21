@@ -95,6 +95,7 @@ Chatgpt 聊天机器人 telegram 端! 强大的 AI 工具~
 - [x] 支持发送**语音**,使用`whisper-1`模型
 - [x] 可以**分析图像内容**和使用`DALL-E-3`模型生成图片
 - [x] 可以**分析视频内容**
+- [x] 支持`长文本`发送和分析 推荐搭建中转平台[haste-server](https://github.com/toptal/haste-server) 并且安装谷歌插件 [Markdown Reader](https://chromewebstore.google.com/detail/markdown-reader/medapdbncneneejhbgcjceippjlfkmkg)
 - [ ] 更多内容开发中...
 
 <p align="center">
