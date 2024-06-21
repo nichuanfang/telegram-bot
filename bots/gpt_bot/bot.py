@@ -65,7 +65,6 @@ def compress_question(question):
 
 @auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    assert update.message and context.user_data
     is_image_generator = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])['name'] == '图像生成助手'
     init_message_task = None
@@ -76,16 +75,17 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 message_text, reply_to_message_id=update.message.message_id)
         )
     max_length = 3000
-    # 使用re模块搜索第一个匹配的URL
-    match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
     try:
-        if match:
-            code_id: str = match[1]
-            content_task = asyncio.create_task(
-                handle_code_url(update, code_id))
-        elif update.message.text:
-            content_task = asyncio.create_task(
-                handle_text(update, max_length))
+        if update.message.text:
+            # 使用re模块搜索第一个匹配的URL
+            match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
+            if match:
+                code_id: str = match[1]
+                content_task = asyncio.create_task(
+                    handle_code_url(update, code_id))
+            else:
+                content_task = asyncio.create_task(
+                    handle_text(update, max_length))
         elif update.message.photo:
             content_task = asyncio.create_task(
                 handle_photo(update, context, max_length))
