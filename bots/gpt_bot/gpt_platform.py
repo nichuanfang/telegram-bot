@@ -11,7 +11,6 @@ from bots.gpt_bot.chat import Chat
 import platform
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
-from my_utils import bot_util
 
 
 def gpt_platform(cls):
