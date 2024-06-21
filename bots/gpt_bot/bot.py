@@ -264,8 +264,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
-        response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'),
-                                          headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
+        response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'))
         if response.status_code == 200:
             result = response.json()
             document_id = result.get('key')
@@ -292,8 +291,7 @@ async def handle_response(update: Update, context: CallbackContext, content, is_
             if len(res.encode()) < 3000:
                 await bot_util.send_message(update, res)
             else:
-                response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=res.encode('utf-8'),
-                                                  headers={'Content-Type': 'text/plain; charset=UTF-8', 'x-forwarded-for': 'telegram-bot'})
+                response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=res.encode('utf-8'))
                 if response.status_code == 200:
                     result = response.json()
                     document_id = result.get('key')
@@ -556,7 +554,16 @@ async def model_handler(update: Update, context: CallbackContext):
             current_model = supported_models[0]
             context.user_data['current_model'] = current_model
     else:
-        supported_models = current_mask['supported_models']
+        # 收费平台也有可能不兼容  面具[全局](supported_models)-模型[局部](unsupported_models) 才是真正的可以模型
+        unsupported_models = PLATFORMS[platform.name].get('unsupported_models')
+        if unsupported_models:
+            # 求并集
+            unsupported_models_set = set(unsupported_models)
+            supported_models = [
+                model for model in current_mask['supported_models'] if model not in unsupported_models_set]
+        else:
+            supported_models = current_mask['supported_models']
+
         if context.user_data.get('current_model') not in supported_models:
             current_model = supported_models[0]
             context.user_data['current_model'] = current_model
