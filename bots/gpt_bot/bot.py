@@ -450,7 +450,8 @@ async def handle_exception(update, context, e, init_message_task):
         # free_1可能授权码失效了
         context.user_data['current_platform'] = migrate_platform(
             context.user_data['current_platform'], 'free_1', 4)
-        init_text = 'free_1授权码已更新\n\n'
+        # init_text = 'free_1授权码已更新\n\n'
+        init_text = ''
     elif 'at byte offset' in error_message:
         init_text = '缺少结束标记!\n\n'
     elif 'content_filter' in error_message:
