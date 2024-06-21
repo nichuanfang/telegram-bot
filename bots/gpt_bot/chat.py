@@ -1,5 +1,3 @@
-from json import dumps as jsonDumps
-from json import loads as jsonLoads
 from pathlib import Path
 from typing import List
 
@@ -170,17 +168,17 @@ class Chat:
             x = x["obj"]
             print(f"[{x['role']}]:{x['content']}")
 
-    def pin_messages(self, *indexes):
-        '''
-        锁定历史消息
-        '''
-        self._messages.pin(*indexes)
+    # def pin_messages(self, *indexes):
+    #     '''
+    #     锁定历史消息
+    #     '''
+    #     self._messages.pin(*indexes)
 
-    def unpin_messages(self, *indexes):
-        '''
-        解锁历史消息
-        '''
-        self._messages.unpin(*indexes)
+    # def unpin_messages(self, *indexes):
+    #     '''
+    #     解锁历史消息
+    #     '''
+    #     self._messages.unpin(*indexes)
 
     def fetch_messages(self):
         for item in self._messages.core:
@@ -193,10 +191,13 @@ class Chat:
         assert context.user_data
         clear_messages = context.user_data.get('clear_messages', None)
         if clear_messages:
+            is_claude = context.user_data.get('current_model', 'gpt-3-turbo').startswith(
+                'claude-3')
             context.user_data['clear_messages'] = None
-            new_queue = Temque(maxlen=5)
-            new_queue.add_many(*clear_messages)
-            new_queue.add_many(*list(self._messages))
+            new_queue = Temque(maxlen=self._messages.maxlen)
+            new_queue.add_many(
+                is_claude, *(clear_messages+list(self._messages)))
+            # new_queue.add_many(is_claude, *list(self._messages))
             self._messages = new_queue
 
     def append_messages(self, answer, is_claude, *messages):
@@ -229,25 +230,25 @@ class Chat:
                 return self.async_request
             case 'forge':
                 return self.add_dialogs
-            case 'pin':
-                return self.pin_messages
-            case 'unpin':
-                return self.unpin_messages
-            case 'dump':
-                return self._dump
-            case 'load':
-                return self._load
+            # case 'pin':
+            #     return self.pin_messages
+            # case 'unpin':
+            #     return self.unpin_messages
+            # case 'dump':
+            #     return self._dump
+            # case 'load':
+            #     return self._load
         raise AttributeError(name)
 
-    def _dump(self, fpath: str):
-        """ 存档 """
-        messages = self.fetch_messages()
-        jt = jsonDumps(messages, ensure_ascii=False)
-        Path(fpath).write_text(jt, encoding="utf8")
-        return True
+    # def _dump(self, fpath: str):
+    #     """ 存档 """
+    #     messages = self.fetch_messages()
+    #     jt = jsonDumps(messages, ensure_ascii=False)
+    #     Path(fpath).write_text(jt, encoding="utf8")
+    #     return True
 
-    def _load(self, fpath: str):
-        """ 载入存档 """
-        jt = Path(fpath).read_text(encoding="utf8")
-        self._messages.add_many(*jsonLoads(jt))
-        return True
+    # def _load(self, fpath: str):
+    #     """ 载入存档 """
+    #     jt = Path(fpath).read_text(encoding="utf8")
+    #     self._messages.add_many(*jsonLoads(jt))
+    #     return True
