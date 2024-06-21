@@ -178,7 +178,9 @@ def auth(func):
                     await update.message.reply_text('You are not authorized to use this bot.')
                     return
             else:
-                context.user_data['current_platform'] = instantiate_platform()
+                if context.bot.first_name == 'GPTBot':
+                    context.user_data['current_platform'] = instantiate_platform(
+                    )
                 context.user_data['identity'] = 'user'
         await func(*args, **kwargs)
     return wrapper

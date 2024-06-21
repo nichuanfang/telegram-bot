@@ -147,7 +147,7 @@ class Platform(metaclass=ABCMeta):
         if isinstance(content, dict) and content.get('type') == "audio":
             return await self.audio_transcribe(content['audio_path'])
         # 如果类型是视频 这里需要对视频进行处理
-        return [{"role": "user", "content": str(content)}]
+        return [{"role": "user", "content": content}]
 
     async def generate_image(self, messages: List):
         # 生成图片
