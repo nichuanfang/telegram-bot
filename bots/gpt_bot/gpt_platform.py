@@ -107,14 +107,11 @@ class Platform(metaclass=ABCMeta):
         @param is_free:  是否为免费key
         @param kwargs: 其他字段
         """
-
-        messages_task = asyncio.create_task(self.prepare_messages(content))
+        messages = await self.prepare_messages(content)
         if kwargs.get('model') == "dall-e-3":
-            messages = await messages_task
             answer = await self.generate_image(messages)
             yield 'finished', answer
         else:
-            messages = await messages_task
             async for status, answer in self.completion(True, *messages, **kwargs):
                 yield status, answer
 
@@ -141,7 +138,8 @@ class Platform(metaclass=ABCMeta):
             })
             answer: str = completion.choices[0].message.content
             yield answer
-        self.chat.append_messages(answer, *messages)
+        self.chat.append_messages(
+            answer, kwargs['model'].startswith('claude-3'), *messages)
 
     async def prepare_messages(self, content: Union[str, List, Dict]) -> List[Dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":

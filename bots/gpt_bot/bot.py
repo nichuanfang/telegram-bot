@@ -81,7 +81,6 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             update.message.reply_text(
                 message_text, reply_to_message_id=update.message.message_id)
         )
-    max_length = 3000
     try:
         if update.message.text:
             # 使用re模块搜索第一个匹配的URL
@@ -92,10 +91,10 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     handle_code_url(update, code_id))
             else:
                 content_task = asyncio.create_task(
-                    handle_text(update, max_length))
+                    handle_text(update))
         elif update.message.photo or update.message.sticker:
             content_task = asyncio.create_task(
-                handle_photo(update, context, max_length))
+                handle_photo(update, context))
         elif update.message.audio or update.message.voice:
             content_task = asyncio.create_task(handle_audio(update, context))
         elif update.message.document:
@@ -103,26 +102,25 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if update.message.document.mime_type.startswith('video'):
                 # 视频处理
                 content_task = asyncio.create_task(
-                    handle_video(update, context, max_length))
+                    handle_video(update, context))
             else:
                 content_task = asyncio.create_task(
-                    handle_document(update, context, max_length))
+                    handle_document(update, context))
         elif update.message.video:
             content_task = asyncio.create_task(
-                handle_video(update, context, max_length))
+                handle_video(update, context))
         else:
             raise ValueError('不支持的输入类型!')
         curr_mask = context.user_data.get(
             'current_mask', MASKS[DEFAULT_MASK_KEY])
-        content_result = await content_task
         curr_mask['openai_completion_options'].update({
             "model": context.user_data.get('current_model', curr_mask['default_model'])
         })
         if ENABLE_STREAM:
-            await handle_stream_response(update, context, content_result, is_image_generator, init_message_task,
+            await handle_stream_response(update, context, content_task, is_image_generator, init_message_task,
                                          **curr_mask['openai_completion_options'])
         else:
-            await handle_response(update, context, content_result, is_image_generator,
+            await handle_response(update, context, content_task, is_image_generator,
                                   **curr_mask['openai_completion_options'])
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
@@ -165,7 +163,7 @@ async def handle_photo_download(update: Update, context: CallbackContext):
     return base64.b64encode(webp_data).decode("utf-8")
 
 
-async def handle_photo(update: Update, context: CallbackContext, max_length: int):
+async def handle_photo(update: Update, context: CallbackContext):
     content = []
     current_mask = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])
@@ -177,7 +175,7 @@ async def handle_photo(update: Update, context: CallbackContext, max_length: int
 
     # 并行处理 caption 和 photo download
     handle_result = await asyncio.gather(
-        handle_caption(update, max_length),
+        handle_caption(update, 3000),
         handle_photo_download(update, context)
     )
 
@@ -205,9 +203,9 @@ async def handle_document_download(update: Update, context: CallbackContext):
     return f'```{document.mime_type}\n{document_bytes.decode(encoding="utf-8")}\n```\n'
 
 
-async def handle_document(update: Update, context: CallbackContext, max_length):
+async def handle_document(update: Update, context: CallbackContext):
     handled_result = await asyncio.gather(handle_document_download(update, context),
-                                          handle_caption(update, max_length))
+                                          handle_caption(update, 3000))
     handle_document_result = handled_result[0]
     handle_caption_result = handled_result[1]
     return handle_document_result + (handle_caption_result if handle_caption_result else '')
@@ -241,6 +239,8 @@ async def analyse_video(update: Update, context: CallbackContext):
         'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
+    if platform.name.startswith('free'):
+        raise ValueError(f'当前平台: {platform.name_zh}不支持视频解析!')
     if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     try:
@@ -275,9 +275,9 @@ async def analyse_video(update: Update, context: CallbackContext):
     return content
 
 
-async def handle_video(update: Update, context: CallbackContext, max_length):
+async def handle_video(update: Update, context: CallbackContext):
     handled_result = await asyncio.gather(analyse_video(update, context),
-                                          handle_caption(update, max_length))
+                                          handle_caption(update, 3000))
     analyse_video_result = handled_result[0]
     handle_caption_result = handled_result[1]
     if handle_caption_result:
@@ -352,7 +352,7 @@ async def handle_code_url(update, code_id):
     return compress_question(response.text)
 
 
-async def handle_text(update, max_length):
+async def handle_text(update):
     if len(update.message.text.encode()) > 3000:
         raise ValueError(
             f'Your question is too long.请通过在线分享平台 {bot_util.HASTE_SERVER_HOST}  提问')
@@ -361,16 +361,18 @@ async def handle_text(update, max_length):
     return content_text
 
 
-async def handle_stream_response(update: Update, context: CallbackContext, content: str, is_image_generator: bool,
+async def handle_stream_response(update: Update, context: CallbackContext, content_task, is_image_generator: bool,
                                  init_message_task, **openai_completion_options):
     prev_answer = ''
     current_message_length = 0
     max_message_length = 3000
     message_content = ''
-    gpt_platform: Platform = context.user_data['current_platform']
-    init_message: Message = await init_message_task
-    current_message_id = init_message.message_id
     need_notice = True
+    gpt_platform: Platform = context.user_data['current_platform']
+    ic_result = await asyncio.gather(init_message_task, content_task)
+    init_message: Message = ic_result[0]
+    current_message_id = init_message.message_id
+    content = ic_result[1]
     async for status, curr_answer in gpt_platform.async_stream_request(content, **openai_completion_options):
         if is_image_generator:
             img_response = await HTTP_CLIENT.get(curr_answer)
@@ -405,14 +407,15 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             document_id = result.get('key')
             if document_id:
                 document_url = f'{bot_util.HASTE_SERVER_HOST}/{document_id}'
-                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'分享成功，请访问：{document_url}')
+                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
             else:
                 await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
-async def handle_response(update: Update, context: CallbackContext, content, is_image_generator, **openai_completion_options):
+async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, **openai_completion_options):
     await bot_util.send_typing(update)
     gpt_platform: Platform = context.user_data['current_platform']
+    content = await content_task
     async for res in gpt_platform.async_request(content, **openai_completion_options):
         if res is None or len(res) == 0:
             continue
@@ -447,11 +450,14 @@ async def handle_exception(update, context, e, init_message_task):
         f"==================================================ERROR END====================================================================")
     error_message = str(e)
     if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
-        # free_1可能授权码失效了
-        context.user_data['current_platform'] = migrate_platform(
-            context.user_data['current_platform'], 'free_1', 4)
-        # init_text = 'free_1授权码已更新\n\n'
-        init_text = ''
+        current_platform: Platform = context.user_data['current_platform']
+        if current_platform.name.startswith('free'):
+            # free_1可能授权码失效了
+            context.user_data['current_platform'] = migrate_platform(
+                context.user_data['current_platform'], 'free_1', 4)
+            init_text = 'free_1授权码已更新\n\n'
+        else:
+            init_text = ''
     elif 'at byte offset' in error_message:
         init_text = '缺少结束标记!\n\n'
     elif 'content_filter' in error_message:

@@ -50,23 +50,33 @@ class Temque:
         self.core: List[dict] = []
         self.maxlen = maxlen or float("inf")
 
-    def _trim(self):
+    def _trim(self, is_claude: bool = False):
         core = self.core
         if len(core) > self.maxlen:
             dc = len(core) - self.maxlen
             indexes = []
             for i, x in enumerate(core):
-                # if not x["pin"]:
                 indexes.append(i)
                 if len(indexes) == dc:
-                    break
+                    # 如果是claude模型 还要保证此时的消息角色为user
+                    if is_claude and x['obj']['role'] == 'user':
+                        dc += 1
+                    else:
+                        break
+            # [::-1]逆序输出
             for i in indexes[::-1]:
                 core.pop(i)
+            pass
 
-    def add_many(self, *objs):
+    def add_many(self, is_claude, *objs):
+        """添加历史消息  
+
+        Args:
+            is_claude (bool): 判断是否为claude消息 如果是 保持第一个消息为user 防止报错
+        """
         for x in objs:
             self.core.append({"obj": x})
-        self._trim()
+        self._trim(is_claude)
 
     def __iter__(self):
         for x in self.core:
@@ -88,14 +98,12 @@ class Temque:
     def deepcopy(self):
         ...  # 创建这个方法是为了以代码提示的方式提醒用户: copy 方法是浅拷贝
 
-    def __add__(self, obj: 'list|Temque'):
-        que = self.copy()
-        if isinstance(obj, self.__class__):
-            que.core += obj.core
-            que._trim()
-        else:
-            que.add_many(*obj)
-        return que
+    def __add__(self, *obj: list):
+        contents = []
+        for message in self.core:
+            contents.append(message['obj'])
+        contents.append(*obj)
+        return contents
 
     def drop_last(self):
         if len(self.core) > 0:
@@ -175,7 +183,8 @@ class Chat:
         self._messages.unpin(*indexes)
 
     def fetch_messages(self):
-        return list(self._messages)
+        for item in self._messages.core:
+            item['obj']
 
     def drop_last_message(self):
         self._messages.drop_last()
@@ -190,18 +199,12 @@ class Chat:
             new_queue.add_many(*list(self._messages))
             self._messages = new_queue
 
-    def append_messages(self, answer, *messages):
-        self._messages.add_many(
-            *messages, {"role": "assistant", "content": answer})
+    def append_messages(self, answer, is_claude, *messages):
+        self._messages.add_many(is_claude,
+                                *messages, {"role": "assistant", "content": answer})
 
     def combine_messages(self, *messages, **kwargs):
-        if kwargs['model'].startswith('claude-3'):
-            flag = len(
-                self._messages.core) == self._messages.maxlen and self._messages.core[0]['obj']['role'] == 'user'
-            if flag:
-                # 移除第一个元素
-                self._messages.drop_last()
-        return kwargs.pop('messages', []) + list(self._messages + messages), kwargs
+        return kwargs.pop('messages', []) + (self._messages.__add__(*messages)), kwargs
 
     def clear_messages(self, context: CallbackContext):
         """
