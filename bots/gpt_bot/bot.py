@@ -460,6 +460,10 @@ async def handle_exception(update, context, e, init_message_task):
             init_text = 'free_1授权码已失效\n\n'
         else:
             init_text = ''
+    elif '上游负载已饱和' in error_message:
+        current_platform: Platform = context.user_data['current_platform']
+        current_platform.chat.clear_messages()
+        init_text = '已达到token上限'
     elif 'at byte offset' in error_message:
         init_text = '缺少结束标记!\n\n'
     elif 'content_filter' in error_message:
