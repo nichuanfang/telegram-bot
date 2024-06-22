@@ -55,7 +55,7 @@ for file in os.listdir(platforms_path):
             PLATFORMS_REGISTRY[platform_key] = attr
 
 
-def instantiate_platform():
+def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: bool = False):
     """
     初始化平台
     @param platform_name: 平台名称(英文)
@@ -63,7 +63,7 @@ def instantiate_platform():
     @return:  平台对象
     """
     # 默认平台
-    platform = platforms[DEFAULT_PLATFORM_KEY]
+    platform = platforms[platform_key]
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in platform:
@@ -81,24 +81,26 @@ def instantiate_platform():
         openai_api_key = platform['openai_api_key']
     # 平台初始化参数
     platform_init_params = {
-        'name': DEFAULT_PLATFORM_KEY,
+        'name': platform_key,
         'name_zh': platform['name'],
         'domestic_openai_base_url': platform['domestic_openai_base_url'],
         'foreign_openai_base_url': platform['foreign_openai_base_url'],
         'openai_api_key': openai_api_key,
         'index_url': platform['index_url'],
         'payment_url': platform['payment_url'],
-        'max_message_count': 4 if DEFAULT_PLATFORM_KEY.startswith('free') else masks[DEFAULT_MASK_KEY]['max_message_count']
+        'max_message_count': masks[DEFAULT_MASK_KEY]['max_message_count']
     }
-    logger.info(f'当前使用的openai代理平台为{platform["name"]}.')
-    return PLATFORMS_REGISTRY[DEFAULT_PLATFORM_KEY](**platform_init_params)
+    if need_logger:
+        logger.info(f'当前使用的openai代理平台为{platform["name"]}.')
+    return PLATFORMS_REGISTRY[platform_key](**platform_init_params)
 
 
-def migrate_platform(from_platform: Platform, to_platform_key: str, max_message_count: int):
+async def migrate_platform(from_platform: Platform, to_platform_key: str, context: CallbackContext, max_message_count: int):
     """
     迁移平台
     @param from_platform 原平台对象
     @param to_platform_key: 要迁移到的平台key
+    @param current_model: 当前的模型
     @param   max_message_count 最大消息数
     @return:  平台对象
     """
@@ -127,7 +129,7 @@ def migrate_platform(from_platform: Platform, to_platform_key: str, max_message_
         'openai_api_key': openai_api_key,
         'index_url': to_platform['index_url'],
         'payment_url': to_platform['payment_url'],
-        'max_message_count': 4 if to_platform_key.startswith('free') else max_message_count
+        'max_message_count': max_message_count
     }
     logger.info(f'当前使用的openai代理平台为{to_platform["name"]}.')
     # 新平台
@@ -136,7 +138,8 @@ def migrate_platform(from_platform: Platform, to_platform_key: str, max_message_
     # 恢复历史消息
     new_platform.chat._messages.core = from_platform.chat._messages.core
     # 修剪历史消息
-    new_platform.chat._messages._trim()
+    await new_platform.chat._messages._trim(
+        context, True)
     return new_platform
 
 
@@ -171,7 +174,10 @@ def auth(func):
                     logger.info(
                         f'=================user {user_id} access the GPTbot for free===================')
                     context.user_data['current_platform'] = instantiate_platform(
-                    )
+                        need_logger=True)
+                    # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
+                    context.user_data['candidate_platform'] = instantiate_platform(
+                        'free_2')
                 else:
                     logger.warn(
                         f"======================user {user_id}'s  access has been filtered====================")
@@ -180,7 +186,10 @@ def auth(func):
             else:
                 if context.bot.first_name == 'GPTBot':
                     context.user_data['current_platform'] = instantiate_platform(
-                    )
+                        need_logger=True)
+                    # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
+                    context.user_data['candidate_platform'] = instantiate_platform(
+                        'free_2')
                 context.user_data['identity'] = 'user'
         await func(*args, **kwargs)
     return wrapper

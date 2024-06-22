@@ -7,8 +7,8 @@ from typing import Union, List, Dict
 
 import openai
 
-from bots.gpt_bot.chat import Chat
 import platform
+from bots.gpt_bot.chat import Chat
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
 
@@ -81,7 +81,7 @@ class Platform(metaclass=ABCMeta):
         module = cls.__module__
         return os.path.basename(module.rsplit('.', 1)[1])
 
-    async def async_request(self, content: Union[str, List, Dict] = '', **kwargs):
+    async def async_request(self, content: Union[str, List, Dict] = '', context=None, **kwargs):
         """
         非流式响应的请求逻辑
         @param content: 请求的内容
@@ -96,10 +96,10 @@ class Platform(metaclass=ABCMeta):
             yield await self.generate_image(messages)
         else:
             messages = await messages_task
-            async for answer in self.completion(False, *messages, **kwargs):
+            async for answer in self.completion(False, context, * messages, **kwargs):
                 yield answer
 
-    async def async_stream_request(self, content: Union[str, List, Dict] = '', **kwargs):
+    async def async_stream_request(self, content: Union[str, List, Dict] = '', context=None,  **kwargs):
         """
         流式响应的请求逻辑
         @param content:  请求内容
@@ -111,10 +111,10 @@ class Platform(metaclass=ABCMeta):
             answer = await self.generate_image(messages)
             yield 'finished', answer
         else:
-            async for status, answer in self.completion(True, *messages, **kwargs):
+            async for status, answer in self.completion(True, context, * messages, **kwargs):
                 yield status, answer
 
-    async def completion(self, stream: bool, *messages, **kwargs):
+    async def completion(self, stream: bool, context, *messages, **kwargs):
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
         if stream:
@@ -135,10 +135,9 @@ class Platform(metaclass=ABCMeta):
                 "stream": False,
                 **kwargs
             })
-            answer: str = completion.choices[0].message.content
-            yield answer
-        self.chat.append_messages(
-            answer, kwargs['model'].startswith('claude-3'), *messages)
+            yield completion.choices[0].message.content
+        await self.chat.append_messages(
+            answer, context, *messages)
 
     async def prepare_messages(self, content: Union[str, List, Dict]) -> List[Dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":
@@ -182,3 +181,12 @@ class Platform(metaclass=ABCMeta):
         total = json.loads(subscription.text)['soft_limit_usd']
         used = json.loads(usage.text)['total_usage'] / 100
         return f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}'
+
+    async def summary(self, content: dict, prompt: str):
+        """ 提取摘要 """
+        res = await self.chat.openai_client.chat.completions.create(**{
+            "messages": [{'role': 'system', 'content': prompt}, content],
+            "model": "gpt-3.5-turbo-16k",
+            "stream": False
+        })
+        return res.choices[0].message.content

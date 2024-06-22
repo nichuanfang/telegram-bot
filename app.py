@@ -129,6 +129,7 @@ for bot_directory in bot_directories:
         logger.error(f"Failed to import bot {bot_directory}: {e}")
 
 if __name__ == '__main__':
+    # 程序推出释放http池
     atexit.register(lambda: asyncio.run(HTTP_CLIENT.aclose()))
     for p in processes:
         p.start()
