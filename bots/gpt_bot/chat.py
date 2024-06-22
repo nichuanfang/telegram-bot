@@ -1,8 +1,16 @@
-from pathlib import Path
+import asyncio
+from concurrent.futures import thread
+import traceback
 from typing import List
-
-from openai import AsyncOpenAI
+from my_utils import my_logging
 from telegram.ext import CallbackContext
+from openai import AsyncOpenAI
+# 生成摘要prompt提示
+SUMMARY_PROMPT = '生成一个摘要.如果包含代码,总结代码片段的主要目的和功能，包括所使用的任何特定算法或技术'
+# 生成摘要最大重试次数
+SUMMARY_MAX_RETRIES = 2
+# 日志模块
+logger = my_logging.get_logger('chat')
 
 
 class AKPool:
@@ -48,7 +56,12 @@ class Temque:
         self.core: List[dict] = []
         self.maxlen = maxlen or float("inf")
 
-    def _trim(self, is_claude: bool = False):
+    async def _trim(self, context: CallbackContext, is_platform_migrate: bool = False):
+        if 'current_model' in context.user_data:
+            is_claude: bool = context.user_data['current_model'].startswith(
+                'claude-3')
+        else:
+            is_claude = False
         core = self.core
         if len(core) > self.maxlen:
             dc = len(core) - self.maxlen
@@ -65,16 +78,15 @@ class Temque:
             for i in indexes[::-1]:
                 core.pop(i)
             pass
+        # 接下来进行历史消息处理流程
+        if not is_platform_migrate:
+            # 平台迁移不处理历史消息了 只裁剪
+            await self.process_history_message(core, context)
 
-    def add_many(self, is_claude, *objs):
-        """添加历史消息  
-
-        Args:
-            is_claude (bool): 判断是否为claude消息 如果是 保持第一个消息为user 防止报错
-        """
+    async def add_many(self, context: CallbackContext = None, *objs):
         for x in objs:
             self.core.append({"obj": x})
-        self._trim(is_claude)
+        await self._trim(context)
 
     def __iter__(self):
         for x in self.core:
@@ -109,8 +121,52 @@ class Temque:
             self.core.pop()
 
     def clear(self):
-        """清空队列中的所有元素"""
         self.core = []
+
+    async def process_history_message(self, core: List[dict], context: CallbackContext):
+        for index, item in enumerate(core):
+            if len(item) < 1000:
+                continue
+            # 每一个消息都需要重试
+            retries = 0
+            while retries < SUMMARY_MAX_RETRIES:
+                try:
+                    asyncio.create_task(self.summary(
+                        context, index, item['obj']))
+                except Exception as e:
+                    logger.error(
+                        f"处理项目时发生错误：{item}。错误信息：{e}"
+                    )
+                    # 三种优雅的处理方式：日志记录、降级、重试
+                    retries += 1
+
+    async def summary(self, context: CallbackContext,  index: int, message: dict):
+        """生成摘要
+
+            Args:
+                message (_type_): 历史消息
+                index: 索引
+                message: 需要摘要的消息
+            """
+        # 专门用于摘要历史消息的平台
+        candidate_platform = context.user_data['candidate_platform']
+        # 调用平台的接口生成摘要
+        try:
+            summary_content: str = await candidate_platform.summary(
+                message, SUMMARY_PROMPT)
+        except Exception as e:
+            traceback.print_exc()
+            raise RuntimeError(f'生成摘要失败: \n{e}')
+        # 更新生成的摘要信息
+        self.core[index] = summary_content
+
+
+async def coroutine_wrapper(normal_function, *args, **kwargs):
+    return await asyncio.to_thread(normal_function, *args, **kwargs)
+
+
+async def async_func(normal_function, *args, **kwargs):
+    return await coroutine_wrapper(normal_function, *args, **kwargs)
 
 
 class Chat:
@@ -187,22 +243,19 @@ class Chat:
     def drop_last_message(self):
         self._messages.drop_last()
 
-    def recover_messages(self, context: CallbackContext):
+    async def recover_messages(self, context: CallbackContext):
         assert context.user_data
         clear_messages = context.user_data.get('clear_messages', None)
         if clear_messages:
-            is_claude = context.user_data.get('current_model', 'gpt-3-turbo').startswith(
-                'claude-3')
             context.user_data['clear_messages'] = None
             new_queue = Temque(maxlen=self._messages.maxlen)
-            new_queue.add_many(
-                is_claude, *(clear_messages+list(self._messages)))
-            # new_queue.add_many(is_claude, *list(self._messages))
+            await new_queue.add_many(
+                context, *(clear_messages+list(self._messages)))
             self._messages = new_queue
 
-    def append_messages(self, answer, is_claude, *messages):
-        self._messages.add_many(is_claude,
-                                *messages, {"role": "assistant", "content": answer})
+    async def append_messages(self, answer, context, *messages):
+        await self._messages.add_many(context,
+                                      *messages, {"role": "assistant", "content": answer})
 
     def combine_messages(self, *messages, **kwargs):
         return kwargs.pop('messages', []) + (self._messages.__add__(*messages)), kwargs
@@ -217,20 +270,20 @@ class Chat:
         user_data['clear_messages'] = list(self._messages)
         self._messages.clear()
 
-    def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
-        '''
-        添加历史对话
-        '''
-        messages = [dict(x) for x in ms]
-        self._messages.add_many(*messages)
+    # def add_dialogs(self, *ms: dict | system_msg | user_msg | assistant_msg):
+    #     '''
+    #     添加历史对话
+    #     '''
+    #     messages = [dict(x) for x in ms]
+    #     self._messages.add_many(*messages)
 
     def __getattr__(self, name):
         match name:  # 兼容旧代码
             case 'asy_request':
                 return self.async_request
-            case 'forge':
-                return self.add_dialogs
-            # case 'pin':
+            # case 'forge':
+            #     return self.add_dialogs
+            # # case 'pin':
             #     return self.pin_messages
             # case 'unpin':
             #     return self.unpin_messages

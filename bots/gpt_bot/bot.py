@@ -374,7 +374,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     init_message: Message = ic_result[0]
     current_message_id = init_message.message_id
     content = ic_result[1]
-    async for status, curr_answer in gpt_platform.async_stream_request(content, **openai_completion_options):
+    async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         if is_image_generator:
             img_response = await HTTP_CLIENT.get(curr_answer)
             if img_response.content:
@@ -417,7 +417,7 @@ async def handle_response(update: Update, context: CallbackContext, content_task
     await bot_util.send_typing(update)
     gpt_platform: Platform = context.user_data['current_platform']
     content = await content_task
-    async for res in gpt_platform.async_request(content, **openai_completion_options):
+    async for res in gpt_platform.async_request(content, context, **openai_completion_options):
         if res is None or len(res) == 0:
             continue
         if is_image_generator:
@@ -518,21 +518,17 @@ async def clear_handler(update: Update, context: CallbackContext):
         [InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    task = asyncio.create_task(update.message.reply_text(
+    asyncio.create_task(update.message.reply_text(
         '上下文已清除', reply_markup=reply_markup))
     # 清空历史消息
     context.user_data['current_platform'].chat.clear_messages(context)
-    await task
-
-# 处理按钮点击事件
 
 
 async def restore_context_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    task = asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
-    context.user_data['current_platform'].chat.recover_messages(context)
-    await task
+    asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
+    await context.user_data['current_platform'].chat.recover_messages(context)
 
 
 def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
@@ -624,6 +620,8 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     selected_mask_key = query.data[9:]
     # 面具实体 应用选择的面具
     selected_mask = context.user_data['current_mask'] = MASKS[selected_mask_key]
+    asyncio.create_task(query.edit_message_text(text=bot_util.escape_markdown_v2(
+        selected_mask['introduction']), parse_mode=ParseMode.MARKDOWN_V2))
     # 选择当前模型
     current_model = context.user_data.get('current_model')
     #     'current_model', selected_mask['default_model'])
@@ -645,15 +643,10 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
             context.user_data['current_model'] = selected_mask['default_model']
 
     # 根据选择的面具进行相应的处理
-    switch_success_message_task = asyncio.create_task(query.edit_message_text(
-        text=bot_util.escape_markdown_v2(selected_mask['introduction']),
-        parse_mode=ParseMode.MARKDOWN_V2
-    ))
     curr_platform.chat.set_max_message_count(
-        4 if curr_platform.name.startswith('free') else selected_mask['max_message_count'])
+        selected_mask['max_message_count'])
     # 切换面具后清除上下文
     curr_platform.chat.clear_messages(context)
-    await switch_success_message_task
 
 
 # 生成模型选择键盘
@@ -733,16 +726,15 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的模型  model_key:
     selected_model = query.data[10:]
-    # 应用选择的面具
-    context.user_data['current_model'] = selected_model
-    # 根据选择的模型进行相应的处理
-    switch_model_task = asyncio.create_task(query.edit_message_text(
+    asyncio.create_task(query.edit_message_text(
         text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
         parse_mode=ParseMode.MARKDOWN_V2
     ))
+    # 应用选择的面具
+    context.user_data['current_model'] = selected_model
+    # 根据选择的模型进行相应的处理
     # 切换模型后清除上下文
     context.user_data['current_platform'].chat.clear_messages(context)
-    await switch_model_task
 
 
 @auth
@@ -818,14 +810,16 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的平台 platform_key:
     selected_platform_key = query.data[13:]
+    asyncio.create_task(query.edit_message_text(
+        text=f'平台已切换至[{bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["name"])}]({bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["index_url"])}) ',
+        parse_mode=ParseMode.MARKDOWN_V2,
+    ))
     current_platform: Platform = context.user_data['current_platform']
     # 当前的平台key
     current_platform_key = current_platform.name
     if selected_platform_key == current_platform_key:
         await query.edit_message_text(
-            text=f'平台已切换至*{telegram.helpers.escape_markdown(current_platform.name_zh, version=2)}*',
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
+            text=f'平台已切换至{current_platform.name_zh}')
         return
     # 解决切换平台可能带来的问题 比如当前面具在当前平台还在不在 ;  当前模型在当前平台可不可用
     if 'current_mask' not in context.user_data:
@@ -856,21 +850,22 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
             # todo 如果模型不支持 就设置为第一个模型
             if current_model not in supported_models:
                 default_model = supported_models[0]
-                context.user_data['current_model'] = default_model
+                current_model = context.user_data['current_model'] = default_model
         else:
-            # 有可能免费平台的收费平台不支持 比如'claude-3-haiku-20240307'
-            if current_model not in current_mask['supported_models']:
-                context.user_data['current_model'] = current_mask['default_model']
+            # 有可能免费平台的收费平台不支持 比如'claude-3-haiku-20240307'  这里应该是 current_mask['supported_models']与platforms的unsupported_models的差集
+            supported_models = list(current_mask['supported_models'])
+            if 'unsupported_models' in PLATFORMS[selected_platform_key]:
+                unsupported_models = PLATFORMS[selected_platform_key]['unsupported_models']
+                diff = [
+                    model for model in supported_models if model not in unsupported_models]
+            else:
+                diff = supported_models
+            if current_model not in diff:
+                current_model = context.user_data['current_model'] = diff[0]
 
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
-    new_platform = context.user_data['current_platform'] = migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
-                                                                            max_message_count=current_mask['max_message_count'])
-    switch_message = f'平台已切换至[{bot_util.escape_markdown_v2(new_platform.name_zh)}]({bot_util.escape_markdown_v2(new_platform.index_url)}) '
-
-    await query.edit_message_text(
-        text=switch_message,
-        parse_mode=ParseMode.MARKDOWN_V2,
-    )
+    new_platform = context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
+                                                                                  context=context, max_message_count=current_mask['max_message_count'])
 
 
 @auth
