@@ -83,15 +83,7 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
     try:
         if update.message.text:
-            # 使用re模块搜索第一个匹配的URL
-            match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
-            if match:
-                code_id: str = match[1]
-                content_task = asyncio.create_task(
-                    handle_code_url(update, code_id))
-            else:
-                content_task = asyncio.create_task(
-                    handle_text(update))
+            content_task = asyncio.create_task(handle_code_or_url(update))
         elif update.message.photo or update.message.sticker:
             content_task = asyncio.create_task(
                 handle_photo(update, context))
@@ -344,7 +336,16 @@ def process_video(video_path):
     return key_frames
 
 
-async def handle_code_url(update, code_id):
+async def handle_code_or_url(update: Update):
+    # 使用re模块搜索第一个匹配的URL
+    match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
+    if match:
+        return await handle_code_url(update, match[1])
+    else:
+        return await handle_text(update)
+
+
+async def handle_code_url(update: Update, code_id):
     response = await HTTP_CLIENT.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
     if response.status_code != 200 or len(response.text) == 0:
         raise ValueError(
