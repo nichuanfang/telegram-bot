@@ -5,9 +5,10 @@ import importlib
 import json
 import os
 import re
+import requests
+from urllib.parse import urlparse
 import uuid
 
-import requests
 from fake_useragent import UserAgent
 from telegram import Update
 from telegram.constants import ParseMode
@@ -15,6 +16,8 @@ from telegram.ext import CallbackContext
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
+ua = UserAgent()
+
 logger = get_logger('bot_util')
 # 代码分享平台的地址
 HASTE_SERVER_HOST = os.getenv('HASTE_SERVER_HOST', None)
@@ -65,18 +68,9 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
     # 默认平台
     platform = platforms[platform_key]
 
-    # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
+    # 如果没配置openai_api_key 说明是free_1 | free_3 需要爬虫抓取授权码
     if 'openai_api_key' not in platform:
-        try:
-            url, code = generate_code(
-                platform['index_url'], platform['username'], platform['password'])
-        except:
-            # 兜底url和code 防止发布站不可用 获取不到目标网站信息
-            url = platform['reveal _url']
-            code = platform['reveal_code']
-        platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
-        platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
-        openai_api_key = f'nk-{code}'
+        openai_api_key: str = generate_api_key(platform)
     else:
         openai_api_key = platform['openai_api_key']
     # 平台初始化参数
@@ -109,15 +103,7 @@ async def migrate_platform(from_platform: Platform, to_platform_key: str, contex
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in to_platform:
-        try:
-            url, code = generate_code(
-                to_platform['index_url'], to_platform['username'], to_platform['password'])
-        except:
-            url = to_platform['reveal _url']
-            code = to_platform['reveal_code']
-        to_platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
-        to_platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
-        openai_api_key = f'nk-{code}'
+        openai_api_key = generate_api_key(to_platform)
     else:
         openai_api_key = to_platform['openai_api_key']
     # 修改参数
@@ -177,7 +163,9 @@ def auth(func):
                         need_logger=True)
                     # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
                     context.user_data['candidate_platform'] = instantiate_platform(
-                        'free_2')
+                        'free_2'
+                    )
+                    context.user_data['current_model'] = platforms[DEFAULT_PLATFORM_KEY]['supported_models'][0]
                 else:
                     logger.warn(
                         f"======================user {user_id}'s  access has been filtered====================")
@@ -190,25 +178,51 @@ def auth(func):
                     # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
                     context.user_data['candidate_platform'] = instantiate_platform(
                         'free_2')
+                    default_platform = platforms[DEFAULT_PLATFORM_KEY]
+                    if 'supported_models' in default_platform:
+                        context.user_data['current_model'] = default_platform['supported_models'][0]
+                    else:
+                        context.user_data['current_model'] = masks[DEFAULT_MASK_KEY]['default_model']
                 context.user_data['identity'] = 'user'
         await func(*args, **kwargs)
     return wrapper
 
 
-def generate_code(url: str, username: str, password: str):
+def generate_api_key(platform: dict):
+    # 扩展性配置  免费节点的特殊操作
+    if platform['platform_key'] == 'free_1':
+        return generate_code(platform)
+    elif platform['platform_key'] == 'free_3':
+        return generate_authorization(platform)
+
+
+FREE_1_HEADERS = {
+    'accept': '*/*',
+    'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
+    'priority': 'u=1, i',
+    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin'
+}
+
+
+def generate_code(platform: dict):
     """
-    构建授权码  (用户名密码获取地址   https://free01.xyz)
-    @param url: 请求的url
-    @param username: 白嫖发布站的用户名
-    @param password: 白嫖发布站的密码
+    生成授权码  (用户名密码获取地址   https://free01.xyz)
+    @param platform: 平台
     @return: 授权码
     """
-    ua = UserAgent()
-    headers = {
+    url = platform['index_url']
+    parsed_url = urlparse(url)
+    FREE_1_HEADERS.update({
+        'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
         'user-agent': ua.random,
-        'Authorization': f'Basic {base64.b64encode((username + ":" + password).encode()).decode()}'
-    }
-    response = requests.get(url, headers=headers)
+        'Authorization': f'Basic {base64.b64encode(( platform["username"] + ":" + platform["password"]).encode()).decode()}'
+    })
+    response = requests.get(platform['index_url'], headers=FREE_1_HEADERS)
     html_content = response.content.decode('utf-8')
     # 定义正则表达式模式
     pattern = r"密码：\s*(\d+)"
@@ -216,14 +230,60 @@ def generate_code(url: str, username: str, password: str):
     # 使用正则表达式查找密码
     password_matches = re.findall(pattern, html_content)
     url_matches = re.findall(url_pattern, html_content)
-    if len(password_matches) == 0:
-        raise RuntimeError('free_1平台授权码提取失败!')
-    if len(url_matches) == 0:
-        raise RuntimeError('free_1平台授权码提取失败!')
-    return url_matches[0] if url_matches[0].endswith('/') else url_matches[0] + '/', password_matches[0]
+    if len(password_matches) == 0 or len(url_matches) == 0:
+        url = platform['reveal _url']
+        code = platform['reveal_code']
+    else:
+        url = url_matches[0] if url_matches[0].endswith(
+            '/') else url_matches[0] + '/'
+        code = password_matches[0]
+    platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
+    platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
+    return f'nk-{code}'
 
+
+FREE_3_HEADERS = {
+    'accept': '*/*',
+    'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
+    'priority': 'u=1, i',
+    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin'
+}
+
+
+def generate_authorization(platform: dict):
+    """生成认证头
+
+    Args:
+        platform (_type_):  平台元信息
+    """
+    url = platform['foreign_openai_base_url']
+    parsed_url = urlparse(url)
+    email = platform['email']
+    password = platform['password']
+    FREE_3_HEADERS.update({
+        'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
+        'user-agent': ua.random,
+        'content-type': 'application/json'
+    })
+    response = requests.post(f'{url}/api/v1/auths/signin', json={
+        'email': 'f18326186224@gmail.com',
+        'password': 'GS2T*CUN$BALSG',
+    }, headers=FREE_3_HEADERS)
+    if response.status_code == 200:
+        json_data = json.loads(response.text)
+        token = json_data['token']
+        token_type = json_data['token_type']
+        return f'{token_type} {token}'
+    else:
+        return ''
 
 # =====================================消息相关====================================
+
 
 async def send_message(update: Update, text):
     assert update.message

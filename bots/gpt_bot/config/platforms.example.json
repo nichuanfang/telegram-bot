@@ -113,44 +113,52 @@
   "free_3": {
     "name": "免费_3",
     "platform_key": "free_3",
-    "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
-    "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
-    "index_url": "https://api.chatanywhere.tech",
-    "payment_url": "https://peiqishop.me/",
+    "domestic_openai_base_url": "https://ffa.chat",
+    "foreign_openai_base_url": "https://ffa.chat",
+    "index_url": "https://ffa.chat/",
+    "payment_url": "https://ffa.chat/",
     "supported_models": [
-      "gpt-3.5-turbo",
-      "gpt-4o"
+      "gpt-4o",
+      "gemini-1.5-pro",
+      "零一万物-large"
     ],
     "mask_model_mapping": {
       "common": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ],
       "compressed": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ],
       "github_copilot": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro"
       ],
       "travel_guide": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ],
       "song_recommender": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ],
       "movie_expert": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ],
       "doctor": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
+        "gpt-4o",
+        "gemini-1.5-pro",
+        "零一万物-large"
       ]
     },
-    "openai_api_key": ""
+    "email": "",
+    "password": ""
   }
 }
