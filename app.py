@@ -1,4 +1,3 @@
-from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
 from my_utils import my_logging, validation_util
 import dotenv
 import aiocron
@@ -10,16 +9,53 @@ import multiprocessing
 import asyncio
 from telegram import Bot
 from telegram.ext import ApplicationBuilder, ContextTypes
-dotenv.load_dotenv(override=True)
-# 设置临时文件夹
-if not os.path.exists('temp'):
-    os.mkdir('temp')
 
+# 日志
 logger = my_logging.get_logger('app')
 
-# 获取 bots 目录下的所有子目录
-bot_directories = [d for d in os.listdir(
-    'bots') if os.path.isdir(os.path.join('bots', d))]
+
+def init():
+    """ 初始化环境 """
+    dotenv.load_dotenv(override=True)
+    # 设置临时文件夹
+    if not os.path.exists('temp'):
+        os.mkdir('temp')
+    # 获取 bots 目录下的所有子目录
+    bot_directories = [d for d in os.listdir(
+        'bots') if os.path.isdir(os.path.join('bots', d))]
+    return bot_directories
+
+
+def bootstrap(logger, bot_directories):
+    """启动机器人核心方法"""
+    processes = []
+    # 动态加载每个机器人
+    for bot_directory in bot_directories:
+        try:
+            if bot_directory == '__pycache__':
+                continue
+            bot_module = __import__(
+                f'bots.{bot_directory}.bot', fromlist=['handlers'])
+            handlers = getattr(bot_module, 'handlers')
+
+            token = os.getenv(f'{bot_directory.upper()}_TOKEN')
+            if token is None or len(token) == 0:
+                logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
+
+            if bot_directory == 'dogyun_bot':
+                # 创建一个单独的进程来运行调度器
+                p_scheduler = multiprocessing.Process(
+                    target=run_scheduler, args=(token,))
+                processes.append(p_scheduler)
+
+            command_handlers = handlers()
+            p_bot = multiprocessing.Process(target=start_bot, args=(
+                bot_directory, token, command_handlers))
+            processes.append(p_bot)
+
+        except ImportError as e:
+            logger.error(f"Failed to import bot {bot_directory}: {e}")
+    return processes
 
 
 async def add_scheduled_tasks(bot):
@@ -101,36 +137,10 @@ def run_scheduler(token):
     asyncio.run(start_scheduler(token))
 
 
-processes = []
-# 动态加载每个机器人
-for bot_directory in bot_directories:
-    try:
-        if bot_directory == '__pycache__':
-            continue
-        bot_module = __import__(
-            f'bots.{bot_directory}.bot', fromlist=['handlers'])
-        handlers = getattr(bot_module, 'handlers')
-
-        token = os.getenv(f'{bot_directory.upper()}_TOKEN')
-        if token is None or len(token) == 0:
-            logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
-
-        if bot_directory == 'dogyun_bot':
-            # 创建一个单独的进程来运行调度器
-            p_scheduler = multiprocessing.Process(
-                target=run_scheduler, args=(token,))
-            processes.append(p_scheduler)
-
-        command_handlers = handlers()
-        p_bot = multiprocessing.Process(target=start_bot, args=(
-            bot_directory, token, command_handlers))
-        processes.append(p_bot)
-    except ImportError as e:
-        logger.error(f"Failed to import bot {bot_directory}: {e}")
-
 if __name__ == '__main__':
-    # 程序推出释放http池
-    atexit.register(lambda: asyncio.run(HTTP_CLIENT.aclose()))
+    bot_directories = init()
+    # Bootstrap!
+    processes = bootstrap(logger, bot_directories)
     for p in processes:
         p.start()
     for p in processes:

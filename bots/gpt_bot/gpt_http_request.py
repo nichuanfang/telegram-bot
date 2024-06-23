@@ -1,7 +1,7 @@
 # 定制化请求
 
-import httpx
 from fake_useragent import UserAgent
+import requests
 
 headers = {
     'accept': 'application/json',
@@ -18,8 +18,6 @@ headers = {
 }
 # 创建一个 UserAgent 实例
 ua = UserAgent()
-# 全局客户端
-HTTP_CLIENT = httpx.AsyncClient()
 
 
 class BotHttpRequest:
@@ -36,7 +34,7 @@ class BotHttpRequest:
                 'model': 'whisper-1'
                 # 'language': 'zh'
             }
-            response = await HTTP_CLIENT.post(
+            response = requests.post(
                 url=f'{openai_base_url}/audio/transcriptions',
                 files=files,
                 data=data,
@@ -54,7 +52,7 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = f'Bearer {openai_api_key}'
-        response = await HTTP_CLIENT.get(
+        response = requests.get(
             f'{openai_base_url[:-3]}/dashboard/billing/subscription',
             headers=headers
         )
@@ -66,7 +64,7 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = f'Bearer {openai_api_key}'
-        response = await HTTP_CLIENT.get(
+        response = requests.get(
             f'{openai_base_url[:-3]}/dashboard/billing/usage',
             headers=headers
         )
@@ -77,7 +75,7 @@ class BotHttpRequest:
         headers['user-agent'] = ua.random
         headers['content-type'] = 'application/json'
         headers['Authorization'] = openai_api_key
-        response = await HTTP_CLIENT.post(
+        response = requests.post(
             f'{openai_base_url}/query/balance',
             headers=headers
         )

@@ -1,9 +1,10 @@
-import json
+import ujson
 import requests
-from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from fake_useragent import UserAgent
+
+from my_utils.my_logging import get_logger
 
 headers = {
     'accept': '*/*',
@@ -17,6 +18,9 @@ headers = {
     'sec-fetch-site': 'same-origin',
 }
 ua = UserAgent()
+logger = get_logger('free_3')
+
+pattern = r'"content":"([^"]*)"'
 
 
 @gpt_platform
@@ -31,13 +35,14 @@ class Free_3(Platform):
 
     async def completion(self, stream: bool, context, *messages, **kwargs):
         # 默认的提问方法
-        new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
+        new_messages, kwargs = self.chat.combine_messages(
+            *messages, **kwargs)
+        answer = ''
         if stream:
             json_data = {
                 'stream': True,
                 'messages': new_messages,
                 'citations': False,
-                "chat_id": "b0ade8ce-9f70-4fab-ac89-768d7d443d9",
                 **kwargs
             }
             headers.update({
@@ -45,21 +50,21 @@ class Free_3(Platform):
                 'user-agent': ua.random,
                 'authorization': self.openai_api_key
             })
-
-            with requests.get(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, stream=True) as response:
-                response.raise_for_status()
+            with requests.post(
+                    f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, stream=True) as response:
                 for line in response.iter_lines():
-                    if line:
-                        # 假设API返回的是JSON格式数据
-                        data = json.loads(line.decode('utf-8'))
-                        # 在这里处理接收到的数据
-                        print(data)  # 举例输出，根据实际情况进行处理
-            answer: str = ""
-            # async for chunk_iter in completion:
-            #     if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
-            #         answer += chunk
-            #         yield 'not_finished', answer
-            # yield 'finished', answer
+                    raw_data = line.decode('utf-8')[6:]
+                    if raw_data == '[DONE]':
+                        yield 'finished', answer
+                        break
+                    if raw_data:
+                        try:
+                            data = ujson.loads(raw_data)
+                        except:
+                            raise RuntimeError(raw_data)
+                        answer += data['choices'][0]['delta']['content']
+                        yield 'not_finished', answer
+
         else:
             # todo 此平台的图片解析有问题 需要研究
             json_data = {
@@ -76,8 +81,11 @@ class Free_3(Platform):
             })
             completion = requests.post(
                 f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data)
-            answer = json.loads(completion.text)[
-                'choices'][0]['message']['content']
-            yield answer
+            try:
+                answer = ujson.loads(completion.text)[
+                    'choices'][0]['message']['content']
+                yield answer
+            except:
+                raise RuntimeError(completion.text)
         await self.chat.append_messages(
             answer, context, *messages)

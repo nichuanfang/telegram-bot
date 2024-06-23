@@ -112,7 +112,8 @@ class Temque:
         contents = []
         for message in self.core:
             contents.append(message['obj'])
-        contents.append(*obj)
+        for item in obj:
+            contents.append(item)
         return contents
 
     def drop_last(self):

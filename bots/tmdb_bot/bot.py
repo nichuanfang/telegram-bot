@@ -1,6 +1,5 @@
 import asyncio
 import os
-from pickletools import read_string1
 
 from telegram import Update
 from telegram.constants import ParseMode
