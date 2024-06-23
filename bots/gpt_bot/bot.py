@@ -13,15 +13,15 @@ import cv2
 import numpy as np
 
 import regex
+import requests
 import telegram.helpers
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
-from bots.gpt_bot.gpt_http_request import HTTP_CLIENT
 
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
-from my_utils.bot_util import auth, migrate_platform
+from my_utils.bot_util import auth, instantiate_platform, migrate_platform
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
@@ -157,6 +157,7 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 
 async def handle_photo(update: Update, context: CallbackContext):
     content = []
+    current_platform: Platform = context.user_data['current_platform']
     current_mask = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
@@ -174,17 +175,22 @@ async def handle_photo(update: Update, context: CallbackContext):
     caption_result = handle_result[0]
     image_base64 = handle_result[1]
 
-    if caption_result:
-        content.append({'type': 'text', 'text': caption_result})
+    if current_platform.name == 'free_3':
+        if caption_result:
+            content.append(caption_result)
+        if image_base64:
+            content.append(f'data:image/webp;base64,{image_base64}')
+    else:
+        if caption_result:
+            content.append({'type': 'text', 'text': caption_result})
 
-    if image_base64:
-        content.append({
-            'type': 'image_url',
-            'image_url': {
-                'url': f'data:image/webp;base64,{image_base64}'
-            }
-        })
-
+        if image_base64:
+            content.append({
+                'type': 'image_url',
+                'image_url': {
+                    'url': f'data:image/webp;base64,{image_base64}'
+                }
+            })
     return content
 
 
@@ -223,15 +229,19 @@ async def analyse_video(update: Update, context: CallbackContext):
     content = []
     platform: Platform = context.user_data['current_platform']
     platform.chat.clear_messages(context)
-    content.append({
-        'type': 'text',
-        'text': '视频关键帧开始'
-    })
+    is_free_3 = (platform.name == 'free_3')
+    if is_free_3:
+        content.append('视频关键帧开始')
+    else:
+        content.append({
+            'type': 'text',
+            'text': '视频关键帧开始'
+        })
     current_mask = context.user_data.get(
         'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
         'current_model', current_mask['default_model'])
-    if platform.name.startswith('free'):
+    if platform.name != 'free_3' and platform.name.startswith('free'):
         raise ValueError(f'当前平台: {platform.name_zh}不支持视频解析!')
     if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
@@ -248,22 +258,28 @@ async def analyse_video(update: Update, context: CallbackContext):
         mime_type = 'image/webp'
         _, buffer = cv2.imencode('.webp', frame)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
-        content.append({
-            'type': 'image_url',
-            'image_url': {
-                'url': f'data:{mime_type};base64,{image_base64}'
-            }
-        })
+        if platform.name == 'free_3':
+            content.append(f'data:{mime_type};base64,{image_base64}')
+        else:
+            content.append({
+                'type': 'image_url',
+                'image_url': {
+                    'url': f'data:{mime_type};base64,{image_base64}'
+                }
+            })
     # Clean up
     os.remove(video_path)
-    content.append({
-        'type': 'text',
-        'text': '视频关键帧结束'
-    })
-    content.append({
-        'type': 'text',
-        'text': '请提供整个视频的综合分析'
-    })
+    if is_free_3:
+        content.append('视频关键帧结束,请提供整个视频的综合分析')
+    else:
+        content.append({
+            'type': 'text',
+            'text': '视频关键帧结束'
+        })
+        content.append({
+            'type': 'text',
+            'text': '请提供整个视频的综合分析'
+        })
     return content
 
 
@@ -273,10 +289,14 @@ async def handle_video(update: Update, context: CallbackContext):
     analyse_video_result = handled_result[0]
     handle_caption_result = handled_result[1]
     if handle_caption_result:
-        analyse_video_result.append({
-            'type': 'text',
-            'text': handle_caption_result
-        })
+        current_platform: Platform = context.user_data['current_platform']
+        if current_platform.name == 'free_3':
+            analyse_video_result.append(handle_caption_result)
+        else:
+            analyse_video_result.append({
+                'type': 'text',
+                'text': handle_caption_result
+            })
     return analyse_video_result
 
 
@@ -346,7 +366,7 @@ async def handle_code_or_url(update: Update):
 
 
 async def handle_code_url(update: Update, code_id):
-    response = await HTTP_CLIENT.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
+    response = requests.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
     if response.status_code != 200 or len(response.text) == 0:
         raise ValueError(
             f'Your question url is Invalid.')
@@ -376,7 +396,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     content = ic_result[1]
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         if is_image_generator:
-            img_response = await HTTP_CLIENT.get(curr_answer)
+            img_response = requests.get(curr_answer)
             if img_response.content:
                 await asyncio.gather(
                     bot_util.edit_message(
@@ -402,7 +422,8 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
-        response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'))
+        response = requests.post(
+            f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'))
         if response.status_code == 200:
             result = response.json()
             document_id = result.get('key')
@@ -422,7 +443,7 @@ async def handle_response(update: Update, context: CallbackContext, content_task
             continue
         if is_image_generator:
             # 将res的url下载 返回一个图片
-            img_response = await HTTP_CLIENT.get(res)
+            img_response = requests.get(res)
             if img_response.content:
                 await update.message.reply_photo(photo=img_response.content,
                                                  reply_to_message_id=update.effective_message.message_id)
@@ -430,7 +451,8 @@ async def handle_response(update: Update, context: CallbackContext, content_task
             if len(res.encode()) < 3000:
                 await bot_util.send_message(update, res)
             else:
-                response = await HTTP_CLIENT.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=res.encode('utf-8'))
+                response = requests.post(
+                    f'{bot_util.HASTE_SERVER_HOST}/documents', data=res.encode('utf-8'))
                 if response.status_code == 200:
                     result = response.json()
                     document_id = result.get('key')
@@ -454,10 +476,20 @@ async def handle_exception(update, context, e, init_message_task):
     if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
-            # free_1可能授权码失效了
-            # context.user_data['current_platform'] = migrate_platform(
-            #     context.user_data['current_platform'], 'free_1', 4)
-            init_text = 'free_1授权码已失效\n\n'
+            # free_1 | free_3    可能授权码/认证信息失效了
+            # 移除临时配置文件中的相关key
+            json_data = None
+            with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+                json_data: dict = json.loads(f.read())
+                if current_platform.name in json_data:
+                    json_data[current_platform.name].pop('openai_api_key')
+            if json_data:
+                with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+                    f.write(json.dumps(json_data, ensure_ascii=False))
+                    # 刷新token成功!
+            context.user_data['current_platform'] = instantiate_platform(
+                current_platform.name)
+            init_text = '授权信息已失效, 尝试重新获取,请稍后重试!\n\n'
         else:
             init_text = ''
     elif '上游负载已饱和' in error_message:

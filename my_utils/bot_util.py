@@ -19,6 +19,8 @@ from my_utils.validation_util import validate
 ua = UserAgent()
 
 logger = get_logger('bot_util')
+# 临时配置路径
+TEMP_CONFIG_PATH = os.path.join('temp', 'config.json')
 # 代码分享平台的地址
 HASTE_SERVER_HOST = os.getenv('HASTE_SERVER_HOST', None)
 if not HASTE_SERVER_HOST:
@@ -70,7 +72,9 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
 
     # 如果没配置openai_api_key 说明是free_1 | free_3 需要爬虫抓取授权码
     if 'openai_api_key' not in platform:
-        openai_api_key: str = generate_api_key(platform)
+        # 反序列化平台信息
+        platform: dict = generate_api_key(platform)
+        openai_api_key = platform['openai_api_key']
     else:
         openai_api_key = platform['openai_api_key']
     # 平台初始化参数
@@ -103,7 +107,8 @@ async def migrate_platform(from_platform: Platform, to_platform_key: str, contex
 
     # 如果没配置openai_api_key 说明是free_1 需要爬虫抓取授权码  构造成 'Bearer nk-{code} 这样的授权头
     if 'openai_api_key' not in to_platform:
-        openai_api_key = generate_api_key(to_platform)
+        to_platform: dict = generate_api_key(to_platform)
+        openai_api_key = to_platform['openai_api_key']
     else:
         openai_api_key = to_platform['openai_api_key']
     # 修改参数
@@ -189,6 +194,13 @@ def auth(func):
 
 
 def generate_api_key(platform: dict):
+    # 尝试先从临时配置文件获取
+    if os.path.exists(TEMP_CONFIG_PATH):
+        with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+            temp_config_data: dict = json.loads(f.read())
+            #   配置文件键为平台key  值为 授权码/认证信息
+            if platform['platform_key'] in temp_config_data and 'openai_api_key' in temp_config_data[platform['platform_key']]:
+                return temp_config_data[platform['platform_key']]
     # 扩展性配置  免费节点的特殊操作
     if platform['platform_key'] == 'free_1':
         return generate_code(platform)
@@ -239,7 +251,20 @@ def generate_code(platform: dict):
         code = password_matches[0]
     platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
     platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
-    return f'nk-{code}'
+    platform['openai_api_key'] = f'nk-{code}'
+    if os.path.exists(TEMP_CONFIG_PATH):
+        with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+            old_json_data: dict = json.loads(f.read())
+    else:
+        old_json_data = {}
+
+    # 刷新临时配置文件
+    with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+        old_json_data.update({
+            platform['platform_key']: platform
+        })
+        f.write(json.dumps(old_json_data, ensure_ascii=False))
+    return platform
 
 
 FREE_3_HEADERS = {
@@ -271,16 +296,29 @@ def generate_authorization(platform: dict):
         'content-type': 'application/json'
     })
     response = requests.post(f'{url}/api/v1/auths/signin', json={
-        'email': 'f18326186224@gmail.com',
-        'password': 'GS2T*CUN$BALSG',
+        'email': email,
+        'password': password,
     }, headers=FREE_3_HEADERS)
     if response.status_code == 200:
         json_data = json.loads(response.text)
         token = json_data['token']
         token_type = json_data['token_type']
-        return f'{token_type} {token}'
+        platform['openai_api_key'] = f'{token_type} {token}'
+        if os.path.exists(TEMP_CONFIG_PATH):
+            with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+                old_json_data: dict = json.loads(f.read())
+        else:
+            old_json_data = {}
+
+        # 刷新临时配置文件
+        with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+            old_json_data.update({
+                platform['platform_key']:  platform
+            })
+            f.write(json.dumps(old_json_data, ensure_ascii=False))
+        return platform
     else:
-        return ''
+        return None
 
 # =====================================消息相关====================================
 

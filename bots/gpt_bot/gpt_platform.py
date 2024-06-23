@@ -81,7 +81,7 @@ class Platform(metaclass=ABCMeta):
         module = cls.__module__
         return os.path.basename(module.rsplit('.', 1)[1])
 
-    async def async_request(self, content: Union[str, List, Dict] = '', context=None, **kwargs):
+    async def async_request(self, content='', context=None, **kwargs):
         """
         非流式响应的请求逻辑
         @param content: 请求的内容
@@ -99,7 +99,7 @@ class Platform(metaclass=ABCMeta):
             async for answer in self.completion(False, context, * messages, **kwargs):
                 yield answer
 
-    async def async_stream_request(self, content: Union[str, List, Dict] = '', context=None,  **kwargs):
+    async def async_stream_request(self, content='', context=None,  **kwargs):
         """
         流式响应的请求逻辑
         @param content:  请求内容
@@ -117,13 +117,13 @@ class Platform(metaclass=ABCMeta):
     async def completion(self, stream: bool, context, *messages, **kwargs):
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
+        answer = ''
         if stream:
             completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": True,
                 **kwargs
             })
-            answer: str = ""
             async for chunk_iter in completion:
                 if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
                     answer += chunk
@@ -135,13 +135,22 @@ class Platform(metaclass=ABCMeta):
                 "stream": False,
                 **kwargs
             })
-            yield completion.choices[0].message.content
+            answer = completion.choices[0].message.content
+            yield answer
         await self.chat.append_messages(
             answer, context, *messages)
 
-    async def prepare_messages(self, content: Union[str, List, Dict]) -> List[Dict[str, str]]:
+    async def prepare_messages(self, content) -> List[Dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":
             return await self.audio_transcribe(content['audio_path'])
+        if isinstance(content, list):
+            result = []
+            for item in content:
+                if isinstance(item, dict):
+                    break
+                result.append({"role": "user", "content": item})
+            if len(result) != 0:
+                return result
         # 如果类型是视频 这里需要对视频进行处理
         return [{"role": "user", "content": content}]
 
