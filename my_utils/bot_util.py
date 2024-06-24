@@ -158,7 +158,7 @@ async def migrate_platform(from_platform: Platform, to_platform_key: str, contex
     # 恢复历史消息
     new_platform.chat._messages.core = from_platform.chat._messages.core
     # 修剪历史消息
-    new_platform.chat.clear_messages()
+    new_platform.chat.clear_messages(context)
     return new_platform
 
 
