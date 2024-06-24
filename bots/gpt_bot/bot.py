@@ -71,7 +71,7 @@ def compress_question(question):
 @auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     is_image_generator = context.user_data.get(
-        'current_mask')['name'] == '图像生成助手'
+        'current_mask')['mask_key'] == 'image_generator'
     init_message_task = None
     if ENABLE_STREAM:
         message_text = '正在生成图片，请稍候...' if is_image_generator else '正在输入...'
@@ -158,10 +158,8 @@ async def handle_photo(update: Update, context: CallbackContext):
     current_platform: Platform = context.user_data['current_platform']
     current_model: str = context.user_data.get(
         'current_model')
-
-    if not current_model.startswith(('gpt-4o', 'claude-3')):
+    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro', 'deepseek-v2-chat', '零一万物-large')):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
-
     # 并行处理 caption 和 photo download
     handle_result = await asyncio.gather(
         handle_caption(update, 3000),
@@ -206,23 +204,32 @@ async def handle_document(update: Update, context: CallbackContext):
 
 
 async def handle_audio(update: Update, context: CallbackContext):
+    current_platform: Platform = context.user_data['current_platform']
     audio_file = update.message.audio or update.message.voice
     if audio_file:
         file_id = audio_file.file_id
-        new_file = await context.bot.get_file(file_id)
+        new_file: File = await context.bot.get_file(file_id)
         ogg_path = os.path.join(f"temp/{file_id}.ogg")
-        await new_file.download_to_drive(ogg_path)
-        try:
-            return {
+        if 'whisper-1' not in current_platform.supported_models:
+            raise RuntimeError(f'当前平台: {current_platform.name_zh}不支持语音输入!')
+        else:
+            await new_file.download_to_drive(ogg_path)
+            content = {
                 'type': 'audio',
                 'audio_path': ogg_path
             }
+        try:
+            return content
         except Exception as e:
             raise ValueError(e)
 
 
 async def analyse_video(update: Update, context: CallbackContext):
     content = []
+    current_model: str = context.user_data.get(
+        'current_model')
+    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro', 'deepseek-v2-chat', '零一万物-large')):
+        raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     platform: Platform = context.user_data['current_platform']
     platform.chat.clear_messages(context)
     is_free_3 = (platform.name == 'free_3')
@@ -233,12 +240,6 @@ async def analyse_video(update: Update, context: CallbackContext):
             'type': 'text',
             'text': '视频关键帧开始'
         })
-    current_model: str = context.user_data.get(
-        'current_model')
-    if platform.name != 'free_3' and platform.name.startswith('free'):
-        raise ValueError(f'当前平台: {platform.name_zh}不支持视频解析!')
-    if not current_model.startswith(('gpt-4o', 'claude-3')):
-        raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     try:
         video_file = await context.bot.get_file(update.message.effective_attachment.file_id)
     except:

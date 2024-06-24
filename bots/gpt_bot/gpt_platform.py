@@ -90,7 +90,7 @@ class Platform(metaclass=ABCMeta):
         module = cls.__module__
         return os.path.basename(module.rsplit('.', 1)[1])
 
-    async def async_request(self, content='', context=None, **kwargs):
+    async def async_request(self, content='',  context=None, **kwargs):
         """
         非流式响应的请求逻辑
         @param content: 请求的内容
@@ -123,7 +123,7 @@ class Platform(metaclass=ABCMeta):
             async for status, answer in self.completion(True, context, * messages, **kwargs):
                 yield status, answer
 
-    async def completion(self, stream: bool, context, *messages, **kwargs):
+    async def completion(self, stream: bool, update, context, *messages, **kwargs):
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
         answer = ''
