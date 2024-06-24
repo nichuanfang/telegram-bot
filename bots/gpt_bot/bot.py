@@ -30,14 +30,12 @@ HASTE_SERVER_HOST_PATTERN = re.compile(
     rf'{re.escape(bot_util.HASTE_SERVER_HOST)}/(?:raw/)?([a-zA-Z]{{10}})(?:\.[a-zA-Z]+)?')
 STOP_WORDS = frozenset({'的', '是', '在', '和', '了', '有',
                        '我', '也', '不', '就', '与', '他', '她', '它'})
-# 默认面具
-DEFAULT_MASK_KEY: str = bot_util.DEFAULT_MASK_KEY
 # 默认平台
 DEFAULT_PLATFORM_KEY = bot_util.DEFAULT_PLATFORM_KEY
 # 面具列表
-MASKS = bot_util.masks
+MASKS: dict = bot_util.masks
 # 平台列表(非平台对象列表)
-PLATFORMS = bot_util.platforms
+PLATFORMS: dict = bot_util.platforms
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
 
@@ -73,7 +71,7 @@ def compress_question(question):
 @auth
 async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     is_image_generator = context.user_data.get(
-        'current_mask', MASKS[DEFAULT_MASK_KEY])['name'] == '图像生成助手'
+        'current_mask')['name'] == '图像生成助手'
     init_message_task = None
     if ENABLE_STREAM:
         message_text = '正在生成图片，请稍候...' if is_image_generator else '正在输入...'
@@ -104,9 +102,9 @@ async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             raise ValueError('不支持的输入类型!')
         curr_mask = context.user_data.get(
-            'current_mask', MASKS[DEFAULT_MASK_KEY])
+            'current_mask')
         curr_mask['openai_completion_options'].update({
-            "model": context.user_data.get('current_model', curr_mask['default_model'])
+            "model": context.user_data.get('current_model')
         })
         if ENABLE_STREAM:
             await handle_stream_response(update, context, content_task, is_image_generator, init_message_task,
@@ -158,10 +156,8 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 async def handle_photo(update: Update, context: CallbackContext):
     content = []
     current_platform: Platform = context.user_data['current_platform']
-    current_mask = context.user_data.get(
-        'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
-        'current_model', current_mask['default_model'])
+        'current_model')
 
     if not current_model.startswith(('gpt-4o', 'claude-3')):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
@@ -237,10 +233,8 @@ async def analyse_video(update: Update, context: CallbackContext):
             'type': 'text',
             'text': '视频关键帧开始'
         })
-    current_mask = context.user_data.get(
-        'current_mask', MASKS[DEFAULT_MASK_KEY])
     current_model: str = context.user_data.get(
-        'current_model', current_mask['default_model'])
+        'current_model')
     if platform.name != 'free_3' and platform.name.startswith('free'):
         raise ValueError(f'当前平台: {platform.name_zh}不支持视频解析!')
     if not current_model.startswith(('gpt-4o', 'claude-3')):
@@ -567,43 +561,19 @@ async def restore_context_handler(update: Update, context: CallbackContext):
     await context.user_data['current_platform'].chat.recover_messages(context)
 
 
-def generate_mask_keyboard(masks, current_mask_key, is_free: bool):
+def generate_mask_keyboard(masks, current_mask_key):
     keyboard = []
     row = []
-    if is_free:
-        if current_mask_key not in masks:
-            for i, mask_key in enumerate(masks):
-                # 如果是当前选择的面具，添加标记
-                name = MASKS[mask_key]['name']
-                if i == 0:
-                    name = "* " + name
-                row.append(InlineKeyboardButton(
-                    name, callback_data=f'mask_key:{mask_key}'))
-                if (i + 1) % 2 == 0:
-                    keyboard.append(row)
-                    row = []
-        else:
-            for i, mask_key in enumerate(masks):
-                # 如果是当前选择的面具，添加标记
-                name = MASKS[mask_key]['name']
-                if mask_key == current_mask_key:
-                    name = "* " + name
-                row.append(InlineKeyboardButton(
-                    name, callback_data=f'mask_key:{mask_key}'))
-                if (i + 1) % 2 == 0:
-                    keyboard.append(row)
-                    row = []
-    else:
-        for i, (key, mask) in enumerate(masks.items()):
-            # 如果是当前选择的面具，添加标记
-            name = mask["name"]
-            if key == current_mask_key:
-                name = "* " + name
-            row.append(InlineKeyboardButton(
-                name, callback_data=f'mask_key:{key}'))
-            if (i + 1) % 2 == 0:
-                keyboard.append(row)
-                row = []
+    for i, mask_key in enumerate(masks):
+        # 如果是当前选择的面具，添加标记
+        mask_name = MASKS[mask_key]['name']
+        if mask_key == current_mask_key:
+            mask_name = "* " + mask_name
+        row.append(InlineKeyboardButton(
+            mask_name, callback_data=f'mask_key:{mask_key}'))
+        if (i + 1) % 2 == 0:
+            keyboard.append(row)
+            row = []
     if row:
         keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
@@ -620,23 +590,14 @@ async def masks_handler(update: Update, context: CallbackContext):
     await bot_util.send_typing(update)
     # 获取当前选择的面具
     current_mask = context.user_data.get(
-        'current_mask', MASKS[DEFAULT_MASK_KEY])
+        'current_mask')
     current_mask_key = current_mask['mask_key']
-
-    # 免费的模型和收费的模型 masks不同
     current_platform: Platform = context.user_data['current_platform']
-    # 当前的平台key
-    current_platform_key = current_platform.name
-    if current_platform_key.startswith('free'):
-        is_free = True
-        masks = list(PLATFORMS[current_platform_key]
-                     ['mask_model_mapping'].keys())
-    else:
-        masks = MASKS
-        is_free = False
+    # 当前平台支持的面具列表
+    masks = current_platform.supported_masks
     # 生成内联键盘
     keyboard = generate_mask_keyboard(
-        masks, current_mask_key, is_free)
+        masks, current_mask_key)
     await update.message.reply_text(
         '请选择一个面具:',
         reply_markup=keyboard
@@ -654,35 +615,25 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的面具 mask_key:{mask_key}
     selected_mask_key = query.data[9:]
+    asyncio.create_task(query.edit_message_text(text=bot_util.escape_markdown_v2(
+        MASKS[selected_mask_key]['introduction']), parse_mode=ParseMode.MARKDOWN_V2))
+    # 当前平台
+    current_platform: Platform = context.user_data['current_platform']
     # 面具实体 应用选择的面具
     selected_mask = context.user_data['current_mask'] = MASKS[selected_mask_key]
-    asyncio.create_task(query.edit_message_text(text=bot_util.escape_markdown_v2(
-        selected_mask['introduction']), parse_mode=ParseMode.MARKDOWN_V2))
-    # 选择当前模型
-    current_model = context.user_data.get('current_model')
-    #     'current_model', selected_mask['default_model'])
-    # 当前平台
-    curr_platform: Platform = context.user_data['current_platform']
-    # 获取当前模型  如果当前模型兼容选择的面具 则无需切换模型; 如果不兼容 则需切换到该面具的默认模型
-    if curr_platform.name.startswith('free'):
-        supported_models = PLATFORMS[curr_platform.name]['supported_models']
-        if current_model:
-            if current_model not in supported_models:
-                context.user_data['current_model'] = supported_models[0]
-        else:
-            context.user_data['current_model'] = supported_models[0]
-    else:
-        if current_model:
-            if current_model not in selected_mask['supported_models']:
-                context.user_data['current_model'] = selected_mask['default_model']
-        else:
-            context.user_data['current_model'] = selected_mask['default_model']
+
+    # 根据所选择的面具 模型也要对应切换过去
+    current_model = context.user_data['current_model']
+    # 面具支持的模型
+    mask_supported_models = current_platform.mask_model_mapping[selected_mask_key]
+    if current_model not in mask_supported_models:
+        context.user_data['current_model'] = mask_supported_models[0]
 
     # 根据选择的面具进行相应的处理
-    curr_platform.chat.set_max_message_count(
+    current_platform.chat.set_max_message_count(
         selected_mask['max_message_count'])
     # 切换面具后清除上下文
-    curr_platform.chat.clear_messages(context)
+    current_platform.chat.clear_messages(context)
 
 
 # 生成模型选择键盘
@@ -716,32 +667,13 @@ async def model_handler(update: Update, context: CallbackContext):
     await bot_util.send_typing(update)
     # 获取当前的面具
     current_mask = context.user_data.get(
-        'current_mask', MASKS[DEFAULT_MASK_KEY])
+        'current_mask')
     platform: Platform = context.user_data['current_platform']
-    if platform.name.startswith('free'):
-        supported_models = PLATFORMS[platform.name]['supported_models']
-        current_model = context.user_data.get(
-            'current_model', supported_models[0])
-        if current_model not in supported_models:
-            current_model = supported_models[0]
-            context.user_data['current_model'] = current_model
-    else:
-        # 收费平台也有可能不兼容  面具[全局](supported_models)-模型[局部](unsupported_models) 才是真正的可以模型
-        unsupported_models = PLATFORMS[platform.name].get('unsupported_models')
-        if unsupported_models:
-            # 求并集
-            unsupported_models_set = set(unsupported_models)
-            supported_models = [
-                model for model in current_mask['supported_models'] if model not in unsupported_models_set]
-        else:
-            supported_models = current_mask['supported_models']
-
-        if context.user_data.get('current_model') not in supported_models:
-            current_model = supported_models[0]
-            context.user_data['current_model'] = current_model
-        else:
-            # 获取当前选择的模型
-            current_model = context.user_data.get('current_model')
+    # 当前面具支持的模型列表
+    supported_models = platform.mask_model_mapping[current_mask['mask_key']]
+    current_model = context.user_data.get('current_model')
+    if current_model not in supported_models:
+        current_model = context.user_data['current_model'] = supported_models[0]
     # 生成内联键盘
     keyboard = generate_model_keyboard(supported_models, current_model)
 
@@ -858,50 +790,27 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
             text=f'平台已切换至{current_platform.name_zh}')
         return
     # 解决切换平台可能带来的问题 比如当前面具在当前平台还在不在 ;  当前模型在当前平台可不可用
-    if 'current_mask' not in context.user_data:
-        current_mask = context.user_data['current_mask'] = MASKS[DEFAULT_MASK_KEY]
-    else:
-        current_mask = context.user_data['current_mask']
-        # 判断所选平台是否支持这些面具
-        if selected_platform_key.startswith('free'):
-            mask_model_mapping = PLATFORMS[selected_platform_key]['mask_model_mapping']
-            # todo 如果面具不支持 就设置为第一个面具
-            if current_mask['mask_key'] not in mask_model_mapping.keys():
-                default_mask_key = list(mask_model_mapping.keys())[0]
-                current_mask = context.user_data['current_mask'] = MASKS[default_mask_key]
-        else:
-            # 剩余的都是收费的平台 支持所有面具
-            current_mask = context.user_data['current_mask']
+    current_mask = context.user_data['current_mask']
+    # 判断所选平台是否支持这些面具
+
+    supported_masks = PLATFORMS[selected_platform_key]['supported_masks']
+    # todo 如果面具不支持 就设置为第一个面具
+    if current_mask['mask_key'] not in supported_masks:
+        current_mask = context.user_data['current_mask'] = MASKS[supported_masks[0]]
 
     # 处理模型切换
-    if 'current_model' not in context.user_data:
-        # 如果此时会话中未存储当前模型 初始化一个当前面具的默认模型
-        current_model = context.user_data['current_model'] = current_mask['default_model']
-    else:
-        # 当前模型
-        current_model = context.user_data['current_model']
-        # 判断当前平台是否支持这个模型
-        if selected_platform_key.startswith('free'):
-            supported_models = PLATFORMS[selected_platform_key]['supported_models']
-            # todo 如果模型不支持 就设置为第一个模型
-            if current_model not in supported_models:
-                default_model = supported_models[0]
-                current_model = context.user_data['current_model'] = default_model
-        else:
-            # 有可能免费平台的收费平台不支持 比如'claude-3-haiku-20240307'  这里应该是 current_mask['supported_models']与platforms的unsupported_models的差集
-            supported_models = list(current_mask['supported_models'])
-            if 'unsupported_models' in PLATFORMS[selected_platform_key]:
-                unsupported_models = PLATFORMS[selected_platform_key]['unsupported_models']
-                diff = [
-                    model for model in supported_models if model not in unsupported_models]
-            else:
-                diff = supported_models
-            if current_model not in diff:
-                current_model = context.user_data['current_model'] = diff[0]
+    current_model = context.user_data['current_model']
+    # 判断当前平台是否支持这个模型
+    mask_model_mapping = PLATFORMS[selected_platform_key]['mask_model_mapping']
+    # 上面更改后的面具支持的模型列表 和平台自带的supported_models不同 那个是平台层面的模型可用性 跟面具层面的不一样
+    mask_supported_models = mask_model_mapping[current_mask['mask_key']]
+    # todo 如果模型不支持 就设置为第一个模型
+    if current_model not in mask_supported_models:
+        context.user_data['current_model'] = mask_supported_models[0]
 
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
-    new_platform = context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
-                                                                                  context=context, max_message_count=current_mask['max_message_count'])
+    context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
+                                                                   context=context, max_message_count=current_mask['max_message_count'])
 
 
 @auth

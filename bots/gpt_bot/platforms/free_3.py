@@ -34,6 +34,7 @@ class Free_3(Platform):
         return '已使用 $0.0 , 订阅总额 $0.0'
 
     async def completion(self, stream: bool, context, *messages, **kwargs):
+        kwargs['messages'][0]['content'] = kwargs['messages'][0]['content']+',请用中文进行回复'
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
@@ -62,7 +63,9 @@ class Free_3(Platform):
                             data = ujson.loads(raw_data)
                         except:
                             raise RuntimeError(raw_data)
-                        answer += data['choices'][0]['delta']['content']
+                        delta = data['choices'][0]['delta']
+                        if 'content' in delta:
+                            answer += delta['content']
                         yield 'not_finished', answer
 
         else:

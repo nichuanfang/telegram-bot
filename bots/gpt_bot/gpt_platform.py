@@ -40,7 +40,10 @@ class Platform(metaclass=ABCMeta):
         openai_api_key,
         index_url: str,
         payment_url: str,
-        max_message_count: int
+        max_message_count: int,
+        supported_masks: list,
+        supported_models: list,
+        mask_model_mapping: dict
     ):
         # 平台名称(英文)
         self.name = name
@@ -61,6 +64,12 @@ class Platform(metaclass=ABCMeta):
         self.payment_url = payment_url
         # 最大历史消息容量
         self.max_message_count = max_message_count
+        # 支持的面具
+        self.supported_masks = supported_masks
+        # 支持的模型
+        self.supported_models = supported_models
+        # 支持的面具模型映射表
+        self.mask_model_mapping = mask_model_mapping
         # 初始化参数
         chat_init_params = {
             "api_key": openai_api_key,

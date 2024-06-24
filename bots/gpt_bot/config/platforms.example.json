@@ -6,7 +6,70 @@
     "foreign_openai_base_url": "https://api.bianxieai.com/v1",
     "index_url": "https://api.bianxieai.com",
     "payment_url": "https://shop.bianxieai.com/",
-    "openai_api_key": ""
+    "openai_api_key": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "image_generator",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
+    "supported_models": [
+      "gpt-3.5-turbo",
+      "gpt-4o",
+      "dall-e-3",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
+    ],
+    "mask_model_mapping": {
+      "common": [
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ],
+      "compressed": [
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ],
+      "github_copilot": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "image_generator": [
+        "dall-e-3"
+      ],
+      "song_recommender": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "movie_expert": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "travel_guide": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "doctor": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ]
+    }
   },
   "juheai": {
     "name": "聚合AI",
@@ -15,7 +78,70 @@
     "foreign_openai_base_url": "https://api.juheai.top/v1",
     "index_url": "https://one.meithink.com/",
     "payment_url": "https://one.meithink.com/",
-    "openai_api_key": ""
+    "openai_api_key": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "image_generator",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
+    "supported_models": [
+      "gpt-3.5-turbo",
+      "gpt-4o",
+      "dall-e-3",
+      "claude-3-haiku-20240307",
+      "claude-3-sonnet-20240229",
+      "claude-3-opus-20240229"
+    ],
+    "mask_model_mapping": {
+      "common": [
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ],
+      "compressed": [
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ],
+      "github_copilot": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "image_generator": [
+        "dall-e-3"
+      ],
+      "song_recommender": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "movie_expert": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "travel_guide": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229"
+      ],
+      "doctor": [
+        "gpt-4o",
+        "claude-3-haiku-20240307",
+        "claude-3-sonnet-20240229",
+        "claude-3-opus-20240229"
+      ]
+    }
   },
   "chatanywhere": {
     "name": "ChatAnywhere",
@@ -24,20 +150,70 @@
     "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
     "index_url": "https://api.chatanywhere.tech",
     "payment_url": "https://peiqishop.me/",
-    "unsupported_models": [
-      "claude-3-haiku-20240307",
-      "claude-3-sonnet-20240229",
-      "claude-3-opus-20240229"
+    "openai_api_key": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "image_generator",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
     ],
-    "openai_api_key": ""
+    "supported_models": [
+      "gpt-3.5-turbo",
+      "gpt-4o",
+      "dall-e-3",
+      "whisper-1"
+    ],
+    "mask_model_mapping": {
+      "common": [
+        "gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "compressed": [
+        "gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "github_copilot": [
+        "gpt-4o"
+      ],
+      "image_generator": [
+        "dall-e-3"
+      ],
+      "song_recommender": [
+        "gpt-4o"
+      ],
+      "movie_expert": [
+        "gpt-4o"
+      ],
+      "travel_guide": [
+        "gpt-4o"
+      ],
+      "doctor": [
+        "gpt-4o"
+      ]
+    }
   },
   "free_1": {
     "name": "免费_1",
     "platform_key": "free_1",
     "index_url": "https://fabu.woyaobaipiao.com/",
     "payment_url": "https://fabu.woyaobaipiao.com/",
-    "reveal _url": "兜底url",
-    "reveal_code": "兜底code",
+    "reveal _url": "",
+    "reveal_code": "",
+    "username": "",
+    "password": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
     "supported_models": [
       "gpt-3.5-turbo",
       "claude-3-haiku-20240307"
@@ -71,44 +247,59 @@
         "gpt-3.5-turbo",
         "claude-3-haiku-20240307"
       ]
-    },
-    "username": "用户名",
-    "password": "密码"
+    }
   },
   "free_2": {
     "name": "免费_2",
     "platform_key": "free_2",
     "domestic_openai_base_url": "https://free.gpt.ge/v1",
     "foreign_openai_base_url": "https://free.gpt.ge/v1",
-    "index_url": "https://v3.cm/",
-    "payment_url": "https://v3.cm/",
+    "index_url": "https://api.gpt.ge/panel",
+    "payment_url": "https://shop.gpt.ge",
+    "openai_api_key": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
     "supported_models": [
-      "gpt-3.5-turbo"
+      "gpt-3.5-turbo",
+      "gpt-3.5-turbo-16k"
     ],
     "mask_model_mapping": {
       "common": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "compressed": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "github_copilot": [
-        "* gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "travel_guide": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "song_recommender": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "movie_expert": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ],
       "doctor": [
-        "gpt-3.5-turbo"
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k"
       ]
-    },
-    "openai_api_key": ""
+    }
   },
   "free_3": {
     "name": "免费_3",
@@ -117,48 +308,71 @@
     "foreign_openai_base_url": "https://ffa.chat",
     "index_url": "https://ffa.chat/",
     "payment_url": "https://ffa.chat/",
+    "email": "",
+    "password": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "image_generator",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
     "supported_models": [
       "gpt-4o",
       "gemini-1.5-pro",
-      "零一万物-large"
+      "deepseek-v2-chat",
+      "零一万物-large",
+      "dall-e-3"
     ],
     "mask_model_mapping": {
       "common": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ],
       "compressed": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ],
       "github_copilot": [
         "gpt-4o",
-        "gemini-1.5-pro"
+        "gemini-1.5-pro",
+        "deepseek-V2-chat",
+        "零一万物-large"
+      ],
+      "image_generator": [
+        "dall-e-3"
       ],
       "travel_guide": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ],
       "song_recommender": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ],
       "movie_expert": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ],
       "doctor": [
         "gpt-4o",
         "gemini-1.5-pro",
+        "deepseek-V2-chat",
         "零一万物-large"
       ]
-    },
-    "email": "",
-    "password": ""
+    }
   }
 }

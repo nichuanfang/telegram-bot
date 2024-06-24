@@ -6,9 +6,7 @@ import requests
 headers = {
     'accept': 'application/json',
     'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
-    # 'origin': 'https://gpt.jaychou.site',
     'priority': 'u=1, i',
-    # 'referer': 'https://gpt.jaychou.site/',
     'sec-ch-ua': '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"Windows"',
