@@ -1,10 +1,13 @@
 import asyncio
+import atexit
 import base64
+import datetime
 import functools
 import importlib
 import json
 import os
 import re
+from redis import Connection, ConnectionPool
 import requests
 from urllib.parse import urlparse
 import uuid
@@ -14,6 +17,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 from bots.gpt_bot.gpt_platform import Platform
+from my_utils import redis_util
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 ua = UserAgent()
@@ -166,55 +170,73 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip()
                              for user_id in values[0].split(',')]
 
 
+# Redis连接池用于存储每日访问计数和过期时间
+REDIS_POOL: ConnectionPool = redis_util.create_redis_pool()
+# 注册关闭连接池
+atexit.register(lambda: asyncio.run(redis_util.close_redis_pool(REDIS_POOL)))
+
+
+def check_visitor_quota(user_id):
+    today_date = datetime.date.today()
+    redis_key = f"visitor_quota:{user_id}:{today_date}"
+
+    if REDIS_POOL is None:
+        raise RuntimeError("Redis pool is not initialized.")
+
+    with redis_util.get_redis_client(REDIS_POOL) as redis_client:
+        # 获取当前用户今天的访问次数
+        count = redis_util.get(redis_client, redis_key)
+        if count is None:
+            count = 0
+        else:
+            count = int(count)
+
+        # 访客每天最多100次调用
+        if count >= 100:
+            return False
+
+        # 访问次数加1，并设置过期时间为今天的最后一秒钟
+        count += 1
+        # 设置过期时间为一天(86400秒)
+        redis_util.set(redis_client, redis_key, count, expire=86400)
+
+    return True
+
+
 def auth(func):
-    """
-    自定义授权装饰器
-    Args:
-            func: 需要授权的方法
-
-    Returns:
-
-    """
-
+    """ 自定义授权装饰器 """
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        # 获取update和context
         update: Update = args[0]
         context: CallbackContext = args[1]
         user_id = update.effective_user.id
+
         if 'identity' not in context.user_data:
             if str(user_id) not in ALLOWED_TELEGRAM_USER_IDS:
-                context.user_data['identity'] = 'vistor'
-                # 只针对GBTBot开放访问 其他机器人正常拦截
-                if context.bot.first_name == 'GPTBot':
-                    logger.info(
-                        f'=================user {user_id} access the GPTbot for free===================')
-                    context.user_data['current_platform'] = instantiate_platform(
-                        need_logger=True)
-                    # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
-                    context.user_data['candidate_platform'] = instantiate_platform(
-                        'free_2'
-                    )
-                    context.user_data['current_mask'] = platform_default_mask()
-                    context.user_data['current_model'] = platform_default_model(
-                    )
-                else:
-                    logger.warn(
-                        f"======================user {user_id}'s  access has been filtered====================")
-                    await update.message.reply_text('You are not authorized to use this bot.')
+                context.user_data['identity'] = 'visitor'
+                # 检查访客的每日访问次数是否超限
+                if not check_visitor_quota(user_id):
+                    await update.message.reply_text('Exceeded daily visitor quota. Access denied.')
                     return
             else:
-                if context.bot.first_name == 'GPTBot':
-                    context.user_data['current_platform'] = instantiate_platform(
-                        need_logger=True)
-                    # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
-                    context.user_data['candidate_platform'] = instantiate_platform(
-                        'free_2')
-                    context.user_data['current_mask'] = platform_default_mask()
-                    context.user_data['current_model'] = platform_default_model(
-                    )
                 context.user_data['identity'] = 'user'
+
+            if context.bot.first_name == 'GPTBot':
+                context.user_data['current_platform'] = instantiate_platform(
+                    need_logger=True)
+                context.user_data['candidate_platform'] = instantiate_platform(
+                    'free_2', need_logger=False)
+                context.user_data['current_mask'] = platform_default_mask()
+                context.user_data['current_model'] = platform_default_model()
+        else:
+            if context.user_data['identity'] == 'visitor':
+                # 检查访客的每日访问次数是否超限
+                if not check_visitor_quota(user_id):
+                    await update.message.reply_text('Exceeded daily visitor quota. Access denied.')
+                    return
+
         await func(*args, **kwargs)
+
     return wrapper
 
 

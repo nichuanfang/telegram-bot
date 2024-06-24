@@ -4,7 +4,6 @@ import aiocron
 import traceback
 import platform
 import os
-import atexit
 import multiprocessing
 import asyncio
 from telegram import Bot

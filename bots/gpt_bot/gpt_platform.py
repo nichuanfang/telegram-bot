@@ -3,7 +3,7 @@ import asyncio
 import json
 import os.path
 from abc import ABCMeta
-from typing import Union, List, Dict
+from typing import Union
 
 import openai
 
@@ -123,7 +123,7 @@ class Platform(metaclass=ABCMeta):
             async for status, answer in self.completion(True, context, * messages, **kwargs):
                 yield status, answer
 
-    async def completion(self, stream: bool, update, context, *messages, **kwargs):
+    async def completion(self, stream: bool,  context, *messages, **kwargs):
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
         answer = ''
@@ -149,7 +149,7 @@ class Platform(metaclass=ABCMeta):
         await self.chat.append_messages(
             answer, context, *messages)
 
-    async def prepare_messages(self, content) -> List[Dict[str, str]]:
+    async def prepare_messages(self, content) -> list[dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":
             return await self.audio_transcribe(content['audio_path'])
         if isinstance(content, list):
@@ -163,7 +163,7 @@ class Platform(metaclass=ABCMeta):
         # 如果类型是视频 这里需要对视频进行处理
         return [{"role": "user", "content": content}]
 
-    async def generate_image(self, messages: List):
+    async def generate_image(self, messages: list):
         # 生成图片
         generate_res = await self.chat.openai_client.images.generate(**{
             "prompt": messages[0]['content'],
