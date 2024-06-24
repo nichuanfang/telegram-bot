@@ -57,11 +57,8 @@ class Temque:
         self.maxlen = maxlen or float("inf")
 
     async def _trim(self, context: CallbackContext, is_platform_migrate: bool = False):
-        if 'current_model' in context.user_data:
-            is_claude: bool = context.user_data['current_model'].startswith(
-                'claude-3')
-        else:
-            is_claude = False
+        is_claude: bool = context.user_data['current_model'].startswith(
+            'claude-3')
         core = self.core
         if len(core) > self.maxlen:
             dc = len(core) - self.maxlen

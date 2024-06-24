@@ -3,6 +3,9 @@ import requests
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from fake_useragent import UserAgent
+from telegram.ext import CallbackContext
+from telegram import Update
+
 
 from my_utils.my_logging import get_logger
 
@@ -33,8 +36,7 @@ class Free_3(Platform):
         """
         return '已使用 $0.0 , 订阅总额 $0.0'
 
-    async def completion(self, stream: bool, context, *messages, **kwargs):
-        # 默认的提问方法
+    async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
         answer = ''
@@ -62,7 +64,9 @@ class Free_3(Platform):
                             data = ujson.loads(raw_data)
                         except:
                             raise RuntimeError(raw_data)
-                        answer += data['choices'][0]['delta']['content']
+                        delta = data['choices'][0]['delta']
+                        if 'content' in delta:
+                            answer += delta['content']
                         yield 'not_finished', answer
 
         else:

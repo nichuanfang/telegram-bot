@@ -26,8 +26,6 @@ HASTE_SERVER_HOST = os.getenv('HASTE_SERVER_HOST', None)
 if not HASTE_SERVER_HOST:
     raise ValueError('请配置代码分享平台的地址!')
 # ====================================加载面具================================
-# 默认面具
-DEFAULT_MASK_KEY: str = os.getenv('DEFAULT_MASK_KEY', 'common')
 masks_path = os.path.abspath(os.path.join(
     'bots', 'gpt_bot', 'config', 'masks.json'))
 # 加载面具
@@ -60,6 +58,26 @@ for file in os.listdir(platforms_path):
             PLATFORMS_REGISTRY[platform_key] = attr
 
 
+def platform_default_mask():
+    """平台默认面具
+    """
+    default_platform: dict = platforms[DEFAULT_PLATFORM_KEY]
+    # 支持的面具
+    supported_masks = default_platform['supported_masks']
+    return masks[supported_masks[0]]
+
+
+def platform_default_model():
+    """平台默认模型
+    """
+    default_platform: dict = platforms[DEFAULT_PLATFORM_KEY]
+    # 支持的面具
+    supported_masks = default_platform['supported_masks']
+    # 模型面具映射表
+    mask_model_mapping = default_platform['mask_model_mapping']
+    return mask_model_mapping[supported_masks[0]][0]
+
+
 def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: bool = False):
     """
     初始化平台
@@ -77,6 +95,7 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
         openai_api_key = platform['openai_api_key']
     else:
         openai_api_key = platform['openai_api_key']
+    default_mask = platform['supported_masks'][0]
     # 平台初始化参数
     platform_init_params = {
         'name': platform_key,
@@ -86,7 +105,10 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
         'openai_api_key': openai_api_key,
         'index_url': platform['index_url'],
         'payment_url': platform['payment_url'],
-        'max_message_count': masks[DEFAULT_MASK_KEY]['max_message_count']
+        'max_message_count': masks[default_mask]['max_message_count'],
+        'supported_models': platform['supported_models'],
+        'supported_masks': platform['supported_masks'],
+        'mask_model_mapping': platform['mask_model_mapping']
     }
     if need_logger:
         logger.info(f'当前使用的openai代理平台为{platform["name"]}.')
@@ -120,7 +142,10 @@ async def migrate_platform(from_platform: Platform, to_platform_key: str, contex
         'openai_api_key': openai_api_key,
         'index_url': to_platform['index_url'],
         'payment_url': to_platform['payment_url'],
-        'max_message_count': max_message_count
+        'max_message_count': max_message_count,
+        'supported_models': to_platform['supported_models'],
+        'supported_masks': to_platform['supported_masks'],
+        'mask_model_mapping': to_platform['mask_model_mapping']
     }
     logger.info(f'当前使用的openai代理平台为{to_platform["name"]}.')
     # 新平台
@@ -170,7 +195,9 @@ def auth(func):
                     context.user_data['candidate_platform'] = instantiate_platform(
                         'free_2'
                     )
-                    context.user_data['current_model'] = platforms[DEFAULT_PLATFORM_KEY]['supported_models'][0]
+                    context.user_data['current_mask'] = platform_default_mask()
+                    context.user_data['current_model'] = platform_default_model(
+                    )
                 else:
                     logger.warn(
                         f"======================user {user_id}'s  access has been filtered====================")
@@ -183,11 +210,9 @@ def auth(func):
                     # 用于压缩历史消息 选用free_2的gpt-3-turbo-16k模型
                     context.user_data['candidate_platform'] = instantiate_platform(
                         'free_2')
-                    default_platform = platforms[DEFAULT_PLATFORM_KEY]
-                    if 'supported_models' in default_platform:
-                        context.user_data['current_model'] = default_platform['supported_models'][0]
-                    else:
-                        context.user_data['current_model'] = masks[DEFAULT_MASK_KEY]['default_model']
+                    context.user_data['current_mask'] = platform_default_mask()
+                    context.user_data['current_model'] = platform_default_model(
+                    )
                 context.user_data['identity'] = 'user'
         await func(*args, **kwargs)
     return wrapper
@@ -252,6 +277,7 @@ def generate_code(platform: dict):
     platform['domestic_openai_base_url'] = f'{url}api/openai/v1'
     platform['foreign_openai_base_url'] = f'{url}api/openai/v1'
     platform['openai_api_key'] = f'nk-{code}'
+
     if os.path.exists(TEMP_CONFIG_PATH):
         with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
             old_json_data: dict = json.loads(f.read())
@@ -304,6 +330,7 @@ def generate_authorization(platform: dict):
         token = json_data['token']
         token_type = json_data['token_type']
         platform['openai_api_key'] = f'{token_type} {token}'
+
         if os.path.exists(TEMP_CONFIG_PATH):
             with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
                 old_json_data: dict = json.loads(f.read())
