@@ -22,6 +22,7 @@ from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandH
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth, instantiate_platform, migrate_platform
+from my_utils.document_util import DocumentHandler
 
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
@@ -158,7 +159,7 @@ async def handle_photo(update: Update, context: CallbackContext):
     current_platform: Platform = context.user_data['current_platform']
     current_model: str = context.user_data.get(
         'current_model')
-    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro', 'deepseek-v2-chat', '零一万物-large')):
+    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro')):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
     # 并行处理 caption 和 photo download
     handle_result = await asyncio.gather(
@@ -192,7 +193,7 @@ async def handle_document_download(update: Update, context: CallbackContext):
     document = update.message.document
     file: File = await context.bot.get_file(document.file_id)
     document_bytes = await file.download_as_bytearray()
-    return f'```{document.mime_type}\n{document_bytes.decode(encoding="utf-8")}\n```\n'
+    return DocumentHandler.format(document_bytes, document.mime_type)
 
 
 async def handle_document(update: Update, context: CallbackContext):
@@ -228,7 +229,7 @@ async def analyse_video(update: Update, context: CallbackContext):
     content = []
     current_model: str = context.user_data.get(
         'current_model')
-    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro', 'deepseek-v2-chat', '零一万物-large')):
+    if not current_model.startswith(('gpt-4o', 'claude-3', 'gemini-1.5-pro')):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     platform: Platform = context.user_data['current_platform']
     platform.chat.clear_messages(context)
@@ -489,7 +490,7 @@ async def handle_exception(update, context, e, init_message_task):
             init_text = ''
     elif '上游负载已饱和' in error_message:
         current_platform: Platform = context.user_data['current_platform']
-        current_platform.chat.clear_messages()
+        current_platform.chat.clear_messages(context)
         init_text = '已达到token上限'
     elif 'at byte offset' in error_message:
         init_text = '缺少结束标记!\n\n'
