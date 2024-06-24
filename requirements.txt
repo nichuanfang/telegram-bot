@@ -8,7 +8,7 @@ beautifulsoup4==4.12.2
 lxml==5.2.2
 tmdbv3api==1.9.0
 aligo==6.2.4
-openai==1.34.0
+openai==1.35.3
 regex==2024.5.15
 opencv-python-headless==4.10.0.84
 pillow==10.3.0
