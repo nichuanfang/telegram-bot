@@ -68,7 +68,7 @@ class Free_3(Platform):
                     try:
                         data = ujson.loads(raw_data)
                     except:
-                        raise RuntimeError(raw_data)
+                        raise RuntimeError('生成图像失败!')
                     delta = data['choices'][0]['delta']
                     if 'content' in delta:
                         answer += delta['content']

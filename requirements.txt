@@ -2,6 +2,7 @@ python-telegram-bot[webhooks]==21.3
 ujson==5.10.0
 fake-useragent==1.5.1
 python-dotenv==1.0.1
+websockets==10.0.0
 requests==2.31.0
 aiocron==1.8
 beautifulsoup4==4.12.2
@@ -13,3 +14,10 @@ regex==2024.5.15
 opencv-python-headless==4.10.0.84
 pillow==10.3.0
 redis==5.0.6
+pandas==2.2.2
+python-pptx==0.6.23
+chardet==5.2.0
+python-docx
+xlrd==2.0.1
+openpyxl==3.1.4
+pymupdf==1.24.5
