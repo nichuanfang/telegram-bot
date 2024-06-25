@@ -3,6 +3,7 @@ ujson==5.10.0
 fake-useragent==1.5.1
 python-dotenv==1.0.1
 requests==2.31.0
+aiohttp==3.9.5
 aiocron==1.8
 beautifulsoup4==4.12.2
 lxml==5.2.2
