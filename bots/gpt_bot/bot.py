@@ -550,8 +550,8 @@ async def clear_handler(update: Update, context: CallbackContext):
         [InlineKeyboardButton("恢复上下文", callback_data='restore_context')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    asyncio.create_task(update.message.reply_text(
-        '上下文已清除', reply_markup=reply_markup))
+    await update.message.reply_text(
+        '上下文已清除', reply_markup=reply_markup)
     # 清空历史消息
     context.user_data['current_platform'].chat.clear_messages(context)
 
@@ -559,7 +559,7 @@ async def clear_handler(update: Update, context: CallbackContext):
 async def restore_context_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    asyncio.create_task(query.edit_message_text(text="上下文已恢复"))
+    await query.edit_message_text(text="上下文已恢复")
     await context.user_data['current_platform'].chat.recover_messages(context)
 
 
@@ -617,8 +617,8 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的面具 mask_key:{mask_key}
     selected_mask_key = query.data[9:]
-    asyncio.create_task(query.edit_message_text(text=bot_util.escape_markdown_v2(
-        MASKS[selected_mask_key]['introduction'], False), parse_mode=ParseMode.MARKDOWN_V2))
+    await query.edit_message_text(text=bot_util.escape_markdown_v2(
+        MASKS[selected_mask_key]['introduction'], False), parse_mode=ParseMode.MARKDOWN_V2)
     # 当前平台
     current_platform: Platform = context.user_data['current_platform']
     # 面具实体 应用选择的面具
@@ -696,10 +696,10 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的模型  model_key:
     selected_model = query.data[10:]
-    asyncio.create_task(query.edit_message_text(
+    await query.edit_message_text(
         text=f'模型已切换至*{bot_util.escape_markdown_v2(selected_model,False)}*',
         parse_mode=ParseMode.MARKDOWN_V2
-    ))
+    )
     # 应用选择的面具
     context.user_data['current_model'] = selected_model
     # 根据选择的模型进行相应的处理
@@ -780,10 +780,10 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的平台 platform_key:
     selected_platform_key = query.data[13:]
-    asyncio.create_task(query.edit_message_text(
+    await query.edit_message_text(
         text=f'平台已切换至[{bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["name"])}]({bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["index_url"])}) ',
         parse_mode=ParseMode.MARKDOWN_V2,
-    ))
+    )
     current_platform: Platform = context.user_data['current_platform']
     # 当前的平台key
     current_platform_key = current_platform.name
