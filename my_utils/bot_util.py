@@ -425,7 +425,7 @@ async def send_typing_action(update: Update, context: CallbackContext, flag_key)
             await asyncio.sleep(3)  # 每3秒发送一次 typing 状态
 
 
-def escape_markdown_v2(text: str) -> str:
+def escape_markdown_v2(text: str, need_format_asterisk: bool = True) -> str:
     """
     Escape special characters for Telegram MarkdownV2 and replace every pair of consecutive asterisks (**) with a single asterisk (*).
     """
@@ -433,7 +433,8 @@ def escape_markdown_v2(text: str) -> str:
         escape_chars = r"\_[]()#~>+-=|{}.!"
         escaped_text = re.sub(f"([{re.escape(escape_chars)}])", r'\\\1', text)
         # 格式化其它列表语法
-        escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\-', escaped_text)
+        if need_format_asterisk:
+            escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\-', escaped_text)
         return escaped_text
     except Exception as e:
         return str(e)
