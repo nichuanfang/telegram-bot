@@ -501,11 +501,8 @@ async def handle_exception(update, context, e, init_message_task):
     else:
         init_text = ''
     try:
-        if e.body and context.user_data['current_platform'].name != 'free_1':
-            try:
-                text = init_text + e.body['message'].split('(request', 1)[0]
-            except:
-                text = init_text + str(e.body)
+        if e.body:
+            text = init_text + str(e.body)
         else:
             try:
                 text = init_text + json.loads(e.args[0])['error']['message']
