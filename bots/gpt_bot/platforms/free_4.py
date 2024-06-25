@@ -21,7 +21,7 @@ headers = {
     'sec-fetch-site': 'same-origin',
 }
 ua = UserAgent()
-logger = get_logger('free_3')
+logger = get_logger('free_4')
 
 
 def extract_image_url(text):

@@ -92,7 +92,7 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
     # 默认平台
     platform = platforms[platform_key]
 
-    # 如果没配置openai_api_key 说明是free_1 | free_3 需要爬虫抓取授权码
+    # 如果没配置openai_api_key 说明是free_1 | free_4 需要爬虫抓取授权码
     if 'openai_api_key' not in platform:
         # 反序列化平台信息
         platform: dict = generate_api_key(platform)
@@ -250,7 +250,7 @@ def generate_api_key(platform: dict):
     # 扩展性配置  免费节点的特殊操作
     if platform['platform_key'] == 'free_1':
         return generate_code(platform)
-    elif platform['platform_key'] == 'free_3':
+    elif platform['platform_key'] == 'free_4':
         return generate_authorization(platform)
 
 
@@ -314,7 +314,7 @@ def generate_code(platform: dict):
     return platform
 
 
-FREE_3_HEADERS = {
+FREE_4_HEADERS = {
     'accept': '*/*',
     'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
     'priority': 'u=1, i',
@@ -337,7 +337,7 @@ def generate_authorization(platform: dict):
     parsed_url = urlparse(url)
     email = platform['email']
     password = platform['password']
-    FREE_3_HEADERS.update({
+    FREE_4_HEADERS.update({
         'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
         'user-agent': ua.random,
         'content-type': 'application/json'
@@ -345,7 +345,7 @@ def generate_authorization(platform: dict):
     response = requests.post(f'{url}/api/v1/auths/signin', json={
         'email': email,
         'password': password,
-    }, headers=FREE_3_HEADERS)
+    }, headers=FREE_4_HEADERS)
     if response.status_code == 200:
         json_data = json.loads(response.text)
         token = json_data['token']

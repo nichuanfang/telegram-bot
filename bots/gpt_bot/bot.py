@@ -170,7 +170,7 @@ async def handle_photo(update: Update, context: CallbackContext):
     caption_result = handle_result[0]
     image_base64 = handle_result[1]
 
-    if current_platform.name == 'free_3':
+    if current_platform.name == 'free_4':
         if caption_result:
             content.append(caption_result)
         if image_base64:
@@ -233,8 +233,8 @@ async def analyse_video(update: Update, context: CallbackContext):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     platform: Platform = context.user_data['current_platform']
     platform.chat.clear_messages(context)
-    is_free_3 = (platform.name == 'free_3')
-    if is_free_3:
+    is_free_4 = (platform.name == 'free_4')
+    if is_free_4:
         content.append('视频关键帧开始')
     else:
         content.append({
@@ -254,7 +254,7 @@ async def analyse_video(update: Update, context: CallbackContext):
         mime_type = 'image/webp'
         _, buffer = cv2.imencode('.webp', frame)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
-        if platform.name == 'free_3':
+        if platform.name == 'free_4':
             content.append(f'data:{mime_type};base64,{image_base64}')
         else:
             content.append({
@@ -265,7 +265,7 @@ async def analyse_video(update: Update, context: CallbackContext):
             })
     # Clean up
     os.remove(video_path)
-    if is_free_3:
+    if is_free_4:
         content.append('视频关键帧结束,请提供整个视频的综合分析')
     else:
         content.append({
@@ -286,7 +286,7 @@ async def handle_video(update: Update, context: CallbackContext):
     handle_caption_result = handled_result[1]
     if handle_caption_result:
         current_platform: Platform = context.user_data['current_platform']
-        if current_platform.name == 'free_3':
+        if current_platform.name == 'free_4':
             analyse_video_result.append(handle_caption_result)
         else:
             analyse_video_result.append({
@@ -414,7 +414,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             if message_content != prev_answer:
                 await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
                 current_message_length += new_content_length
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.01)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
@@ -472,7 +472,7 @@ async def handle_exception(update, context, e, init_message_task):
     if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
-            # free_1 | free_3    可能授权码/认证信息失效了
+            # free_1 | free_4    可能授权码/认证信息失效了
             # 移除临时配置文件中的相关key
             json_data = None
             with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
@@ -751,6 +751,8 @@ def generate_platform_keyboard(update, context, current_platform: Platform):
                 '免费_2', callback_data='platform_key:free_2'))
             row.append(InlineKeyboardButton(
                 '免费_3', callback_data='platform_key:free_3'))
+            row.append(InlineKeyboardButton(
+                '免费_4', callback_data='platform_key:free_4'))
         elif current_platform.name == 'free_2':
             row.append(InlineKeyboardButton(
                 '免费_1', callback_data='platform_key:free_1'))
@@ -758,6 +760,8 @@ def generate_platform_keyboard(update, context, current_platform: Platform):
                 '* 免费_2', callback_data='platform_key:free_2'))
             row.append(InlineKeyboardButton(
                 '免费_3', callback_data='platform_key:free_3'))
+            row.append(InlineKeyboardButton(
+                '免费_4', callback_data='platform_key:free_4'))
         elif current_platform.name == 'free_3':
             row.append(InlineKeyboardButton(
                 '免费_1', callback_data='platform_key:free_1'))
@@ -765,6 +769,17 @@ def generate_platform_keyboard(update, context, current_platform: Platform):
                 '免费_2', callback_data='platform_key:free_2'))
             row.append(InlineKeyboardButton(
                 '* 免费_3', callback_data='platform_key:free_3'))
+            row.append(InlineKeyboardButton(
+                '免费_4', callback_data='platform_key:free_4'))
+        elif current_platform.name == 'free_4':
+            row.append(InlineKeyboardButton(
+                '免费_1', callback_data='platform_key:free_1'))
+            row.append(InlineKeyboardButton(
+                '免费_2', callback_data='platform_key:free_2'))
+            row.append(InlineKeyboardButton(
+                '免费_3', callback_data='platform_key:free_3'))
+            row.append(InlineKeyboardButton(
+                '* 免费_4', callback_data='platform_key:free_4'))
         keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
