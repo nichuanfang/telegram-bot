@@ -18,3 +18,4 @@ chardet==5.2.0
 python-docx
 xlrd==2.0.1
 openpyxl==3.1.4
+js2py==0.74
