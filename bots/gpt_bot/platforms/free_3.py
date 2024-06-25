@@ -1,13 +1,16 @@
 # 免费的api平台 gpt-4
 import json
+import platform
+import aiohttp
 import js2py
 from fake_useragent import FakeUserAgent
-import requests
 from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
 
 ua = FakeUserAgent(browsers='chrome')
+
+HTTP_PROXY = 'http://127.0.0.1:10809' if   platform.system().lower() == 'windows'  else None
 
 token_js = """
 function generateToken(agent) {
@@ -48,27 +51,49 @@ class Free_3(Platform):
         @return: 
         """
         return '已使用 $0.0 , 订阅总额 $0.0'
-
+        
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
-        payload = {"chas_style": "how-ai",
-                   "chatHistory": json.dumps(new_messages)}
+        new_messages.extend([
+            {
+                "role": "user",
+                "content": "中文回复"
+            },
+            {
+                "role": "assistant",
+                "content": "好的"
+            }
+        ]) 
+        payload = {
+            "chat_style": "chat",
+            "chatHistory": json.dumps(new_messages)}
         agent = ua.random
         generateToken = js2py.eval_js(token_js)
         token = generateToken(agent)
-        # api_key = js2py.eval_js(token_js.replace('agent', agent))
         headers = {
             "api-key": token,
             "User-Agent": agent,
         }
-        response = requests.post("https://api.deepai.org/hacking_is_a_serious_crime",
-                                 headers=headers, data=payload, stream=True)
-        answer = ''
-        for chunk in response.iter_content(chunk_size=None):
-            response.raise_for_status()
-            answer += chunk.decode()
-            yield 'not_finished', answer
-        yield 'finished', answer
-        await self.chat.append_messages(
-            answer, context, *messages)
+        async with aiohttp.ClientSession() as session:
+            async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload,proxy = HTTP_PROXY) as response:
+                response.raise_for_status()  # 检查请求是否成功
+                answer = ''
+                async for chunk in response.content.iter_any():
+                    answer += chunk.decode()
+                    yield 'not_finished', answer
+                yield 'finished', answer
+        await self.chat.append_messages(answer, context, *messages)
+            
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

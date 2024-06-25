@@ -434,7 +434,7 @@ def escape_markdown_v2(text: str, need_format_asterisk: bool = True) -> str:
         escaped_text = re.sub(f"([{re.escape(escape_chars)}])", r'\\\1', text)
         # 格式化其它列表语法
         if need_format_asterisk:
-            escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\-', escaped_text)
+            escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\*', escaped_text)
         return escaped_text
     except Exception as e:
         return str(e)

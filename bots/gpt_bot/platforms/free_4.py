@@ -1,6 +1,7 @@
+import platform
 import re
+import aiohttp
 import ujson
-import requests
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from fake_useragent import UserAgent
@@ -21,13 +22,15 @@ headers = {
     'sec-fetch-site': 'same-origin',
 }
 ua = UserAgent()
+pattern = re.compile(r'data: (.*)\n')
+image_pattern = re.compile(r'\!\[Image\]\((.*?)\)')
+HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
 logger = get_logger('free_4')
 
 
 def extract_image_url(text):
     # 正则表达式匹配 ![Image](URL) 格式的字符串
-    pattern = r'\!\[Image\]\((.*?)\)'
-    match = re.search(pattern, text)
+    match = image_pattern.search(text)
     if match:
         return match.group(1)  # 返回匹配到的 URL 部分
     else:
@@ -57,21 +60,30 @@ class Free_4(Platform):
             'user-agent': ua.random,
             'authorization': self.openai_api_key
         })
-        with requests.post(
-                f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, stream=True) as response:
-            answer = ''
-            for line in response.iter_lines():
-                raw_data = line.decode('utf-8')[6:]
-                if raw_data == '[DONE]':
-                    break
-                if raw_data:
+        answer = ''
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                response.raise_for_status()  # 检查请求是否成功
+                async for item in response.content.iter_any():
                     try:
-                        data = ujson.loads(raw_data)
+                        chunk = pattern.findall(item.decode())
                     except:
-                        raise RuntimeError('生成图像失败!')
-                    delta = data['choices'][0]['delta']
-                    if 'content' in delta:
-                        answer += delta['content']
+                        continue
+                    if chunk.__len__() == 0:
+                        continue
+                    if chunk[-1] == '[DONE]':
+                        if len(chunk) > 1:
+                            try:
+                                answer += ''.join([ujson.loads(i)['choices']
+                                                   [0]['delta']['content'] for i in chunk[:-1]])
+                            except:
+                                continue
+                        break
+                    try:
+                        answer += ''.join([ujson.loads(i)['choices']
+                                           [0]['delta']['content'] for i in chunk])
+                    except:
+                        continue
         return extract_image_url(answer)
 
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
@@ -90,25 +102,35 @@ class Free_4(Platform):
                 'user-agent': ua.random,
                 'authorization': self.openai_api_key
             })
-            with requests.post(
-                    f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, stream=True) as response:
-                for line in response.iter_lines():
-                    raw_data = line.decode('utf-8')[6:]
-                    if raw_data == '[DONE]':
-                        yield 'finished', answer
-                        break
-                    if raw_data:
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                    response.raise_for_status()  # 检查请求是否成功
+                    async for item in response.content.iter_any():
                         try:
-                            data = ujson.loads(raw_data)
+                            chunk = pattern.findall(item.decode())
                         except:
-                            raise RuntimeError(raw_data)
-                        delta = data['choices'][0]['delta']
-                        if 'content' in delta:
-                            answer += delta['content']
-                        yield 'not_finished', answer
+                            continue
+                        if chunk.__len__() == 0:
+                            continue
+                        if chunk[-1] == '[DONE]':
+                            if len(chunk) > 1:
+                                try:
+                                    answer += ''.join([ujson.loads(i)['choices']
+                                                      [0]['delta']['content'] for i in chunk[:-1]])
+                                except:
+                                    continue
+                            yield 'finished', answer
+                            break
+                        try:
+                            answer += ''.join([ujson.loads(i)['choices']
+                                               [0]['delta']['content'] for i in chunk])
+                            yield 'not_finished', answer
+                        except:
+                            continue
+            await self.chat.append_messages(answer, context, *messages)
 
         else:
-            # todo 此平台的图片解析有问题 需要研究
             json_data = {
                 'stream': False,
                 'messages': new_messages,
@@ -121,13 +143,12 @@ class Free_4(Platform):
                 'content-type': 'application/json',
                 'authorization': self.openai_api_key
             })
-            completion = requests.post(
-                f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data)
-            try:
-                answer = ujson.loads(completion.text)[
-                    'choices'][0]['message']['content']
-                yield answer
-            except:
-                raise RuntimeError(completion.text)
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                    response.raise_for_status()  # 检查请求是否成功
+                    completion = await response.json()
+                    answer = completion[
+                        'choices'][0]['message']['content']
+                    yield answer
         await self.chat.append_messages(
             answer, context, *messages)
