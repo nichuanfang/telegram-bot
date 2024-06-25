@@ -52,10 +52,6 @@ class Free_3(Platform):
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
-        new_messages.append({
-            'role': 'user',
-            'content': '用中文回复我!'
-        })
         payload = {"chas_style": "how-ai",
                    "chatHistory": json.dumps(new_messages)}
         agent = ua.random
