@@ -2,7 +2,6 @@ python-telegram-bot[webhooks]==21.3
 ujson==5.10.0
 fake-useragent==1.5.1
 python-dotenv==1.0.1
-websockets==10.0.0
 requests==2.31.0
 aiocron==1.8
 beautifulsoup4==4.12.2

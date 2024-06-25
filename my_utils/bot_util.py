@@ -372,14 +372,13 @@ def generate_authorization(platform: dict):
 
 
 async def send_message(update: Update, text):
-    assert update.message
     try:
         escaped_text = escape_markdown_v2(text)  # 转义特殊字符
         return await update.message.reply_text(escaped_text,
                                                reply_to_message_id=update.message.message_id,
                                                disable_web_page_preview=True,
                                                parse_mode=ParseMode.MARKDOWN_V2)
-    except:
+    except Exception as e:
         return await update.message.reply_text(text, reply_to_message_id=update.message.message_id,
                                                disable_web_page_preview=True)
 
@@ -389,32 +388,26 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
         # 等流式响应完全结束再尝试markdown格式 加快速度
         if stream_ended:
             escaped_text = escape_markdown_v2(text)
-            chat_id = update.message.chat_id if update and update.message else None
-            if chat_id is not None:
-                await context.bot.edit_message_text(
-                    text=escaped_text,
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    disable_web_page_preview=True,
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
+            await context.bot.edit_message_text(
+                text=escaped_text,
+                chat_id=update.message.chat_id,
+                message_id=message_id,
+                disable_web_page_preview=True,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
         else:
-            chat_id = update.message.chat_id if update and update.message else None
-            if chat_id is not None:
-                await context.bot.edit_message_text(
-                    text=text,
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    disable_web_page_preview=True
-                )
+            await context.bot.edit_message_text(
+                text=text,
+                chat_id=update.message.chat_id,
+                message_id=message_id,
+                disable_web_page_preview=True
+            )
     except Exception:
         try:
-            chat_id = update.message.chat_id if update and update.message else None
-            if chat_id is not None:
-                await context.bot.edit_message_text(
-                    text=text,
-                    chat_id=chat_id,
-                    message_id=message_id, disable_web_page_preview=True)
+            await context.bot.edit_message_text(
+                text=text,
+                chat_id=update.message.chat_id,
+                message_id=message_id, disable_web_page_preview=True)
         except Exception:
             pass
 
@@ -439,7 +432,8 @@ def escape_markdown_v2(text: str) -> str:
     try:
         escape_chars = r"\_[]()#~>+-=|{}.!"
         escaped_text = re.sub(f"([{re.escape(escape_chars)}])", r'\\\1', text)
-        escaped_text = re.sub(r'\\\*\\\*', '**', escaped_text)
+        # 格式化其它列表语法
+        escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\-', escaped_text)
         return escaped_text
     except Exception as e:
         return str(e)
