@@ -163,7 +163,7 @@ async def handle_photo(update: Update, context: CallbackContext):
         raise ValueError(f'当前模型: {current_model}不支持图片解析!')
     # 并行处理 caption 和 photo download
     handle_result = await asyncio.gather(
-        handle_caption(update, 3000),
+        handle_caption(update, 3500),
         handle_photo_download(update, context)
     )
 
@@ -198,7 +198,7 @@ async def handle_document_download(update: Update, context: CallbackContext):
 
 async def handle_document(update: Update, context: CallbackContext):
     handled_result = await asyncio.gather(handle_document_download(update, context),
-                                          handle_caption(update, 3000))
+                                          handle_caption(update, 3500))
     handle_document_result = handled_result[0]
     handle_caption_result = handled_result[1]
     return handle_document_result + (handle_caption_result if handle_caption_result else '')
@@ -281,7 +281,7 @@ async def analyse_video(update: Update, context: CallbackContext):
 
 async def handle_video(update: Update, context: CallbackContext):
     handled_result = await asyncio.gather(analyse_video(update, context),
-                                          handle_caption(update, 3000))
+                                          handle_caption(update, 3500))
     analyse_video_result = handled_result[0]
     handle_caption_result = handled_result[1]
     if handle_caption_result:
@@ -370,7 +370,7 @@ async def handle_code_url(update: Update, code_id):
 
 
 async def handle_text(update):
-    if len(update.message.text.encode()) > 3000:
+    if len(update.message.text.encode()) > 3500:
         raise ValueError(
             f'Your question is too long.请通过在线分享平台 {bot_util.HASTE_SERVER_HOST}  提问')
     content_text = update.effective_message.text.strip()
@@ -382,7 +382,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                                  init_message_task, **openai_completion_options):
     prev_answer = ''
     current_message_length = 0
-    max_message_length = 3000
+    max_message_length = 3500
     message_content = ''
     need_notice = True
     gpt_platform: Platform = context.user_data['current_platform']
@@ -444,7 +444,7 @@ async def handle_response(update: Update, context: CallbackContext, content_task
                 await update.message.reply_photo(photo=img_response.content,
                                                  reply_to_message_id=update.effective_message.message_id)
         else:
-            if len(res.encode()) < 3000:
+            if len(res.encode()) < 3500:
                 await bot_util.send_message(update, res)
             else:
                 response = requests.post(
