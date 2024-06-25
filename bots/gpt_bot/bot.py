@@ -618,7 +618,7 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     # 获取用户选择的面具 mask_key:{mask_key}
     selected_mask_key = query.data[9:]
     asyncio.create_task(query.edit_message_text(text=bot_util.escape_markdown_v2(
-        MASKS[selected_mask_key]['introduction']), parse_mode=ParseMode.MARKDOWN_V2))
+        MASKS[selected_mask_key]['introduction'], False), parse_mode=ParseMode.MARKDOWN_V2))
     # 当前平台
     current_platform: Platform = context.user_data['current_platform']
     # 面具实体 应用选择的面具
@@ -697,7 +697,7 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     # 获取用户选择的模型  model_key:
     selected_model = query.data[10:]
     asyncio.create_task(query.edit_message_text(
-        text=f'模型已切换至*{telegram.helpers.escape_markdown(selected_model, version=2)}*',
+        text=f'模型已切换至*{bot_util.escape_markdown_v2(selected_model,False)}*',
         parse_mode=ParseMode.MARKDOWN_V2
     ))
     # 应用选择的面具
