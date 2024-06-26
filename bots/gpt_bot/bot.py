@@ -414,7 +414,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             if message_content != prev_answer:
                 await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
                 current_message_length += new_content_length
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.02)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
