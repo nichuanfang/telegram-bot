@@ -379,8 +379,17 @@ async def send_message(update: Update, text):
                                                disable_web_page_preview=True,
                                                parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        return await update.message.reply_text(text, reply_to_message_id=update.message.message_id,
-                                               disable_web_page_preview=True)
+        # 如果格式化错误 就发送到代码分享平台
+        response = requests.post(
+            f'{HASTE_SERVER_HOST}/documents', data=escaped_text.encode('utf-8'))
+        if response.status_code == 200:
+            result = response.json()
+            document_id = result.get('key')
+            if document_id:
+                document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
+                await update.message.reply_text(f'请访问：{document_url}')
+            else:
+                await update.message.reply_text(f'保存到在线分享平台失败，请稍后重试。')
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
@@ -406,13 +415,27 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
                 disable_web_page_preview=True
             )
     except Exception:
-        try:
-            await context.bot.edit_message_text(
-                text=text,
-                chat_id=update.message.chat_id,
-                message_id=message_id, disable_web_page_preview=True)
-        except Exception:
-            pass
+        # 如果格式化错误 就发送到代码分享平台
+        response = requests.post(
+            f'{HASTE_SERVER_HOST}/documents', data=escaped_text.encode('utf-8'))
+        if response.status_code == 200:
+            result = response.json()
+            document_id = result.get('key')
+            if document_id:
+                document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
+                await context.bot.edit_message_text(
+                    text=f'请访问：{document_url}',
+                    chat_id=update.message.chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True
+                )
+            else:
+                await context.bot.edit_message_text(
+                    text=f'保存到在线分享平台失败，请稍后重试。',
+                    chat_id=update.message.chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True
+                )
 
 
 async def send_typing(update: Update):
