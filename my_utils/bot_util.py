@@ -381,7 +381,7 @@ async def send_message(update: Update, text):
     except Exception as e:
         # 如果格式化错误 就发送到代码分享平台
         response = requests.post(
-            f'{HASTE_SERVER_HOST}/documents', data=escaped_text.encode('utf-8'))
+            f'{HASTE_SERVER_HOST}/documents', data=text.encode('utf-8'))
         if response.status_code == 200:
             result = response.json()
             document_id = result.get('key')
@@ -417,7 +417,7 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
     except Exception:
         # 如果格式化错误 就发送到代码分享平台
         response = requests.post(
-            f'{HASTE_SERVER_HOST}/documents', data=escaped_text.encode('utf-8'))
+            f'{HASTE_SERVER_HOST}/documents', data=text.encode('utf-8'))
         if response.status_code == 200:
             result = response.json()
             document_id = result.get('key')
