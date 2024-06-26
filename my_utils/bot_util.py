@@ -387,9 +387,9 @@ async def send_message(update: Update, text):
             document_id = result.get('key')
             if document_id:
                 document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
-                await update.message.reply_text(f'请访问：{document_url}')
+                await update.message.reply_text(f'{text}\n\n请访问：{document_url}')
             else:
-                await update.message.reply_text(f'保存到在线分享平台失败，请稍后重试。')
+                await update.message.reply_text(text)
 
 
 async def edit_message(update: Update, context: CallbackContext, message_id, stream_ended, text):
@@ -424,14 +424,14 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
             if document_id:
                 document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
                 await context.bot.edit_message_text(
-                    text=f'请访问：{document_url}',
+                    text=f'{text}\n\n请访问：{document_url}',
                     chat_id=update.message.chat_id,
                     message_id=message_id,
                     disable_web_page_preview=True
                 )
             else:
                 await context.bot.edit_message_text(
-                    text=f'保存到在线分享平台失败，请稍后重试。',
+                    text=text,
                     chat_id=update.message.chat_id,
                     message_id=message_id,
                     disable_web_page_preview=True
