@@ -387,7 +387,10 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
     try:
         # 等流式响应完全结束再尝试markdown格式 加快速度
         if stream_ended:
+            # 如果格式话前的文本和之后的文本一模一样
             escaped_text = escape_markdown_v2(text)
+            if escaped_text == text:
+                escaped_text = escaped_text+'\r'
             await context.bot.edit_message_text(
                 text=escaped_text,
                 chat_id=update.message.chat_id,
