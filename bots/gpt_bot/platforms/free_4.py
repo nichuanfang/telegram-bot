@@ -22,7 +22,7 @@ headers = {
     'sec-fetch-site': 'same-origin',
 }
 ua = UserAgent()
-pattern = re.compile(r'data: (.*)\n')
+pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
 image_pattern = re.compile(r'\!\[Image\]\((.*?)\)')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
 logger = get_logger('free_4')
@@ -65,25 +65,20 @@ class Free_4(Platform):
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 async for item in response.content.iter_any():
-                    try:
-                        chunk = pattern.findall(item.decode())
-                    except:
-                        continue
-                    if chunk.__len__() == 0:
-                        continue
-                    if chunk[-1] == '[DONE]':
-                        if len(chunk) > 1:
-                            try:
-                                answer += ''.join([ujson.loads(i)['choices']
-                                                   [0]['delta']['content'] for i in chunk[:-1]])
-                            except:
-                                continue
-                        break
-                    try:
-                        answer += ''.join([ujson.loads(i)['choices']
-                                           [0]['delta']['content'] for i in chunk])
-                    except:
-                        continue
+                    chunks = item.decode().splitlines()
+                    for chunk in chunks:
+                        if chunk:
+                            raw_data = chunk[6:]
+                            if raw_data == '[DONE]':
+                                break
+                            else:
+                                try:
+                                    delta = ujson.loads(raw_data)[
+                                        'choices'][0]['delta']
+                                except:
+                                    continue
+                                if delta:
+                                    answer += delta['content']
         return extract_image_url(answer)
 
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
@@ -107,27 +102,22 @@ class Free_4(Platform):
                 async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
                     async for item in response.content.iter_any():
-                        try:
-                            chunk = pattern.findall(item.decode())
-                        except:
-                            continue
-                        if chunk.__len__() == 0:
-                            continue
-                        if chunk[-1] == '[DONE]':
-                            if len(chunk) > 1:
-                                try:
-                                    answer += ''.join([ujson.loads(i)['choices']
-                                                      [0]['delta']['content'] for i in chunk[:-1]])
-                                except:
-                                    continue
-                            yield 'finished', answer
-                            break
-                        try:
-                            answer += ''.join([ujson.loads(i)['choices']
-                                               [0]['delta']['content'] for i in chunk])
-                            yield 'not_finished', answer
-                        except:
-                            continue
+                        chunks = item.decode().splitlines()
+                        for chunk in chunks:
+                            if chunk:
+                                raw_data = chunk[6:]
+                                if raw_data == '[DONE]':
+                                    yield 'finished', answer
+                                    break
+                                else:
+                                    try:
+                                        delta = ujson.loads(raw_data)[
+                                            'choices'][0]['delta']
+                                    except:
+                                        continue
+                                    if delta:
+                                        answer += delta['content']
+                                        yield 'not_finished', answer
             await self.chat.append_messages(answer, context, *messages)
 
         else:
