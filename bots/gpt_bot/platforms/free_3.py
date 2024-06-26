@@ -56,9 +56,19 @@ class Free_3(Platform):
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
-        answer = ''
+        a: list = new_messages
+        a.extend([
+            {
+                'role': 'user',
+                'content': '请用中文回复我'
+            },
+            {
+                'role': 'assistant',
+                'content': '好的 语言已切换为中文'
+            }])
         # 当前模型
         current_model = context.user_data['current_model']
+        answer = ''
         if current_model == 'LLaMA':
             # 尝试deepinfra和deepai
             async for status, item in self.llama_complete(stream, new_messages):
@@ -71,18 +81,20 @@ class Free_3(Platform):
             #         yield status, item
             # await self.chat.append_messages(answer, context, *messages)
             pass
+        await self.chat.append_messages(
+            answer, context, *messages)
 
     # =========================================LLaMA===========================================
 
     async def llama_complete(self, stream: bool, new_messages: list):
         # 尝试 deepinfra 然后尝试deepai
         try:
-            completion = self.deepinfra(stream, new_messages)
+            completion = self.deepai(stream, new_messages)
             async for status, item in completion:
                 yield status, item
         except Exception as e:
             try:
-                completion = self.deepai(stream, new_messages)
+                completion = self.deepinfra(stream, new_messages)
                 async for status, item in completion:
                     yield status, item
             except:
@@ -102,9 +114,9 @@ class Free_3(Platform):
         }
 
         async with aiohttp.ClientSession() as session:
+            answer = ''
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
-                answer = ''
                 async for item in response.content.iter_any():
                     chunks = item.decode().splitlines()
                     for chunk in chunks:
@@ -137,25 +149,14 @@ class Free_3(Platform):
             "User-Agent": agent,
         }
         async with aiohttp.ClientSession() as session:
+            answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 async for item in response.content.iter_any():
-                    chunks = item.decode().splitlines()
-                    for chunk in chunks:
-                        if chunk:
-                            raw_data = chunk[6:]
-                            if raw_data == '[DONE]':
-                                yield 'finished', answer
-                                break
-                            else:
-                                try:
-                                    delta = ujson.loads(raw_data)[
-                                        'choices'][0]['delta']
-                                except:
-                                    continue
-                                if delta:
-                                    answer += delta['content']
-                                    yield 'not_finished', answer
+                    chunk = item.decode()
+                    answer += chunk
+                    yield 'not_finished', answer
+                yield 'finished', answer
     # =========================================gemini-1.5-flash-latest===========================================
 
     async def gemini_complete(self, stream: bool, *new_messages):
