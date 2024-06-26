@@ -118,22 +118,22 @@ class Free_3(Platform):
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 async for item in response.content.iter_any():
-                    chunks = item.decode().splitlines()
-                    for chunk in chunks:
-                        if chunk:
-                            raw_data = chunk[6:]
-                            if raw_data == '[DONE]':
-                                yield 'finished', answer
-                                break
-                            else:
-                                try:
+                    try:
+                        chunks = item.decode().splitlines()
+                        for chunk in chunks:
+                            if chunk:
+                                raw_data = chunk[6:]
+                                if raw_data == '[DONE]':
+                                    yield 'finished', answer
+                                    break
+                                else:
                                     delta = ujson.loads(raw_data)[
                                         'choices'][0]['delta']
-                                except:
-                                    continue
-                                if delta:
-                                    answer += delta['content']
-                                    yield 'not_finished', answer
+                                    if delta:
+                                        answer += delta['content']
+                                        yield 'not_finished', answer
+                    except:
+                        continue
 
     # =========================================LLaMA-Deepai===========================================
 
@@ -153,9 +153,12 @@ class Free_3(Platform):
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 async for item in response.content.iter_any():
-                    chunk = item.decode()
-                    answer += chunk
-                    yield 'not_finished', answer
+                    try:
+                        chunk = item.decode()
+                        answer += chunk
+                        yield 'not_finished', answer
+                    except:
+                        continue
                 yield 'finished', answer
     # =========================================gemini-1.5-flash-latest===========================================
 
