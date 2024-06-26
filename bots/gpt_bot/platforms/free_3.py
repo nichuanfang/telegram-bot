@@ -117,23 +117,26 @@ class Free_3(Platform):
             answer = ''
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
+                flag = False
                 async for item in response.content.iter_any():
                     try:
                         chunks = item.decode().splitlines()
                         for chunk in chunks:
                             if chunk:
-                                raw_data = chunk[6:]
-                                if raw_data == '[DONE]':
+                                if '[DONE]' in chunk:
+                                    flag = True
                                     yield 'finished', answer
                                     break
                                 else:
-                                    delta = ujson.loads(raw_data)[
+                                    delta = ujson.loads(chunk[6:])[
                                         'choices'][0]['delta']
                                     if delta:
                                         answer += delta['content']
                                         yield 'not_finished', answer
                     except:
                         continue
+                if not flag:
+                    yield 'finished', answer
 
     # =========================================LLaMA-Deepai===========================================
 
