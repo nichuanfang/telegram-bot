@@ -9,25 +9,8 @@ import asyncio
 from telegram import Bot
 from telegram.ext import ApplicationBuilder, ContextTypes
 
-from seleniumbase import Driver
-import time
-
-driver = Driver(
-    browser="chrome",
-    uc=True,
-    headless2=False,
-    incognito=True,
-    agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.138 Safari/537.36 AVG/112.0.21002.139",
-    do_not_track=True,
-    undetectable=True
-)
-
 # 日志
 logger = my_logging.get_logger('app')
-
-driver.get('https://chat.oaichat.cc')
-time.sleep(5)
-logger.info(f'成功获取cf_cookie: {driver.get_cookies()}')
 
 
 def init():
