@@ -6,7 +6,7 @@ from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from fake_useragent import UserAgent
 from telegram.ext import CallbackContext
-import ujson
+import orjson
 
 
 from my_utils.my_logging import get_logger
@@ -83,7 +83,7 @@ class Free_4(Platform):
                                 break
                             else:
                                 try:
-                                    delta = ujson.loads(line[6:])[
+                                    delta = orjson.loads(line[6:])[
                                         'choices'][0]['delta']
                                     if delta:
                                         answer_parts.append(
@@ -139,7 +139,7 @@ class Free_4(Platform):
                                     break
                                 else:
                                     try:
-                                        delta = ujson.loads(line[6:])[
+                                        delta = orjson.loads(line[6:])[
                                             'choices'][0]['delta']
                                         if delta:
                                             answer_parts.append(
