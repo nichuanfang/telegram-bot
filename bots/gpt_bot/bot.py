@@ -3,7 +3,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
 import io
-import ujson
+import orjson
 import mimetypes
 from PIL import Image
 import os
@@ -476,12 +476,12 @@ async def handle_exception(update, context, e, init_message_task):
             # 移除临时配置文件中的相关key
             json_data = None
             with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                json_data: dict = ujson.loads(f.read())
+                json_data: dict = orjson.loads(f.read())
                 if current_platform.name in json_data:
                     json_data[current_platform.name].pop('openai_api_key')
             if json_data:
                 with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-                    f.write(ujson.dumps(json_data, ensure_ascii=False))
+                    f.write(orjson.dumps(json_data, ensure_ascii=False))
                     # 刷新token成功!
             context.user_data['current_platform'] = instantiate_platform(
                 current_platform.name)

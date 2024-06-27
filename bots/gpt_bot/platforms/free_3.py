@@ -7,7 +7,7 @@ from fake_useragent import FakeUserAgent
 from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
-import ujson
+import orjson
 
 ua = FakeUserAgent(browsers='chrome')
 
@@ -138,7 +138,7 @@ class Free_3(Platform):
                                 break
                             else:
                                 try:
-                                    delta = ujson.loads(line[6:])[
+                                    delta = orjson.loads(line[6:])[
                                         'choices'][0]['delta']
                                     if delta:
                                         answer_parts.append(
@@ -161,7 +161,7 @@ class Free_3(Platform):
     async def deepai(self, stream: bool, new_messages: list):
         payload = {
             "chat_style": "chat",
-            "chatHistory": ujson.dumps(new_messages)}
+            "chatHistory": orjson.dumps(new_messages)}
         agent = ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
         token = generateToken(agent)
