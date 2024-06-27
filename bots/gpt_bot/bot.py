@@ -3,7 +3,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
 import io
-import json
+import ujson
 import mimetypes
 from PIL import Image
 import os
@@ -472,16 +472,16 @@ async def handle_exception(update, context, e, init_message_task):
     if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
-            # free_1 | free_4    可能授权码/认证信息失效了
+            # free_4    可能授权码/认证信息失效了
             # 移除临时配置文件中的相关key
             json_data = None
             with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                json_data: dict = json.loads(f.read())
+                json_data: dict = ujson.loads(f.read())
                 if current_platform.name in json_data:
                     json_data[current_platform.name].pop('openai_api_key')
             if json_data:
                 with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-                    f.write(json.dumps(json_data, ensure_ascii=False))
+                    f.write(ujson.dumps(json_data, ensure_ascii=False))
                     # 刷新token成功!
             context.user_data['current_platform'] = instantiate_platform(
                 current_platform.name)
@@ -500,16 +500,7 @@ async def handle_exception(update, context, e, init_message_task):
         init_text = '网关超时!\n\n'
     else:
         init_text = ''
-    try:
-        if e.body:
-            text = init_text + str(e.body)
-        else:
-            try:
-                text = init_text + json.loads(e.args[0])['error']['message']
-            except:
-                text = init_text + json.loads(e.args[0])
-    except:
-        text = init_text + e.args[0]
+    text = init_text + str(e)
     await exception_message_handler(update, context, init_message_task, text)
 
 

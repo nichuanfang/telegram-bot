@@ -1,9 +1,8 @@
 # 平台接口
 import asyncio
-import json
+import ujson
 import os.path
 from abc import ABCMeta
-from typing import Union
 
 import openai
 
@@ -196,8 +195,8 @@ class Platform(metaclass=ABCMeta):
                                          BotHttpRequest.get_usage(self.openai_api_key, self.openai_base_url))
         subscription = responses[0]
         usage = responses[1]
-        total = json.loads(subscription.text)['soft_limit_usd']
-        used = json.loads(usage.text)['total_usage'] / 100
+        total = ujson.loads(subscription.text)['soft_limit_usd']
+        used = ujson.loads(usage.text)['total_usage'] / 100
         return f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}'
 
     async def summary(self, content: dict, prompt: str):

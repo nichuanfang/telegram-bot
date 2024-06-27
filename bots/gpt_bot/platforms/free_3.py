@@ -1,14 +1,13 @@
 # 免费的api平台 gpt-4
 import io
-import json
 import platform
-import ujson
 import aiohttp
 import js2py
 from fake_useragent import FakeUserAgent
 from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
+import ujson
 
 ua = FakeUserAgent(browsers='chrome')
 
@@ -118,6 +117,7 @@ class Free_3(Platform):
             answer = ''
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
+                answer_parts = []
                 flag = False
                 buffer = io.BytesIO()
                 incomplete_line = ''
@@ -141,7 +141,10 @@ class Free_3(Platform):
                                     delta = ujson.loads(line[6:])[
                                         'choices'][0]['delta']
                                     if delta:
-                                        answer += delta['content']
+                                        answer_parts.append(
+                                            delta['content'])
+                                        # 在需要时进行拼接
+                                        answer = ''.join(answer_parts)
                                         yield 'not_finished', answer
                                     incomplete_line = ''
                                 except:
@@ -158,7 +161,7 @@ class Free_3(Platform):
     async def deepai(self, stream: bool, new_messages: list):
         payload = {
             "chat_style": "chat",
-            "chatHistory": json.dumps(new_messages)}
+            "chatHistory": ujson.dumps(new_messages)}
         agent = ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
         token = generateToken(agent)
