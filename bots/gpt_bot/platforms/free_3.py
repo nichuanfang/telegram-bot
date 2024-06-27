@@ -118,14 +118,13 @@ class Free_3(Platform):
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 answer_parts = []
-                buffer = io.BytesIO()
+                buffer = bytearray()
                 incomplete_line = ''
                 async for item in response.content.iter_any():
                     # 将每个字节流写入缓冲区
-                    buffer.write(item)
-                    buffer.seek(0)
+                    buffer.extend(item)
                     try:
-                        content = buffer.getvalue().decode()
+                        content = buffer.decode()
                     except UnicodeDecodeError:
                         continue
                     lines = content.splitlines()
@@ -148,9 +147,9 @@ class Free_3(Platform):
                                 except:
                                     incomplete_line = line
                     # 清空缓冲区
-                    buffer.truncate(0)
+                    buffer.clear()
                     if incomplete_line:
-                        buffer.write(incomplete_line.encode())
+                        buffer.extend(incomplete_line.encode())
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list):
@@ -168,17 +167,16 @@ class Free_3(Platform):
             answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
-                buffer = io.BytesIO()
+                buffer = bytearray()
                 answer_parts = []
                 async for item in response.content.iter_any():
                     try:
-                        buffer.write(item)
-                        buffer.seek(0)
-                        chunk = buffer.getvalue().decode()
+                        buffer.extend(item)
+                        chunk = buffer.decode()
                         answer_parts.append(chunk)
                         answer = ''.join(answer_parts)
                         yield 'not_finished', answer
-                        buffer.truncate(0)
+                        buffer.clear()
                     except:
                         # 解码失败
                         continue

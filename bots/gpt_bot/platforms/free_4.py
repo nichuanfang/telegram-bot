@@ -66,14 +66,13 @@ class Free_4(Platform):
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 answer_parts = []
-                buffer = io.BytesIO()
+                buffer = bytearray()
                 incomplete_line = ''
                 async for item in response.content.iter_any():
                     # 将每个字节流写入缓冲区
-                    buffer.write(item)
-                    buffer.seek(0)
+                    buffer.extend(item)
                     try:
-                        content = buffer.getvalue().decode()
+                        content = buffer.decode()
                     except UnicodeDecodeError:
                         continue
                     lines = content.splitlines()
@@ -94,9 +93,9 @@ class Free_4(Platform):
                                 except:
                                     incomplete_line = line
                     # 清空缓冲区
-                    buffer.truncate(0)
+                    buffer.clear()
                     if incomplete_line:
-                        buffer.write(incomplete_line.encode())
+                        buffer.extend(incomplete_line.encode())
         return extract_image_url(answer)
 
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
@@ -115,18 +114,18 @@ class Free_4(Platform):
                 'user-agent': ua.random,
                 'authorization': self.openai_api_key
             })
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
                     answer_parts = []
-                    buffer = io.BytesIO()
+                    buffer = bytearray()
                     incomplete_line = ''
                     async for item in response.content.iter_any():
                         # 将每个字节流写入缓冲区
-                        buffer.write(item)
-                        buffer.seek(0)
+                        buffer.extend(item)
                         try:
-                            content = buffer.getvalue().decode()
+                            content = buffer.decode()
                         except UnicodeDecodeError:
                             continue
                         lines = content.splitlines()
@@ -149,9 +148,9 @@ class Free_4(Platform):
                                     except:
                                         incomplete_line = line
                         # 清空缓冲区
-                        buffer.truncate(0)
+                        buffer.clear()
                         if incomplete_line:
-                            buffer.write(incomplete_line.encode())
+                            buffer.extend(incomplete_line.encode())
             await self.chat.append_messages(answer, context, *messages)
 
         else:
