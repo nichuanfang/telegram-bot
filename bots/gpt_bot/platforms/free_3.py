@@ -1,4 +1,5 @@
 # 免费的api平台 gpt-4
+import io
 import json
 import platform
 import ujson
@@ -118,23 +119,37 @@ class Free_3(Platform):
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 flag = False
+                buffer = io.BytesIO()
+                incomplete_line = ''
                 async for item in response.content.iter_any():
+                    # 将每个字节流写入缓冲区
+                    buffer.write(item)
+                    buffer.seek(0)
                     try:
-                        chunks = item.decode().splitlines()
-                        for chunk in chunks:
-                            if chunk:
-                                if '[DONE]' in chunk:
-                                    flag = True
-                                    yield 'finished', answer
-                                    break
-                                else:
-                                    delta = ujson.loads(chunk[6:])[
+                        content = buffer.getvalue().decode()
+                    except UnicodeDecodeError:
+                        continue
+                    lines = content.splitlines()
+                    for line in lines:
+                        if line:
+                            if '[DONE]' in line:
+                                flag = True
+                                yield 'finished', answer
+                                break
+                            else:
+                                try:
+                                    delta = ujson.loads(line[6:])[
                                         'choices'][0]['delta']
                                     if delta:
                                         answer += delta['content']
                                         yield 'not_finished', answer
-                    except:
-                        continue
+                                    incomplete_line = ''
+                                except:
+                                    incomplete_line = line
+                    # 清空缓冲区
+                    buffer.truncate(0)
+                    if incomplete_line:
+                        buffer.write(incomplete_line.encode())
                 if not flag:
                     yield 'finished', answer
 
