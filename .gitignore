@@ -48,3 +48,4 @@ venv/
 # Ignore specific configuration file
 bots/gpt_bot/config/platforms.json
 temp/
+downloaded_files/driver_fixing.lock

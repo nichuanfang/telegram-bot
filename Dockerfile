@@ -22,9 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx264-dev \
     libatlas-base-dev \
     gfortran \
-    pkg-config \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    pkg-config
 
 # 设置工作目录
 WORKDIR /app
@@ -60,9 +58,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxvidcore-dev \
     libx264-dev \
     libatlas-base-dev \
-    ffmpeg \
-    && apt-get clean  \
-    && rm -rf /var/lib/apt/lists/*
+    ffmpeg
+    
+
+
+# 更新包列表并安装依赖项
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list' && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable --no-install-recommends && \
+    apt-get clean &&  \
+    rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
 WORKDIR /app
