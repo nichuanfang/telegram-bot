@@ -4,7 +4,7 @@ import base64
 import datetime
 import functools
 import importlib
-import json
+import ujson
 import os
 import re
 from redis import Connection, ConnectionPool
@@ -34,14 +34,14 @@ masks_path = os.path.abspath(os.path.join(
     'bots', 'gpt_bot', 'config', 'masks.json'))
 # 加载面具
 with open(masks_path, encoding='utf-8') as masks_file:
-    masks = json.load(masks_file)
+    masks = ujson.load(masks_file)
 # ====================================注册平台================================
 
 platforms_path = os.path.abspath(os.path.join(
     'bots', 'gpt_bot', 'config', 'platforms.json'))
 if os.path.exists(platforms_path):
     with open(platforms_path, encoding='utf-8') as platforms_file:
-        platforms = json.load(platforms_file)
+        platforms = ujson.load(platforms_file)
 else:
     raise RuntimeError('platforms.json不存在,无法加载平台数据!')
 
@@ -243,7 +243,7 @@ def generate_api_key(platform: dict):
     # 尝试先从临时配置文件获取
     if os.path.exists(TEMP_CONFIG_PATH):
         with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-            temp_config_data: dict = json.loads(f.read())
+            temp_config_data: dict = ujson.loads(f.read())
             #   配置文件键为平台key  值为 授权码/认证信息
             if platform['platform_key'] in temp_config_data and 'openai_api_key' in temp_config_data[platform['platform_key']]:
                 return temp_config_data[platform['platform_key']]
@@ -301,7 +301,7 @@ def generate_code(platform: dict):
 
     if os.path.exists(TEMP_CONFIG_PATH):
         with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-            old_json_data: dict = json.loads(f.read())
+            old_json_data: dict = ujson.loads(f.read())
     else:
         old_json_data = {}
 
@@ -310,7 +310,7 @@ def generate_code(platform: dict):
         old_json_data.update({
             platform['platform_key']: platform
         })
-        f.write(json.dumps(old_json_data, ensure_ascii=False))
+        f.write(ujson.dumps(old_json_data, ensure_ascii=False))
     return platform
 
 
@@ -347,14 +347,14 @@ def generate_authorization(platform: dict):
         'password': password,
     }, headers=FREE_4_HEADERS)
     if response.status_code == 200:
-        json_data = json.loads(response.text)
+        json_data = ujson.loads(response.text)
         token = json_data['token']
         token_type = json_data['token_type']
         platform['openai_api_key'] = f'{token_type} {token}'
 
         if os.path.exists(TEMP_CONFIG_PATH):
             with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                old_json_data: dict = json.loads(f.read())
+                old_json_data: dict = ujson.loads(f.read())
         else:
             old_json_data = {}
 
@@ -363,7 +363,7 @@ def generate_authorization(platform: dict):
             old_json_data.update({
                 platform['platform_key']:  platform
             })
-            f.write(json.dumps(old_json_data, ensure_ascii=False))
+            f.write(ujson.dumps(old_json_data, ensure_ascii=False))
         return platform
     else:
         return None
