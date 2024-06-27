@@ -168,12 +168,19 @@ class Free_3(Platform):
             answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
+                buffer = io.BytesIO()
+                answer_parts = []
                 async for item in response.content.iter_any():
                     try:
-                        chunk = item.decode()
-                        answer += chunk
+                        buffer.write(item)
+                        buffer.seek(0)
+                        chunk = buffer.getvalue().decode()
+                        answer_parts.append(chunk)
+                        answer = ''.join(answer_parts)
                         yield 'not_finished', answer
+                        buffer.truncate(0)
                     except:
+                        # 解码失败
                         continue
                 yield 'finished', answer
     # =========================================gemini-1.5-flash-latest===========================================
