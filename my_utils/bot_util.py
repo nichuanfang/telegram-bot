@@ -20,6 +20,8 @@ from bots.gpt_bot.gpt_platform import Platform
 from my_utils import redis_util
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
+from seleniumbase import Driver
+import time
 ua = UserAgent()
 
 logger = get_logger('bot_util')
@@ -310,12 +312,28 @@ def generate_cf_authorization(platform: dict):
         platform (_type_):  平台元信息
     """
     url = platform['foreign_openai_base_url']
+    agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.138 Safari/537.36 AVG/112.0.21002.139'
+    driver = Driver(
+        browser="chrome",
+        uc=True,
+        headless2=False,
+        incognito=True,
+        agent=agent,
+        do_not_track=True,
+        undetectable=True
+    )
+    driver.get(url)
+    time.sleep(3)
+    cookies = driver.get_cookies()
+    driver.quit()
+
     # 判断redis中是否存在
     parsed_url = urlparse(url)
     email = platform['email']
     password = platform['password']
-    user_agent = platform['user_agent']
-    cf_cookie = platform['cf_cookie']
+    user_agent = agent
+    cf_cookie = cookies[0]["value"] if cookies else ''
+    logger.info(f'已获取到cf_cookie: {cf_cookie}')
     headers = {
         'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
         'user-agent': user_agent,
@@ -350,7 +368,7 @@ def generate_cf_authorization(platform: dict):
                     option=orjson.OPT_INDENT_2).decode())
         return platform
     else:
-        return None
+        raise RuntimeError('生成free_3的token失败!')
 
 
 def generate_authorization(platform: dict):
