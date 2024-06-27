@@ -119,7 +119,6 @@ class Free_4(Platform):
                 async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
                     answer_parts = []
-                    flag = False
                     buffer = io.BytesIO()
                     incomplete_line = ''
                     async for item in response.content.iter_any():
@@ -134,7 +133,6 @@ class Free_4(Platform):
                         for line in lines:
                             if line:
                                 if '[DONE]' in line:
-                                    flag = True
                                     yield 'finished', answer
                                     break
                                 else:
@@ -154,8 +152,6 @@ class Free_4(Platform):
                         buffer.truncate(0)
                         if incomplete_line:
                             buffer.write(incomplete_line.encode())
-                    if not flag:
-                        yield 'finished', answer
             await self.chat.append_messages(answer, context, *messages)
 
         else:

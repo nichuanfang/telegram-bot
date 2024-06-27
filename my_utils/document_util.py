@@ -5,7 +5,7 @@ import csv
 import chardet
 import pandas as pd
 from docx import Document
-import json
+import orjson
 import xml.etree.ElementTree as ET  # 处理 XML
 
 
@@ -38,9 +38,9 @@ class DocumentHandler:
 
             elif mime_type == 'application/json':  # 测试通过
                 json_data = raw_data.decode('utf-8')
-                parsed_json = json.loads(json_data)
-                json_data = json.dumps(
-                    parsed_json, indent=4, ensure_ascii=False)
+                parsed_json = orjson.loads(json_data)
+                json_data = orjson.dumps(
+                    parsed_json, option=orjson.OPT_INDENT_2).decode()
                 return f'```{mime_type}\n{json_data}\n```'
 
             elif mime_type == 'application/xml' or mime_type == 'text/xml':  # 测试通过
