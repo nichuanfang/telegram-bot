@@ -13,15 +13,3 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
-
-  # 绕过cf的代理服务器 端口8191
-  flaresolverr:
-    image: 'ghcr.io/flaresolverr/flaresolverr:latest'
-    container_name: flaresolverr
-    pid: host
-    privileged: true
-    network_mode: host
-    environment:
-      TZ: 'Asia/Shanghai'
-      LOG_LEVEL: 'info'
-    restart: unless-stopped

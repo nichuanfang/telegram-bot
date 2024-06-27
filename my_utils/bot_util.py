@@ -7,7 +7,7 @@ import importlib
 import orjson
 import os
 import re
-from redis import Connection, ConnectionPool
+from redis import ConnectionPool
 import requests
 from urllib.parse import urlparse
 import uuid
@@ -250,21 +250,10 @@ def generate_api_key(platform: dict):
     # 扩展性配置  免费节点的特殊操作
     # if platform['platform_key'] == 'free_1':
     #     return generate_code(platform)
-    if platform['platform_key'] == 'free_4':
+    if platform['platform_key'] == 'free_3':
+        return generate_cf_authorization(platform)
+    elif platform['platform_key'] == 'free_4':
         return generate_authorization(platform)
-
-
-FREE_1_HEADERS = {
-    'accept': '*/*',
-    'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
-    'priority': 'u=1, i',
-    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin'
-}
 
 
 def generate_code(platform: dict):
@@ -275,12 +264,12 @@ def generate_code(platform: dict):
     """
     url = platform['index_url']
     parsed_url = urlparse(url)
-    FREE_1_HEADERS.update({
+    headers = {
         'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
         'user-agent': ua.random,
         'Authorization': f'Basic {base64.b64encode(( platform["username"] + ":" + platform["password"]).encode()).decode()}'
-    })
-    response = requests.get(platform['index_url'], headers=FREE_1_HEADERS)
+    }
+    response = requests.get(platform['index_url'], headers=headers)
     html_content = response.content.decode('utf-8')
     # 定义正则表达式模式
     pattern = r"密码：\s*(\d+)"
@@ -314,17 +303,54 @@ def generate_code(platform: dict):
     return platform
 
 
-FREE_4_HEADERS = {
-    'accept': '*/*',
-    'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
-    'priority': 'u=1, i',
-    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin'
-}
+def generate_cf_authorization(platform: dict):
+    """ 既要生成认证头 也要生成cf_cookie 还要保存对应的user-agent  open_api_key是个字典
+         查询redis cf_cookie是否过期 如果不存在说明不存在或已过期 重新申请一个
+    Args:
+        platform (_type_):  平台元信息
+    """
+    url = platform['foreign_openai_base_url']
+    # 判断redis中是否存在
+    parsed_url = urlparse(url)
+    email = platform['email']
+    password = platform['password']
+    user_agent = platform['user_agent']
+    cf_cookie = platform['cf_cookie']
+    headers = {
+        'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
+        'user-agent': user_agent,
+        "Cookie": f'cf_clearance={cf_cookie}',
+        'content-type': 'application/json'
+    }
+    response = requests.post(f'{url}/api/v1/auths/signin', json={
+        'email': email,
+        'password': password,
+    }, headers=headers)
+    if response.status_code == 200:
+        json_data = orjson.loads(response.text)
+        token = json_data['token']
+        token_type = json_data['token_type']
+        platform['openai_api_key'] = {
+            'user_agent': user_agent,
+            'cf_clearance': cf_cookie,
+            'api_key': f'{token_type} {token}'
+        }
+        if os.path.exists(TEMP_CONFIG_PATH):
+            with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+                old_json_data: dict = orjson.loads(f.read())
+        else:
+            old_json_data = {}
+
+        # 刷新临时配置文件
+        with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+            old_json_data.update({
+                platform['platform_key']:  platform
+            })
+            f.write(orjson.dumps(old_json_data,
+                    option=orjson.OPT_INDENT_2).decode())
+        return platform
+    else:
+        return None
 
 
 def generate_authorization(platform: dict):
@@ -337,15 +363,15 @@ def generate_authorization(platform: dict):
     parsed_url = urlparse(url)
     email = platform['email']
     password = platform['password']
-    FREE_4_HEADERS.update({
+    headers = {
         'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
         'user-agent': ua.random,
         'content-type': 'application/json'
-    })
+    }
     response = requests.post(f'{url}/api/v1/auths/signin', json={
         'email': email,
         'password': password,
-    }, headers=FREE_4_HEADERS)
+    }, headers=headers)
     if response.status_code == 200:
         json_data = orjson.loads(response.text)
         token = json_data['token']

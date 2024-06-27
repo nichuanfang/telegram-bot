@@ -56,19 +56,13 @@ class Free_3(Platform):
     async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
-        a: list = new_messages
-        a.extend([
-            {
-                'role': 'user',
-                'content': '请用中文回复我'
-            },
-            {
-                'role': 'assistant',
-                'content': '好的 语言已切换为中文'
-            }])
         # 当前模型
         current_model = context.user_data['current_model']
         answer = ''
+        if current_model == 'gpt-4o':
+            async for status, item in self.gpt_4o_complete(stream, new_messages, **kwargs):
+                answer = item
+                yield status, item
         if current_model == 'LLaMA':
             # 尝试deepinfra和deepai
             async for status, item in self.llama_complete(stream, new_messages):
@@ -83,6 +77,59 @@ class Free_3(Platform):
             pass
         await self.chat.append_messages(
             answer, context, *messages)
+
+    # =========================================Gpt4o===========================================
+
+    async def gpt_4o_complete(self, stream: bool, new_messages: list, **kwargs):
+        json_data = {
+            "messages": new_messages,
+            "citations": False,
+            "max_tokens": 16000,
+            "stream": True,
+            **kwargs
+        }
+        headers = {
+            "User-Agent": self.openai_api_key['user_agent'],
+            "Cookie": f'cf_clearance={self.openai_api_key["cf_clearance"]}',
+            "Authorization": self.openai_api_key['api_key']
+        }
+        async with aiohttp.ClientSession() as session:
+            answer = ''
+            async with session.post(f"{self.foreign_openai_base_url}/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                response.raise_for_status()  # 检查请求是否成功
+                answer_parts = []
+                buffer = bytearray()
+                incomplete_line = ''
+                async for item in response.content.iter_any():
+                    # 将每个字节流写入缓冲区
+                    buffer.extend(item)
+                    try:
+                        content = buffer.decode()
+                    except UnicodeDecodeError:
+                        continue
+                    lines = content.splitlines()
+                    for line in lines:
+                        if line:
+                            if '[DONE]' in line:
+                                yield 'finished', answer
+                                break
+                            else:
+                                try:
+                                    delta = orjson.loads(line[6:])[
+                                        'choices'][0]['delta']
+                                    if delta:
+                                        answer_parts.append(
+                                            delta['content'])
+                                        # 在需要时进行拼接
+                                        answer = ''.join(answer_parts)
+                                        yield 'not_finished', answer
+                                    incomplete_line = ''
+                                except:
+                                    incomplete_line = line
+                    # 清空缓冲区
+                    buffer.clear()
+                    if incomplete_line:
+                        buffer.extend(incomplete_line.encode())
 
     # =========================================LLaMA===========================================
 
@@ -153,6 +200,15 @@ class Free_3(Platform):
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list):
+        new_messages.extend([
+            {
+                'role': 'user',
+                'content': '请用中文回复我'
+            },
+            {
+                'role': 'assistant',
+                'content': '好的 语言已切换为中文'
+            }])
         payload = {
             "chat_style": "chat",
             "chatHistory": orjson.dumps(new_messages, option=orjson.OPT_INDENT_2).decode()}
