@@ -25,10 +25,9 @@ driver = Driver(
 # 日志
 logger = my_logging.get_logger('app')
 
-driver.get('URL_HERE')
-time.sleep(10)
+driver.get('https://chat.oaichat.cc')
+time.sleep(5)
 logger.info(f'成功获取cf_cookie: {driver.get_cookies()}')
-driver.quit()
 
 
 def init():

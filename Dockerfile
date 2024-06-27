@@ -48,6 +48,7 @@ ENV PYTHONFAULTHANDLER=1 \
 # 安装运行时必要的依赖项，包括Chrome和ChromeDriver
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
+    curl \
     gnupg \
     unzip \
     libjpeg-dev \
@@ -61,16 +62,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx264-dev \
     libatlas-base-dev \
     ffmpeg \
- && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
- && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
- && apt-get install -y google-chrome-stable \
- && CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f 1) \
- && CHROMEDRIVER_VERSION=$(curl -sS "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION") \
- && wget -q --continue -P /tmp "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" \
- && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin \
- && rm -rf /tmp/chromedriver_linux64.zip \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y google-chrome-stable \ 
+    && wget -q -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE)/chromedriver_linux64.zip \
+    && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
+    && chmod +x /usr/local/bin/chromedriver
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
 WORKDIR /app
