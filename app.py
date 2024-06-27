@@ -22,13 +22,13 @@ driver = Driver(
     undetectable=True
 )
 
-driver.get('URL_HERE')
-time.sleep(10)
-print(driver.get_cookies())
-driver.quit()
-
 # 日志
 logger = my_logging.get_logger('app')
+
+driver.get('URL_HERE')
+time.sleep(10)
+logger.info(f'成功获取cf_cookie: {driver.get_cookies()}')
+driver.quit()
 
 
 def init():
