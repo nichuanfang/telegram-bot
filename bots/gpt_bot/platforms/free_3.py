@@ -58,23 +58,23 @@ class Free_3(Platform):
             *messages, **kwargs)
         # 当前模型
         current_model = context.user_data['current_model']
-        answer = ''
-        if current_model == 'gpt-4o':
-            async for status, item in self.gpt_4o_complete(stream, new_messages, **kwargs):
-                answer = item
-                yield status, item
+        # answer = ''
+        # if current_model == 'gpt-4o':
+        #     async for status, item in self.gpt_4o_complete(stream, new_messages, **kwargs):
+        #         answer = item
+        #         yield status, item
         if current_model == 'LLaMA':
             # 尝试deepinfra和deepai
             async for status, item in self.llama_complete(stream, new_messages):
                 answer = item
                 yield status, item
-        elif current_model == 'gemini-1.5-flash-latest':
+        # elif current_model == 'gemini-1.5-flash-latest':
             # 谷歌的收费模型
             #     async for status, item in self.gemini_complete(stream, new_messages):
             #         answer = item
             #         yield status, item
             # await self.chat.append_messages(answer, context, *messages)
-            pass
+            # pass
         await self.chat.append_messages(
             answer, context, *messages)
 

@@ -252,8 +252,8 @@ def generate_api_key(platform: dict):
     # 扩展性配置  免费节点的特殊操作
     # if platform['platform_key'] == 'free_1':
     #     return generate_code(platform)
-    if platform['platform_key'] == 'free_3':
-        return generate_cf_authorization(platform)
+    # if platform['platform_key'] == 'free_3':
+    #     return generate_cf_authorization(platform)
     elif platform['platform_key'] == 'free_4':
         return generate_authorization(platform)
 
@@ -316,7 +316,7 @@ def generate_cf_authorization(platform: dict):
     driver = Driver(
         browser="chrome",
         uc=True,
-        headless2=False,
+        headless2=True,
         incognito=True,
         agent=agent,
         do_not_track=True,
