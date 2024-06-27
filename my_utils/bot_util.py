@@ -34,14 +34,14 @@ masks_path = os.path.abspath(os.path.join(
     'bots', 'gpt_bot', 'config', 'masks.json'))
 # 加载面具
 with open(masks_path, encoding='utf-8') as masks_file:
-    masks = orjson.load(masks_file)
+    masks = orjson.loads(masks_file.read())
 # ====================================注册平台================================
 
 platforms_path = os.path.abspath(os.path.join(
     'bots', 'gpt_bot', 'config', 'platforms.json'))
 if os.path.exists(platforms_path):
     with open(platforms_path, encoding='utf-8') as platforms_file:
-        platforms = orjson.load(platforms_file)
+        platforms = orjson.loads(platforms_file.read())
 else:
     raise RuntimeError('platforms.json不存在,无法加载平台数据!')
 
@@ -310,7 +310,7 @@ def generate_code(platform: dict):
         old_json_data.update({
             platform['platform_key']: platform
         })
-        f.write(orjson.dumps(old_json_data, ensure_ascii=False))
+        f.write(orjson.dumps(old_json_data, option=orjson.OPT_INDENT_2).decode())
     return platform
 
 
@@ -363,7 +363,8 @@ def generate_authorization(platform: dict):
             old_json_data.update({
                 platform['platform_key']:  platform
             })
-            f.write(orjson.dumps(old_json_data, ensure_ascii=False))
+            f.write(orjson.dumps(old_json_data,
+                    option=orjson.OPT_INDENT_2).decode())
         return platform
     else:
         return None

@@ -481,7 +481,8 @@ async def handle_exception(update, context, e, init_message_task):
                     json_data[current_platform.name].pop('openai_api_key')
             if json_data:
                 with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-                    f.write(orjson.dumps(json_data, ensure_ascii=False))
+                    f.write(orjson.dumps(
+                        json_data,  option=orjson.OPT_INDENT_2).decode())
                     # 刷新token成功!
             context.user_data['current_platform'] = instantiate_platform(
                 current_platform.name)
