@@ -311,35 +311,23 @@ def generate_cf_authorization(platform: dict):
     """
     url = platform['foreign_openai_base_url']
     # 构建user_agent和cf_clearance   如果状态码是500 跳过
-    with CFSession.cfSession() as session:
-        session.get(url)
-        user_agent = session.session.headers.get('user-agent')
-        cf_clearance = session.session.cookies.get('cf_clearance')
-    if not user_agent or not cf_clearance:
-        raise Exception('构建cf_cookie失败!')
-
-    parsed_url = urlparse(url)
-    email = platform['email']
-    password = platform['password']
-    headers = {
-        'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
-        'user-agent': user_agent,
-        "Cookie": f'cf_clearance={cf_clearance}',
-        'content-type': 'application/json'
-    }
-    response = requests.post(f'{url}/api/v1/auths/signin', json={
-        'email': email,
-        'password': password,
-    }, headers=headers)
+    with CFSession.cfSession(headless_mode=True) as session:
+        parsed_url = urlparse(url)
+        email = platform['email']
+        password = platform['password']
+        headers = {
+            'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
+            'content-type': 'application/json'
+        }
+        response = session.post(f'{url}/api/v1/auths/signin', json={
+            'email': email,
+            'password': password,
+        }, headers=headers)
     if response.status_code == 200:
         json_data = orjson.loads(response.text)
         token = json_data['token']
         token_type = json_data['token_type']
-        platform['openai_api_key'] = {
-            'user_agent': user_agent,
-            'cf_clearance': cf_clearance,
-            'api_key': f'{token_type} {token}'
-        }
+        platform['openai_api_key'] = f'{token_type} {token}'
         if os.path.exists(TEMP_CONFIG_PATH):
             with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
                 old_json_data: dict = orjson.loads(f.read())
