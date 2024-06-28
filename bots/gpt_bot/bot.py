@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import heapq
 import io
 import orjson
+import json
 import mimetypes
 from PIL import Image
 import os
@@ -11,10 +12,11 @@ import re
 import traceback
 import cv2
 import numpy as np
+import chardet
 
 import regex
 import requests
-from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from telegram import Bot, File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
@@ -377,6 +379,14 @@ async def handle_text(update):
     return content_text
 
 
+def  generate_additional_keyboard(infos):
+    keyboard = []
+    row = []
+    for info in infos:
+        row.append(InlineKeyboardButton(text=info['title'],url=info['url']))
+    keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
 async def handle_stream_response(update: Update, context: CallbackContext, content_task, is_image_generator: bool,
                                  init_message_task, **openai_completion_options):
     prev_answer = ''
@@ -390,6 +400,19 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     current_message_id = init_message.message_id
     content = ic_result[1]
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
+        # 如果状态是additional 则追加内联按钮
+        if status == 'additional':
+            if curr_answer:
+                try:
+                    if curr_answer.startswith('\x1c'):
+                        json_data = orjson.loads(curr_answer[1:])
+                    else:
+                        json_data = orjson.loads(curr_answer)
+                except:
+                    continue
+                infos = json_data[:min(3,len(json_data))]
+                await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=current_message_id,reply_markup=generate_additional_keyboard(infos))
+            continue
         if is_image_generator:
             img_response = requests.get(curr_answer)
             if img_response.content:

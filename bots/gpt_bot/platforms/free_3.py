@@ -213,17 +213,22 @@ class Free_3(Platform):
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list):
-        new_messages.extend([
-            {
-                'role': 'user',
-                'content': '请用中文回复我'
-            },
-            {
+        new_messages.insert(-1,{
                 'role': 'assistant',
-                'content': '好的 语言已切换为中文'
-            }])
+                'content': '好的,我只回复中文'
+            })
+        # new_messages.extend([
+        #     {
+        #         'role': 'user',
+        #         'content': '请用中文回复我'
+        #     },
+        #     {
+        #         'role': 'assistant',
+        #         'content': '好的,我只回复中文'
+        #     }])
         payload = {
             "chat_style": "chat",
+            "online": "online",
             "chatHistory": orjson.dumps(new_messages, option=orjson.OPT_INDENT_2).decode()}
         agent = ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
@@ -238,18 +243,39 @@ class Free_3(Platform):
                 response.raise_for_status()  # 检查请求是否成功
                 buffer = bytearray()
                 answer_parts = []
+                other_parts = []
+                is_finished = False
                 async for item in response.content.iter_any():
                     try:
                         buffer.extend(item)
                         chunk = buffer.decode()
-                        answer_parts.append(chunk)
-                        answer = ''.join(answer_parts)
-                        yield 'not_finished', answer
-                        buffer.clear()
+                        if is_finished:
+                            other_parts.append(chunk)
+                            continue
+                        if chunk.find('')!=-1:
+                            # 分割内容 主体消息已结束
+                            splits = chunk.split('')
+                            # 属于主体内容
+                            part_one = splits[0]
+                            answer_parts.append(part_one)
+                            answer = ''.join(answer_parts)
+                            yield 'finished', answer
+                            is_finished = True
+                            # 属于附加内容 
+                            part_two = splits[1]
+                            other_parts.append(part_two)
+                        else:
+                            answer_parts.append(chunk)
+                            answer = ''.join(answer_parts)
+                            yield 'not_finished', answer
+                            buffer.clear()
                     except:
                         # 解码失败
                         continue
-                yield 'finished', answer
+                if not is_finished:
+                    yield 'finished', answer
+                else:
+                    yield 'additional', ''.join(other_parts)
     # =========================================gemini-1.5-flash-latest===========================================
 
     async def gemini_complete(self, stream: bool, *new_messages):
