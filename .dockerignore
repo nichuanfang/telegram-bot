@@ -40,3 +40,4 @@ bots/gpt_bot/config/platforms.json
 docker-compose.yml
 Dockerfile
 temp/
+.browser/
