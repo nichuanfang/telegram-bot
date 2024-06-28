@@ -14,6 +14,7 @@ def create_redis_pool() -> redis.ConnectionPool:
         password=redis_password,
         decode_responses=True
     )
+
     return redis_pool
 
 
