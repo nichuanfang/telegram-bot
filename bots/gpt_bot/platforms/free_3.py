@@ -139,7 +139,7 @@ class Free_3(Platform):
             completion = self.deepai(stream, new_messages)
             async for status, item in completion:
                 yield status, item
-        except Exception as e:
+        except:
             try:
                 completion = self.deepinfra(stream, new_messages)
                 async for status, item in completion:

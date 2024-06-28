@@ -4,6 +4,7 @@ import base64
 import datetime
 import functools
 import importlib
+import traceback
 import orjson
 import os
 import re
@@ -13,7 +14,8 @@ from urllib.parse import urlparse
 import uuid
 
 from fake_useragent import UserAgent
-from telegram import Update
+from telegram import Bot, Update
+import telegram
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 from bots.gpt_bot.gpt_platform import Platform
@@ -442,8 +444,6 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
         if stream_ended:
             # 如果格式话前的文本和之后的文本一模一样
             escaped_text = escape_markdown_v2(text)
-            if escaped_text == text:
-                escaped_text = escaped_text+'\r'
             await context.bot.edit_message_text(
                 text=escaped_text,
                 chat_id=update.message.chat_id,
@@ -458,28 +458,37 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
                 message_id=message_id,
                 disable_web_page_preview=True
             )
-    except Exception:
-        # 如果格式化错误 就发送到代码分享平台
-        response = requests.post(
-            f'{HASTE_SERVER_HOST}/documents', data=text.encode('utf-8'))
-        if response.status_code == 200:
-            result = response.json()
-            document_id = result.get('key')
-            if document_id:
-                document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
-                await context.bot.edit_message_text(
-                    text=f'{text}\n\n请访问：{document_url}',
-                    chat_id=update.message.chat_id,
-                    message_id=message_id,
-                    disable_web_page_preview=True
-                )
-            else:
-                await context.bot.edit_message_text(
-                    text=text,
-                    chat_id=update.message.chat_id,
-                    message_id=message_id,
-                    disable_web_page_preview=True
-                )
+    except Exception as e:
+        if 'Message is not modified' in e.message:
+            await asyncio.gather(context.bot.delete_message(
+                chat_id=update.message.chat_id, message_id=message_id), update.message.reply_text(
+                text=escaped_text,
+                reply_to_message_id=update.message.message_id,
+                disable_web_page_preview=True,
+                parse_mode=ParseMode.MARKDOWN_V2
+            ))
+        else:
+            # 如果格式化错误 就发送到代码分享平台
+            response = requests.post(
+                f'{HASTE_SERVER_HOST}/documents', data=text.encode('utf-8'))
+            if response.status_code == 200:
+                result = response.json()
+                document_id = result.get('key')
+                if document_id:
+                    document_url = f'{HASTE_SERVER_HOST}/raw/{document_id}.md'
+                    await context.bot.edit_message_text(
+                        text=f'{text}\n\n请访问：{document_url}',
+                        chat_id=update.message.chat_id,
+                        message_id=message_id,
+                        disable_web_page_preview=True
+                    )
+                else:
+                    await context.bot.edit_message_text(
+                        text=text,
+                        chat_id=update.message.chat_id,
+                        message_id=message_id,
+                        disable_web_page_preview=True
+                    )
 
 
 async def send_typing(update: Update):
@@ -500,11 +509,12 @@ def escape_markdown_v2(text: str, need_format_asterisk: bool = True) -> str:
     Escape special characters for Telegram MarkdownV2 and replace every pair of consecutive asterisks (**) with a single asterisk (*).
     """
     try:
-        escape_chars = r"\_[]()#~>+-=|{}.!"
+        escape_chars = r'\_[]()~>#+-=|{}.!'
         escaped_text = re.sub(f"([{re.escape(escape_chars)}])", r'\\\1', text)
         # 格式化其它列表语法
         if need_format_asterisk:
             escaped_text = re.sub(r'(?<!\*)\*(?!\*)', '\*', escaped_text)
+        # escaped_text = re.sub(r'(?<!\`)\`(?!\`)', '\`', escaped_text)
         return escaped_text
     except Exception as e:
         return str(e)
