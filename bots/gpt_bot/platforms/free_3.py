@@ -1,6 +1,7 @@
 # 免费的api平台 gpt-4
 import io
 import platform
+from venv import logger
 import aiohttp
 import js2py
 from fake_useragent import FakeUserAgent
@@ -90,47 +91,61 @@ class Free_3(Platform):
             **kwargs
         }
         headers = {
-            "User-Agent": self.openai_api_key['user_agent'],
-            "Cookie": f'cf_clearance={self.openai_api_key["cf_clearance"]}',
-            "Authorization": self.openai_api_key['api_key']
+            "Authorization": self.openai_api_key,
+            'content-type': 'application/json'
         }
-        async with aiohttp.ClientSession() as session:
-            answer = ''
-            async with session.post(f"{self.foreign_openai_base_url}/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
-                response.raise_for_status()  # 检查请求是否成功
-                answer_parts = []
-                buffer = bytearray()
-                incomplete_line = ''
-                async for item in response.content.iter_any():
-                    # 将每个字节流写入缓冲区
-                    buffer.extend(item)
-                    try:
-                        content = buffer.decode()
-                    except UnicodeDecodeError:
-                        continue
-                    lines = content.splitlines()
-                    for line in lines:
-                        if line:
-                            if '[DONE]' in line:
-                                yield 'finished', answer
-                                break
-                            else:
-                                try:
-                                    delta = orjson.loads(line[6:])[
-                                        'choices'][0]['delta']
-                                    if delta:
-                                        answer_parts.append(
-                                            delta['content'])
-                                        # 在需要时进行拼接
-                                        answer = ''.join(answer_parts)
-                                        yield 'not_finished', answer
-                                    incomplete_line = ''
-                                except:
-                                    incomplete_line = line
-                    # 清空缓冲区
-                    buffer.clear()
-                    if incomplete_line:
-                        buffer.extend(incomplete_line.encode())
+        agent = ''
+        cf_clearance = ''
+        with CFSession.cfSession(headless_mode=True) as session:
+            session.get(f"{self.foreign_openai_base_url}/api/config")
+            agent = session.session.headers.get('user-agent')
+            cf_clearance = session.session.cookies.get('cf_clearance')
+            if not cf_clearance:
+                res = session.post(f"{self.foreign_openai_base_url}/openai/chat/completions",
+                                   headers=headers, json=json_data, stream=False)
+                logger.info(res.text)
+            else:
+                async with aiohttp.ClientSession() as session:
+                    answer = ''
+                    headers.update({
+                        'User-Agent': agent,
+                        'Cookie': f'cf_clearance={cf_clearance}'
+                    })
+                    async with session.post(f"{self.foreign_openai_base_url}/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                        response.raise_for_status()  # 检查请求是否成功
+                        answer_parts = []
+                        buffer = bytearray()
+                        incomplete_line = ''
+                        async for item in response.content.iter_any():
+                            # 将每个字节流写入缓冲区
+                            buffer.extend(item)
+                            try:
+                                content = buffer.decode()
+                            except UnicodeDecodeError:
+                                continue
+                            lines = content.splitlines()
+                            for line in lines:
+                                if line:
+                                    if '[DONE]' in line:
+                                        yield 'finished', answer
+                                        break
+                                    else:
+                                        try:
+                                            delta = orjson.loads(line[6:])[
+                                                'choices'][0]['delta']
+                                            if delta:
+                                                answer_parts.append(
+                                                    delta['content'])
+                                                # 在需要时进行拼接
+                                                answer = ''.join(answer_parts)
+                                                yield 'not_finished', answer
+                                            incomplete_line = ''
+                                        except:
+                                            incomplete_line = line
+                            # 清空缓冲区
+                            buffer.clear()
+                            if incomplete_line:
+                                buffer.extend(incomplete_line.encode())
 
     # =========================================LLaMA===========================================
 
