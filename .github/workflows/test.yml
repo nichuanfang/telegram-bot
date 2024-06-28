@@ -1,0 +1,31 @@
+name: Python SeleniumBase Test
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 */1 * * *' # 每隔一小时执行一次，可以根据需求调整
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome browser
+        run: |
+          choco install googlechrome --ignore-checksums --ignore-dependencies -y
+
+      - name: Install SeleniumBase
+        run: |
+          python -m pip install -U seleniumbase
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run Python script
+        run: |
+          python app.py
