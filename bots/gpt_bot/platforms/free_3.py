@@ -241,14 +241,12 @@ class Free_3(Platform):
             answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
-                buffer = bytearray()
                 answer_parts = []
                 other_parts = []
                 is_finished = False
                 async for item in response.content.iter_any():
                     try:
-                        buffer.extend(item)
-                        chunk = buffer.decode()
+                        chunk = item.decode()
                         if is_finished:
                             other_parts.append(chunk)
                             continue
@@ -268,7 +266,6 @@ class Free_3(Platform):
                             answer_parts.append(chunk)
                             answer = ''.join(answer_parts)
                             yield 'not_finished', answer
-                            buffer.clear()
                     except:
                         # 解码失败
                         continue
