@@ -159,11 +159,12 @@
   "free_3": {
     "name": "免费_3",
     "platform_key": "free_3",
-    "domestic_openai_base_url": "https://deepai.org/",
-    "foreign_openai_base_url": "https://deepai.org/",
-    "index_url": "https://deepai.org/",
-    "payment_url": "https://deepai.org/",
-    "openai_api_key": "deepai",
+    "domestic_openai_base_url": "https://chat.oaichat.cc",
+    "foreign_openai_base_url": "https://chat.oaichat.cc",
+    "index_url": "https://chat.oaichat.cc",
+    "payment_url": "https://chat.oaichat.cc",
+    "email": "",
+    "password": "",
     "supported_masks": [
       "common",
       "compressed",
@@ -171,31 +172,48 @@
       "song_recommender",
       "movie_expert",
       "travel_guide",
-      "doctor"
+      "doctor",
+      "wechat_bf",
+      "daily_chat"
     ],
     "supported_models": [
       "LLaMA"
     ],
     "mask_model_mapping": {
       "common": [
+        "gpt-4o",
         "LLaMA"
       ],
       "compressed": [
+        "gpt-4o",
         "LLaMA"
       ],
       "github_copilot": [
+        "gpt-4o",
         "LLaMA"
       ],
       "song_recommender": [
+        "gpt-4o",
         "LLaMA"
       ],
       "movie_expert": [
+        "gpt-4o",
         "LLaMA"
       ],
       "travel_guide": [
+        "gpt-4o",
         "LLaMA"
       ],
       "doctor": [
+        "gpt-4o",
+        "LLaMA"
+      ],
+      "wechat_bf": [
+        "gpt-4o",
+        "LLaMA"
+      ],
+      "daily_chat": [
+        "gpt-4o",
         "LLaMA"
       ]
     }

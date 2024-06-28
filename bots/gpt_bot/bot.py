@@ -16,7 +16,7 @@ import regex
 import requests
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
-from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
+from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import my_logging, bot_util
@@ -69,7 +69,7 @@ def compress_question(question):
 
 
 @auth
-async def answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def answer(update: Update, context: CallbackContext) -> None:
     is_image_generator = context.user_data.get(
         'current_mask')['mask_key'] == 'image_generator'
     init_message_task = None
@@ -458,7 +458,7 @@ async def handle_response(update: Update, context: CallbackContext, content_task
                         await bot_util.send_message(update, text='保存到在线分享平台失败，请稍后重试。')
 
 
-async def handle_exception(update, context, e, init_message_task):
+async def handle_exception(update: Update, context: CallbackContext, e, init_message_task):
     logger.error(
         f"==================================================ERROR START==================================================================")
     # 记录异常信息
@@ -467,10 +467,10 @@ async def handle_exception(update, context, e, init_message_task):
     logger.error(
         f"==================================================ERROR END====================================================================")
     error_message = str(e)
-    if hasattr(e, 'status_code') and getattr(e, 'status_code') == 401:
+    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500]:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
-            # free_4    可能授权码/认证信息失效了
+            # free_3/4    可能授权码/认证信息失效了
             # 移除临时配置文件中的相关key
             json_data = None
             with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
@@ -483,8 +483,15 @@ async def handle_exception(update, context, e, init_message_task):
                         json_data,  option=orjson.OPT_INDENT_2).decode())
                     # 刷新token成功!
             context.user_data['current_platform'] = instantiate_platform(
-                current_platform.name)
-            init_text = '授权信息已失效, 尝试重新获取,请稍后重试!\n\n'
+                platform_key=current_platform.name)
+            try:
+                init_message: Message = await init_message_task
+                # 更改初始化消息
+                await context.bot.edit_message_text('认证信息已刷新!', init_message.chat_id, init_message.message_id)
+                await answer(update, context)
+                return
+            except:
+                raise Exception('free_4认证失败!')
         else:
             init_text = ''
     elif '上游负载已饱和' in error_message:

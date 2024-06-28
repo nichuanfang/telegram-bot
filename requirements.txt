@@ -20,3 +20,6 @@ python-docx
 xlrd==2.0.1
 openpyxl==3.1.4
 js2py==0.74
+CFSession==1.5.0
+# 不能升级版本 CFSession会报错
+blinker==1.7.0  
