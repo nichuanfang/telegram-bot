@@ -61,6 +61,7 @@ def assembe_and_store():
 
 if __name__ == '__main__':
     agent = ua.random
+    print(agent)
     cf_cookie = acquire_cf_cookie(agent)
     print(cf_cookie)
     res = signin(agent, cf_cookie, EMAIL, PASSWORD)
