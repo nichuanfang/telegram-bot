@@ -60,7 +60,7 @@ def assembe_and_store():
 
 
 if __name__ == '__main__':
-    agent = ua.random
+    agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
     print(agent)
     cf_cookie = acquire_cf_cookie(agent)
     print(cf_cookie)
