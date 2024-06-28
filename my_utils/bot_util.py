@@ -433,13 +433,13 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
             )
     except Exception as e:
         if 'Message is not modified' in e.message:
-            await asyncio.gather(context.bot.delete_message(
-                chat_id=update.message.chat_id, message_id=message_id), update.message.reply_text(
-                text=escaped_text,
-                reply_to_message_id=update.message.message_id,
+            await context.bot.edit_message_text(
+                text=escaped_text+'🔚',
+                chat_id=update.message.chat_id,
+                message_id=message_id,
                 disable_web_page_preview=True,
                 parse_mode=ParseMode.MARKDOWN_V2
-            ))
+            )
         else:
             # 如果格式化错误 就发送到代码分享平台
             response = requests.post(
