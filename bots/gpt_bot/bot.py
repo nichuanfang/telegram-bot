@@ -402,16 +402,16 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         # 如果状态是additional 则追加内联按钮
         if status == 'additional':
-            if curr_answer:
-                try:
+            try:
+                if curr_answer:
                     if curr_answer.startswith('\x1c'):
                         json_data = orjson.loads(curr_answer[1:])
                     else:
                         json_data = orjson.loads(curr_answer)
-                except:
-                    continue
-                infos = json_data[:min(3,len(json_data))]
-                await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=current_message_id,reply_markup=generate_additional_keyboard(infos))
+                    infos = json_data[:min(3,len(json_data))]
+                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=current_message_id,reply_markup=generate_additional_keyboard(infos))
+            except:
+                continue
             continue
         if is_image_generator:
             img_response = requests.get(curr_answer)
