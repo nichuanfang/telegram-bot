@@ -401,7 +401,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     content = ic_result[1]
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         # 如果状态是additional 则追加内联按钮
-        if status == 'additional':
+        if need_notice and status == 'additional':
             try:
                 if curr_answer:
                     if curr_answer.startswith('\x1c'):
@@ -409,7 +409,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                     else:
                         json_data = orjson.loads(curr_answer)
                     infos = json_data[:min(3,len(json_data))]
-                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=current_message_id,reply_markup=generate_additional_keyboard(infos))
+                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=init_message.message_id,reply_markup=generate_additional_keyboard(infos))
             except:
                 continue
             continue
@@ -428,8 +428,8 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         new_content_length = len(new_content)
         if current_message_length + new_content_length > max_message_length:
             if need_notice:
-                await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
                 need_notice = False
+                await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
             continue
         if new_content:
             message_content += new_content
@@ -440,7 +440,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
         response = requests.post(
-            f'{bot_util.HASTE_SERVER_HOST}/documents', data=curr_answer.encode('utf-8'))
+            f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
         if response.status_code == 200:
             result = response.json()
             document_id = result.get('key')
