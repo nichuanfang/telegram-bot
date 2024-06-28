@@ -4,7 +4,6 @@ import base64
 import datetime
 import functools
 import importlib
-import CFSession
 import orjson
 import os
 import re
@@ -249,12 +248,12 @@ def generate_api_key(platform: dict):
             if platform['platform_key'] in temp_config_data and 'openai_api_key' in temp_config_data[platform['platform_key']]:
                 return temp_config_data[platform['platform_key']]
     # 扩展性配置  免费节点的特殊操作
-    # if platform['platform_key'] == 'free_1':
-    #     return generate_code(platform)
-    if platform['platform_key'] == 'free_3':
-        return generate_cf_authorization(platform)
-    elif platform['platform_key'] == 'free_4':
+    if platform['platform_key'] == 'free_4':
         return generate_authorization(platform)
+    # elif platform['platform_key'] == 'free_3':
+    #     return generate_cf_authorization(platform)
+    # elif platform['platform_key'] == 'free_1':
+    #     return generate_code(platform)
 
 
 def generate_code(platform: dict):
@@ -304,46 +303,46 @@ def generate_code(platform: dict):
     return platform
 
 
-def generate_cf_authorization(platform: dict):
-    """ 既要生成认证头 也要生成cf_cookie 还要保存对应的user-agent  open_api_key是个字典
-    Args:
-        platform (_type_):  平台元信息
-    """
-    url = platform['foreign_openai_base_url']
-    # 构建user_agent和cf_clearance   如果状态码是500 跳过
-    with CFSession.cfSession(headless_mode=True) as session:
-        parsed_url = urlparse(url)
-        email = platform['email']
-        password = platform['password']
-        headers = {
-            'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
-            'content-type': 'application/json'
-        }
-        response = session.post(f'{url}/api/v1/auths/signin', json={
-            'email': email,
-            'password': password,
-        }, headers=headers)
-    if response.status_code == 200:
-        json_data = orjson.loads(response.text)
-        token = json_data['token']
-        token_type = json_data['token_type']
-        platform['openai_api_key'] = f'{token_type} {token}'
-        if os.path.exists(TEMP_CONFIG_PATH):
-            with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                old_json_data: dict = orjson.loads(f.read())
-        else:
-            old_json_data = {}
+# def generate_cf_authorization(platform: dict):
+#     """ 既要生成认证头 也要生成cf_cookie 还要保存对应的user-agent  open_api_key是个字典
+#     Args:
+#         platform (_type_):  平台元信息
+#     """
+#     url = platform['foreign_openai_base_url']
+#     # 构建user_agent和cf_clearance   如果状态码是500 跳过
+#     with CFSession.cfSession(headless_mode=True) as session:
+#         parsed_url = urlparse(url)
+#         email = platform['email']
+#         password = platform['password']
+#         headers = {
+#             'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
+#             'content-type': 'application/json'
+#         }
+#         response = session.post(f'{url}/api/v1/auths/signin', json={
+#             'email': email,
+#             'password': password,
+#         }, headers=headers)
+#     if response.status_code == 200:
+#         json_data = orjson.loads(response.text)
+#         token = json_data['token']
+#         token_type = json_data['token_type']
+#         platform['openai_api_key'] = f'{token_type} {token}'
+#         if os.path.exists(TEMP_CONFIG_PATH):
+#             with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+#                 old_json_data: dict = orjson.loads(f.read())
+#         else:
+#             old_json_data = {}
 
-        # 刷新临时配置文件
-        with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-            old_json_data.update({
-                platform['platform_key']:  platform
-            })
-            f.write(orjson.dumps(old_json_data,
-                    option=orjson.OPT_INDENT_2).decode())
-        return platform
-    else:
-        raise RuntimeError('生成free_3的token失败!')
+#         # 刷新临时配置文件
+#         with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+#             old_json_data.update({
+#                 platform['platform_key']:  platform
+#             })
+#             f.write(orjson.dumps(old_json_data,
+#                     option=orjson.OPT_INDENT_2).decode())
+#         return platform
+#     else:
+#         raise RuntimeError('生成free_3的token失败!')
 
 
 def generate_authorization(platform: dict):
