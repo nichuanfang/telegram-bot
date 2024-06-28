@@ -4,7 +4,7 @@ import base64
 import datetime
 import functools
 import importlib
-import traceback
+import CFSession
 import orjson
 import os
 import re
@@ -15,7 +15,6 @@ import uuid
 
 from fake_useragent import UserAgent
 from telegram import Bot, Update
-import telegram
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 from bots.gpt_bot.gpt_platform import Platform
@@ -226,7 +225,7 @@ def auth(func):
                 context.user_data['current_platform'] = instantiate_platform(
                     need_logger=True)
                 context.user_data['candidate_platform'] = instantiate_platform(
-                    'free_2', need_logger=False)
+                    platform_key='free_2', need_logger=False)
                 context.user_data['current_mask'] = platform_default_mask()
                 context.user_data['current_model'] = platform_default_model()
         else:
@@ -252,8 +251,8 @@ def generate_api_key(platform: dict):
     # 扩展性配置  免费节点的特殊操作
     # if platform['platform_key'] == 'free_1':
     #     return generate_code(platform)
-    # if platform['platform_key'] == 'free_3':
-    #     return generate_cf_authorization(platform)
+    if platform['platform_key'] == 'free_3':
+        return generate_cf_authorization(platform)
     elif platform['platform_key'] == 'free_4':
         return generate_authorization(platform)
 
@@ -307,69 +306,56 @@ def generate_code(platform: dict):
 
 def generate_cf_authorization(platform: dict):
     """ 既要生成认证头 也要生成cf_cookie 还要保存对应的user-agent  open_api_key是个字典
-         查询redis cf_cookie是否过期 如果不存在说明不存在或已过期 重新申请一个
     Args:
         platform (_type_):  平台元信息
     """
-    # url = platform['foreign_openai_base_url']
-    # agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.138 Safari/537.36 AVG/112.0.21002.139'
-    # driver = Driver(
-    #     browser="chrome",
-    #     uc=True,
-    #     headless2=True,
-    #     incognito=True,
-    #     agent=agent,
-    #     do_not_track=True,
-    #     undetectable=True
-    # )
-    # driver.get(url)
-    # time.sleep(3)
-    # cookies = driver.get_cookies()
-    # driver.quit()
+    url = platform['foreign_openai_base_url']
+    # 构建user_agent和cf_clearance   如果状态码是500 跳过
+    with CFSession.cfSession() as session:
+        session.get(url)
+        user_agent = session.session.headers.get('user-agent')
+        cf_clearance = session.session.cookies.get('cf_clearance')
+    if not user_agent or not cf_clearance:
+        raise Exception('构建cf_cookie失败!')
 
-    # # 判断redis中是否存在
-    # parsed_url = urlparse(url)
-    # email = platform['email']
-    # password = platform['password']
-    # user_agent = agent
-    # cf_cookie = cookies[0]["value"] if cookies else ''
-    # logger.info(f'已获取到cf_cookie: {cf_cookie}')
-    # headers = {
-    #     'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
-    #     'user-agent': user_agent,
-    #     "Cookie": f'cf_clearance={cf_cookie}',
-    #     'content-type': 'application/json'
-    # }
-    # response = requests.post(f'{url}/api/v1/auths/signin', json={
-    #     'email': email,
-    #     'password': password,
-    # }, headers=headers)
-    # if response.status_code == 200:
-    #     json_data = orjson.loads(response.text)
-    #     token = json_data['token']
-    #     token_type = json_data['token_type']
-    #     platform['openai_api_key'] = {
-    #         'user_agent': user_agent,
-    #         'cf_clearance': cf_cookie,
-    #         'api_key': f'{token_type} {token}'
-    #     }
-    #     if os.path.exists(TEMP_CONFIG_PATH):
-    #         with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-    #             old_json_data: dict = orjson.loads(f.read())
-    #     else:
-    #         old_json_data = {}
+    parsed_url = urlparse(url)
+    email = platform['email']
+    password = platform['password']
+    headers = {
+        'origin': f'{parsed_url.scheme}://{parsed_url.netloc}',
+        'user-agent': user_agent,
+        "Cookie": f'cf_clearance={cf_clearance}',
+        'content-type': 'application/json'
+    }
+    response = requests.post(f'{url}/api/v1/auths/signin', json={
+        'email': email,
+        'password': password,
+    }, headers=headers)
+    if response.status_code == 200:
+        json_data = orjson.loads(response.text)
+        token = json_data['token']
+        token_type = json_data['token_type']
+        platform['openai_api_key'] = {
+            'user_agent': user_agent,
+            'cf_clearance': cf_clearance,
+            'api_key': f'{token_type} {token}'
+        }
+        if os.path.exists(TEMP_CONFIG_PATH):
+            with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+                old_json_data: dict = orjson.loads(f.read())
+        else:
+            old_json_data = {}
 
-    #     # 刷新临时配置文件
-    #     with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-    #         old_json_data.update({
-    #             platform['platform_key']:  platform
-    #         })
-    #         f.write(orjson.dumps(old_json_data,
-    #                 option=orjson.OPT_INDENT_2).decode())
-    #     return platform
-    # else:
-    #     raise RuntimeError('生成free_3的token失败!')
-    pass
+        # 刷新临时配置文件
+        with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+            old_json_data.update({
+                platform['platform_key']:  platform
+            })
+            f.write(orjson.dumps(old_json_data,
+                    option=orjson.OPT_INDENT_2).decode())
+        return platform
+    else:
+        raise RuntimeError('生成free_3的token失败!')
 
 
 def generate_authorization(platform: dict):

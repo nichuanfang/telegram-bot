@@ -8,6 +8,7 @@ from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
 import orjson
+import CFSession
 
 ua = FakeUserAgent(browsers='chrome')
 
@@ -59,11 +60,11 @@ class Free_3(Platform):
         # 当前模型
         current_model = context.user_data['current_model']
         # answer = ''
-        # if current_model == 'gpt-4o':
-        #     async for status, item in self.gpt_4o_complete(stream, new_messages, **kwargs):
-        #         answer = item
-        #         yield status, item
-        if current_model == 'LLaMA':
+        if current_model == 'gpt-4o':
+            async for status, item in self.gpt_4o_complete(stream, new_messages, **kwargs):
+                answer = item
+                yield status, item
+        elif current_model == 'LLaMA':
             # 尝试deepinfra和deepai
             async for status, item in self.llama_complete(stream, new_messages):
                 answer = item
