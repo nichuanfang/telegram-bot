@@ -14,7 +14,6 @@ import numpy as np
 
 import regex
 import requests
-import telegram.helpers
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler, ContextTypes, CallbackContext, CommandHandler, CallbackQueryHandler, filters
@@ -411,9 +410,8 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             continue
         if new_content:
             message_content += new_content
-            if message_content != prev_answer:
-                await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
-                current_message_length += new_content_length
+            current_message_length += new_content_length
+        await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
         await asyncio.sleep(0.02)
         prev_answer = curr_answer
     if not need_notice:
