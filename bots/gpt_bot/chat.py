@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures import thread
 import traceback
 from typing import List
 from my_utils import my_logging

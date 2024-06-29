@@ -12,7 +12,6 @@ aligo==6.2.4
 openai==1.35.3
 regex==2024.5.15
 opencv-python-headless==4.10.0.84
-pillow==10.3.0
 redis==5.0.6
 pandas==2.2.2
 chardet==5.2.0

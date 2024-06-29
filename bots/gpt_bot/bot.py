@@ -2,21 +2,18 @@ import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
-import io
+import aiohttp
 import orjson
-import json
 import mimetypes
-from PIL import Image
 import os
 import re
 import traceback
 import cv2
 import numpy as np
-import chardet
 
 import regex
 import requests
-from telegram import Bot, File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
@@ -142,17 +139,9 @@ async def handle_photo_download(update: Update, context: CallbackContext):
 
     photo_file: File = await context.bot.get_file(photo.file_id)
     image_data = await photo_file.download_as_bytearray()
-
     if not image_data:
         raise ValueError("Empty image data received.")
-
-    # 将图片转换为 WebP 格式
-    image = Image.open(io.BytesIO(image_data))
-    webp_io = io.BytesIO()
-    image.save(webp_io, format='WEBP')
-    webp_data = webp_io.getvalue()
-
-    return base64.b64encode(webp_data).decode("utf-8")
+    return base64.b64encode(image_data).decode("utf-8")
 
 
 async def handle_photo(update: Update, context: CallbackContext):
@@ -175,7 +164,7 @@ async def handle_photo(update: Update, context: CallbackContext):
         if caption_result:
             content.append(caption_result)
         if image_base64:
-            content.append(f'data:image/webp;base64,{image_base64}')
+            content.append(f'data:image/jpeg;base64,{image_base64}')
     else:
         if caption_result:
             content.append({'type': 'text', 'text': caption_result})
@@ -184,7 +173,7 @@ async def handle_photo(update: Update, context: CallbackContext):
             content.append({
                 'type': 'image_url',
                 'image_url': {
-                    'url': f'data:image/webp;base64,{image_base64}'
+                    'url': f'data:image/jpeg;base64,{image_base64}'
                 }
             })
     return content
@@ -252,22 +241,21 @@ async def analyse_video(update: Update, context: CallbackContext):
     key_frames = process_video(video_path)
     # Save key frames
     for _, frame in key_frames:
-        mime_type = 'image/webp'
-        _, buffer = cv2.imencode('.webp', frame)
+        _, buffer = cv2.imencode('.jpg', frame)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
-        if platform.name == 'free_4':
-            content.append(f'data:{mime_type};base64,{image_base64}')
+        if is_free_4:
+            content.append(f'data:image/jpeg;base64,{image_base64}')
         else:
             content.append({
                 'type': 'image_url',
                 'image_url': {
-                    'url': f'data:{mime_type};base64,{image_base64}'
+                    'url': f'data:image/jpeg;base64,{image_base64}'
                 }
             })
     # Clean up
     os.remove(video_path)
     if is_free_4:
-        content.append('视频关键帧结束,请提供整个视频的综合分析')
+        content.append('视频关键帧结束,请根据以上视频关键帧提供整个视频的综合分析')
     else:
         content.append({
             'type': 'text',
@@ -275,7 +263,7 @@ async def analyse_video(update: Update, context: CallbackContext):
         })
         content.append({
             'type': 'text',
-            'text': '请提供整个视频的综合分析'
+            'text': '请根据以上视频关键帧提供整个视频的综合分析'
         })
     return content
 
@@ -396,10 +384,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     message_content = ''
     need_notice = True
     gpt_platform: Platform = context.user_data['current_platform']
-    ic_result = await asyncio.gather(init_message_task, content_task)
-    init_message: Message = ic_result[0]
-    current_message_id = init_message.message_id
-    content = ic_result[1]
+    init_message, content = await asyncio.gather(init_message_task, content_task)
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         # 如果状态是additional 则追加内联按钮
         if status == 'additional' and need_notice:
@@ -419,7 +404,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             if img_response.content:
                 await asyncio.gather(
                     bot_util.edit_message(
-                        update, context, current_message_id, True, '图片生成成功! 正在发送...'),
+                        update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
                     update.message.reply_photo(photo=img_response.content,
                                                reply_to_message_id=update.effective_message.message_id))
             continue
@@ -435,21 +420,22 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         if new_content:
             message_content += new_content
             current_message_length += new_content_length
-        await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
+        await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
         # await asyncio.sleep(0.02)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
-        response = requests.post(
-            f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
-        if response.status_code == 200:
-            result = response.json()
-            document_id = result.get('key')
-            if document_id:
-                document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
-                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
-            else:
-                await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(
+                f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
+            if response.status == 200:
+                result = await response.json()
+                document_id = result.get('key')
+                if document_id:
+                    document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
+                    await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
+                else:
+                    await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, **openai_completion_options):
@@ -491,7 +477,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
     logger.error(
         f"==================================================ERROR END====================================================================")
     error_message = str(e)
-    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500]:
+    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500, 502]:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
             # free_3/4    可能授权码/认证信息失效了
@@ -515,7 +501,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
                 await answer(update, context)
                 return
             except:
-                raise Exception('free_4认证失败!')
+                raise Exception('平台认证失败!')
         else:
             init_text = ''
     elif '上游负载已饱和' in error_message:
