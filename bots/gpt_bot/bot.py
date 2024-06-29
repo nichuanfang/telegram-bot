@@ -2,7 +2,6 @@ import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
-import aiohttp
 import orjson
 import mimetypes
 import os
@@ -416,26 +415,28 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             if need_notice:
                 need_notice = False
                 await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
+            current_message_length += new_content_length
+            prev_answer = curr_answer
             continue
         if new_content:
             message_content += new_content
             current_message_length += new_content_length
+
         await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
         # await asyncio.sleep(0.02)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
-        async with aiohttp.ClientSession() as session:
-            response = await session.post(
-                f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
-            if response.status == 200:
-                result = await response.json()
-                document_id = result.get('key')
-                if document_id:
-                    document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
-                    await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
-                else:
-                    await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
+        response = requests.post(
+            f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
+        if response.status_code == 200:
+            result = response.json()
+            document_id = result.get('key')
+            if document_id:
+                document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
+                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
+            else:
+                await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, **openai_completion_options):
@@ -476,8 +477,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
     traceback.print_exc()
     logger.error(
         f"==================================================ERROR END====================================================================")
-    error_message = str(e)
-    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500, 502]:
+    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500]:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
             # free_3/4    可能授权码/认证信息失效了
@@ -497,23 +497,12 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
             try:
                 init_message: Message = await init_message_task
                 # 更改初始化消息
-                await context.bot.edit_message_text('认证信息已刷新!', init_message.chat_id, init_message.message_id)
-                await answer(update, context)
+                await context.bot.edit_message_text('认证信息已刷新!请重新提问', init_message.chat_id, init_message.message_id)
                 return
             except:
                 raise Exception('平台认证失败!')
         else:
             init_text = ''
-    elif '上游负载已饱和' in error_message:
-        current_platform: Platform = context.user_data['current_platform']
-        current_platform.chat.clear_messages(context)
-        init_text = '已达到token上限'
-    elif 'at byte offset' in error_message:
-        init_text = '缺少结束标记!\n\n'
-    elif 'content_filter' in error_message:
-        init_text = '内容被过滤!\n\n'
-    elif '504 Gateway Time-out' in error_message:
-        init_text = '网关超时!\n\n'
     else:
         init_text = ''
     text = init_text + str(e)
