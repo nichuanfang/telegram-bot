@@ -415,6 +415,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             if need_notice:
                 need_notice = False
                 await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
+            current_message_length += new_content_length
             prev_answer = curr_answer
             continue
         if new_content:
