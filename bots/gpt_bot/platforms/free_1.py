@@ -6,8 +6,6 @@ from bots.gpt_bot.gpt_platform import gpt_platform
 @gpt_platform
 class Free_1(Platform):
 
-    # 1号池子比较特殊  需要配合base64密钥爬虫获取授权码 重写`completion`方法
-
     async def query_balance(self):
         """
         查询余额

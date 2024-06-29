@@ -55,58 +55,6 @@
   "free_1": {
     "name": "免费_1",
     "platform_key": "free_1",
-    "domestic_openai_base_url": "https://api.chatanywhere.tech/v1",
-    "foreign_openai_base_url": "https://api.chatanywhere.cn/v1",
-    "index_url": "https://github.com/chatanywhere/GPT_API_free",
-    "payment_url": "https://github.com/chatanywhere/GPT_API_free",
-    "openai_api_key": "",
-    "supported_masks": [
-      "common",
-      "compressed",
-      "github_copilot",
-      "song_recommender",
-      "movie_expert",
-      "travel_guide",
-      "doctor"
-    ],
-    "supported_models": [
-      "gpt-3.5-turbo",
-      "gpt-4o"
-    ],
-    "mask_model_mapping": {
-      "common": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "compressed": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "github_copilot": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "travel_guide": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "song_recommender": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "movie_expert": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ],
-      "doctor": [
-        "gpt-3.5-turbo",
-        "gpt-4o"
-      ]
-    }
-  },
-  "free_2": {
-    "name": "免费_2",
-    "platform_key": "free_2",
     "domestic_openai_base_url": "https://free.gpt.ge/v1",
     "foreign_openai_base_url": "https://free.gpt.ge/v1",
     "index_url": "https://api.gpt.ge/panel",
@@ -156,9 +104,9 @@
       ]
     }
   },
-  "free_3": {
-    "name": "免费_3",
-    "platform_key": "free_3",
+  "free_2": {
+    "name": "免费_2",
+    "platform_key": "free_2",
     "domestic_openai_base_url": "https://deepai.org/",
     "foreign_openai_base_url": "https://deepai.org/",
     "index_url": "https://deepai.org/",
@@ -197,6 +145,78 @@
       ],
       "doctor": [
         "LLaMA"
+      ]
+    }
+  },
+  "free_3": {
+    "name": "免费_3",
+    "platform_key": "free_1",
+    "domestic_openai_base_url": "https://oi.sorapi.dev",
+    "foreign_openai_base_url": "https://oi.sorapi.dev",
+    "index_url": "https://oi.sorapi.dev",
+    "payment_url": "https://oi.sorapi.dev",
+    "email": "",
+    "password": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor",
+      "wechat_bf",
+      "daily_chat"
+    ],
+    "supported_models": [
+      "gpt-4o",
+      "gemini-1.5-pro-latest",
+      "llama3-70b-8192"
+    ],
+    "mask_model_mapping": {
+      "common": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "compressed": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "github_copilot": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest"
+      ],
+      "travel_guide": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "song_recommender": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "movie_expert": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "doctor": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "wechat_bf": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
+      ],
+      "daily_chat": [
+        "gpt-4o",
+        "gemini-1.5-pro-latest",
+        "llama3-70b-8192"
       ]
     }
   },

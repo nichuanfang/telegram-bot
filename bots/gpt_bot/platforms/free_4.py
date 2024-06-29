@@ -53,7 +53,6 @@ class Free_4(Platform):
         json_data = {
             'stream': True,
             'messages': messages,
-            'citations': False,
             'model': 'gpt-3.5-turbo'
         }
         headers.update({
@@ -106,7 +105,6 @@ class Free_4(Platform):
             json_data = {
                 'stream': True,
                 'messages': new_messages,
-                'citations': False,
                 **kwargs
             }
             headers.update({
