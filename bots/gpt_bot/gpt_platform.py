@@ -203,9 +203,15 @@ class Platform(metaclass=ABCMeta):
 
     async def summary(self, content: dict, prompt: str):
         """ 提取摘要 """
-        res = await self.chat.openai_client.chat.completions.create(**{
-            "messages": [{'role': 'system', 'content': prompt}, content],
-            "model": "gpt-3.5-turbo-16k",
-            "stream": False
-        })
-        return res.choices[0].message.content
+        try:
+            res = await self.chat.openai_client.chat.completions.create(**{
+                "messages": [
+                    {'role': 'system', 'content': prompt},
+                    {'role': 'user', 'content': content['content']}
+                ],
+                "model": "gpt-3.5-turbo-16k",
+                "stream": False
+            })
+            return res.choices[0].message.content
+        except:
+            return content['content']

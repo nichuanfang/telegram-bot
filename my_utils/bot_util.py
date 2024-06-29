@@ -385,7 +385,7 @@ def generate_authorization(platform: dict):
                     option=orjson.OPT_INDENT_2).decode())
         return platform
     else:
-        return None
+        raise Exception('刷新认证信息失败!')
 
 # =====================================消息相关====================================
 
@@ -415,15 +415,25 @@ async def edit_message(update: Update, context: CallbackContext, message_id, str
     try:
         # 等流式响应完全结束再尝试markdown格式 加快速度
         if stream_ended:
-            # 如果格式话前的文本和之后的文本一模一样
-            escaped_text = escape_markdown_v2(text)
-            await context.bot.edit_message_text(
-                text=escaped_text,
-                chat_id=update.message.chat_id,
-                message_id=message_id,
-                disable_web_page_preview=True,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            if text:
+                # 如果格式话前的文本和之后的文本一模一样
+                escaped_text = escape_markdown_v2(text)
+                await context.bot.edit_message_text(
+                    text=escaped_text,
+                    chat_id=update.message.chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+            else:
+                await context.bot.edit_message_text(
+                    text='Empty  Content!',
+                    chat_id=update.message.chat_id,
+                    message_id=message_id,
+                    disable_web_page_preview=True
+                )
+                context.user_data['current_platform'].chat.clear_messages(
+                    context)
         else:
             await context.bot.edit_message_text(
                 text=text,

@@ -122,20 +122,11 @@ class Temque:
 
     async def process_history_message(self, core: List[dict], context: CallbackContext):
         for index, item in enumerate(core):
-            if len(item) < 1000:
+            if len(item['obj']['content']) < 1000:
                 continue
             # 每一个消息都需要重试
-            retries = 0
-            while retries < SUMMARY_MAX_RETRIES:
-                try:
-                    asyncio.create_task(self.summary(
-                        context, index, item['obj']))
-                except Exception as e:
-                    logger.error(
-                        f"处理项目时发生错误：{item}。错误信息：{e}"
-                    )
-                    # 三种优雅的处理方式：日志记录、降级、重试
-                    retries += 1
+            asyncio.create_task(self.summary(
+                context, index, item['obj']))
 
     async def summary(self, context: CallbackContext,  index: int, message: dict):
         """生成摘要
@@ -155,7 +146,11 @@ class Temque:
             traceback.print_exc()
             raise RuntimeError(f'生成摘要失败: \n{e}')
         # 更新生成的摘要信息
-        self.core[index] = summary_content
+        message['content'] = summary_content
+        try:
+            self.core[index]['obj'] = message
+        except:
+            pass
 
 
 async def coroutine_wrapper(normal_function, *args, **kwargs):

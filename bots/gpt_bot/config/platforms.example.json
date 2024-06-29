@@ -158,15 +158,7 @@
     "email": "",
     "password": "",
     "supported_masks": [
-      "common",
-      "compressed",
-      "github_copilot",
-      "song_recommender",
-      "movie_expert",
-      "travel_guide",
-      "doctor",
-      "wechat_bf",
-      "daily_chat"
+      "special"
     ],
     "supported_models": [
       "gpt-4o",
@@ -174,46 +166,7 @@
       "llama3-70b-8192"
     ],
     "mask_model_mapping": {
-      "common": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "compressed": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "github_copilot": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest"
-      ],
-      "travel_guide": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "song_recommender": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "movie_expert": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "doctor": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "wechat_bf": [
-        "gpt-4o",
-        "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
-      ],
-      "daily_chat": [
+      "special": [
         "gpt-4o",
         "gemini-1.5-pro-latest",
         "llama3-70b-8192"

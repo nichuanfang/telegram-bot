@@ -14,18 +14,6 @@ pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
 logger = get_logger('free_3')
 
-headers = {
-    'accept': '*/*',
-    'accept-language': 'zh-CN,zh-TW;q=0.9,zh;q=0.8,en;q=0.7,ja;q=0.6',
-    'priority': 'u=1, i',
-    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
-}
-
 
 @gpt_platform
 class Free_3(Platform):
@@ -41,19 +29,20 @@ class Free_3(Platform):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
         answer = ''
-        if stream:
-            json_data = {
-                'stream': True,
-                'messages': new_messages,
-                **kwargs
-            }
-            headers.update({
-                'origin': self.foreign_openai_base_url,
-                'user-agent': ua.random,
-                'authorization': self.openai_api_key
-            })
-
-            async with aiohttp.ClientSession() as session:
+        try:
+            session = aiohttp.ClientSession()
+            if stream:
+                json_data = {
+                    'stream': True,
+                    'messages': new_messages,
+                    'max_tokens': 16000,
+                    'model': kwargs['model']
+                }
+                headers = {
+                    'origin': self.foreign_openai_base_url,
+                    'user-agent': ua.random,
+                    'authorization': self.openai_api_key
+                }
                 async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
                     answer_parts = []
@@ -89,26 +78,65 @@ class Free_3(Platform):
                         buffer.clear()
                         if incomplete_line:
                             buffer.extend(incomplete_line.encode())
-        else:
-            json_data = {
-                'stream': False,
-                'messages': new_messages,
-                'citations': False,
-                **kwargs
-            }
-            headers.update({
-                'origin': self.foreign_openai_base_url,
-                'user-agent': ua.random,
-                'content-type': 'application/json',
-                'authorization': self.openai_api_key
-            })
-            async with aiohttp.ClientSession() as session:
+            else:
+                json_data = {
+                    'stream': False,
+                    'messages': new_messages,
+                    'max_tokens': 16000,
+                    'model': kwargs['model']
+                }
+                headers = {
+                    'origin': self.foreign_openai_base_url,
+                    'user-agent': ua.random,
+                    'authorization': self.openai_api_key
+                }
                 async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
-                    completion = await response.json()
-                    answer = completion[
-                        'choices'][0]['message']['content']
+                    completion = await response.text()
+                    result = []
+                    for line in completion.splitlines():
+                        if line or line != 'data: [DONE]':
+                            delta = orjson.loads(line[6:])[
+                                'choices'][0]['delta']
+                            if delta:
+                                result.append(delta['content'])
+                    answer = ''.join(result)
                     yield answer
+        finally:
+            if session:
+                await session.close()
         await self.chat.append_messages(
             answer, context, *messages)
 
+    async def summary(self, content: dict, prompt: str):
+        new_messages = [{'role': 'system', 'content': prompt}, content]
+        json_data = {
+            'stream': True,
+            'messages': new_messages,
+            'max_tokens': 16000,
+            'model': 'gpt-4o'
+        }
+        headers = {
+            'origin': self.foreign_openai_base_url,
+            'user-agent': ua.random,
+            'authorization': self.openai_api_key
+        }
+        try:
+            session = aiohttp.ClientSession()
+            async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                response.raise_for_status()  # 检查请求是否成功
+                completion = await response.text()
+                result = []
+                for line in completion.splitlines():
+                    if line or line != 'data: [DONE]':
+                        try:
+                            delta = orjson.loads(line[6:])[
+                                'choices'][0]['delta']
+                        except:
+                            continue
+                        if delta:
+                            result.append(delta['content'])
+                return ''.join(result)
+        finally:
+            if session:
+                await session.close()

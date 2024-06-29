@@ -172,8 +172,8 @@ class Free_2(Platform):
             "User-Agent": agent,
             "X-Deepinfra-Source": "web-page"
         }
-
-        async with aiohttp.ClientSession() as session:
+        try:
+            session = aiohttp.ClientSession()
             answer = ''
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
@@ -210,6 +210,9 @@ class Free_2(Platform):
                     buffer.clear()
                     if incomplete_line:
                         buffer.extend(incomplete_line.encode())
+        finally:
+            if session:
+                await session.close()
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list):
@@ -237,7 +240,8 @@ class Free_2(Platform):
             "api-key": token,
             "User-Agent": agent,
         }
-        async with aiohttp.ClientSession() as session:
+        try:
+            session = aiohttp.ClientSession()
             answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
@@ -251,8 +255,8 @@ class Free_2(Platform):
                             other_parts.append(chunk)
                             continue
                         if chunk.find('')!=-1:
-                              # 分割内容 主体消息已结束
-                            splits = chunk.split('')
+                                  # 分割内容 主体消息已结束
+                            splits = chunk.split('')   
                             # 属于主体内容
                             part_one = splits[0]
                             answer_parts.append(part_one)
@@ -273,7 +277,29 @@ class Free_2(Platform):
                     yield 'finished', answer
                 else:
                     yield 'additional', ''.join(other_parts)
+        finally:
+            if session:
+                await session.close()
     # =========================================gemini-1.5-flash-latest===========================================
 
     async def gemini_complete(self, stream: bool, *new_messages):
         yield
+        
+    async def summary(self, content: dict, prompt: str):
+        """ 利用deepai生成摘要 """
+        new_messages = [{'role': 'system', 'content': prompt}, content]
+        payload = {
+            "chat_style": "chat",
+            "chatHistory": orjson.dumps(new_messages).decode()}
+        agent = ua.random
+        generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
+        token = generateToken(agent)
+        headers = {
+            "api-key": token,
+            "User-Agent": agent,
+        }
+        async with aiohttp.ClientSession() as session:
+            res = await session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY)
+            res = await res.text()
+            return res
+
