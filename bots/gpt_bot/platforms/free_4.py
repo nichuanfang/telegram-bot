@@ -151,8 +151,6 @@ class Free_4(Platform):
                         buffer.clear()
                         if incomplete_line:
                             buffer.extend(incomplete_line.encode())
-            await self.chat.append_messages(answer, context, *messages)
-
         else:
             json_data = {
                 'stream': False,

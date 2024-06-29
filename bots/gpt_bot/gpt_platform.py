@@ -132,9 +132,11 @@ class Platform(metaclass=ABCMeta):
                 "stream": True,
                 **kwargs
             })
+            result = []
             async for chunk_iter in completion:
                 if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
-                    answer += chunk
+                    result.append(chunk)
+                    answer = ''.join(result)
                     yield 'not_finished', answer
             yield 'finished', answer
         else:

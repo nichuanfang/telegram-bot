@@ -379,13 +379,14 @@ async def handle_text(update):
     return content_text
 
 
-def  generate_additional_keyboard(infos):
+def generate_additional_keyboard(infos):
     keyboard = []
     row = []
     for info in infos:
-        row.append(InlineKeyboardButton(text=info['title'],url=info['url']))
+        row.append(InlineKeyboardButton(text=info['title'], url=info['url']))
     keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
+
 
 async def handle_stream_response(update: Update, context: CallbackContext, content_task, is_image_generator: bool,
                                  init_message_task, **openai_completion_options):
@@ -401,15 +402,15 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     content = ic_result[1]
     async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
         # 如果状态是additional 则追加内联按钮
-        if need_notice and status == 'additional':
+        if status == 'additional' and need_notice:
             try:
                 if curr_answer:
                     if curr_answer.startswith('\x1c'):
                         json_data = orjson.loads(curr_answer[1:])
                     else:
                         json_data = orjson.loads(curr_answer)
-                    infos = json_data[:min(3,len(json_data))]
-                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id,message_id=init_message.message_id,reply_markup=generate_additional_keyboard(infos))
+                    infos = json_data[:min(3, len(json_data))]
+                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id, message_id=init_message.message_id, reply_markup=generate_additional_keyboard(infos))
             except:
                 continue
             continue
@@ -435,7 +436,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             message_content += new_content
             current_message_length += new_content_length
         await bot_util.edit_message(update, context, current_message_id, status == 'finished', message_content)
-        await asyncio.sleep(0.02)
+        # await asyncio.sleep(0.02)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
