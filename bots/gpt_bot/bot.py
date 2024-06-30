@@ -477,7 +477,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
     traceback.print_exc()
     logger.error(
         f"==================================================ERROR END====================================================================")
-    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500]:
+    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500, 502]:
         current_platform: Platform = context.user_data['current_platform']
         if current_platform.name.startswith('free'):
             # free_3/4    可能授权码/认证信息失效了
