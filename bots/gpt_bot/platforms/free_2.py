@@ -172,8 +172,8 @@ class Free_2(Platform):
             "User-Agent": agent,
             "X-Deepinfra-Source": "web-page"
         }
+        session = aiohttp.ClientSession()
         try:
-            session = aiohttp.ClientSession()
             answer = ''
             async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
@@ -240,8 +240,8 @@ class Free_2(Platform):
             "api-key": token,
             "User-Agent": agent,
         }
+        session = aiohttp.ClientSession()
         try:
-            session = aiohttp.ClientSession()
             answer = ''
             async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
@@ -261,8 +261,8 @@ class Free_2(Platform):
                             part_one = splits[0]
                             answer_parts.append(part_one)
                             answer = ''.join(answer_parts)
-                            yield 'finished', answer
                             is_finished = True
+                            yield 'finished', answer
                             # 属于附加内容 
                             part_two = splits[1]
                             other_parts.append(part_two)
