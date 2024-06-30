@@ -9,7 +9,7 @@ from telegram.ext import CallbackContext
 import orjson
 from my_utils.my_logging import get_logger
 
-ua = UserAgent()
+ua = UserAgent(browsers="chrome")
 pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
 logger = get_logger('free_3')
@@ -41,7 +41,7 @@ class Free_3(Platform):
                 headers = {
                     'origin': self.foreign_openai_base_url,
                     'user-agent': ua.random,
-                    'authorization': self.openai_api_key
+                    'authorization': self.openai_api_key,
                 }
                 async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                     response.raise_for_status()  # 检查请求是否成功
