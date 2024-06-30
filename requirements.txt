@@ -10,6 +10,7 @@ lxml==5.2.2
 tmdbv3api==1.9.0
 aligo==6.2.4
 openai==1.35.3
+tiktoken==0.7.0
 regex==2024.5.15
 opencv-python-headless==4.10.0.84
 redis==5.0.6
