@@ -50,8 +50,8 @@ class Free_4(Platform):
             'authorization': self.openai_api_key
         }
         answer = ''
+        session = aiohttp.ClientSession()
         try:
-            session = aiohttp.ClientSession()
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 answer_parts = []
@@ -94,13 +94,12 @@ class Free_4(Platform):
         new_messages, kwargs = self.chat.combine_messages(
             *messages, **kwargs)
         answer = ''
+        session = aiohttp.ClientSession()
         try:
-            session = aiohttp.ClientSession()
             if stream:
                 json_data = {
                     'stream': True,
                     'messages': new_messages,
-                    'max_tokens': 16000,
                     **kwargs
                 }
                 headers = {
@@ -112,6 +111,7 @@ class Free_4(Platform):
                     response.raise_for_status()  # 检查请求是否成功
                     answer_parts = []
                     buffer = bytearray()
+                    is_finished = False
                     incomplete_line = ''
                     async for item in response.content.iter_any():
                         # 将每个字节流写入缓冲区
@@ -124,6 +124,7 @@ class Free_4(Platform):
                         for line in lines:
                             if line:
                                 if '[DONE]' in line:
+                                    is_finished = True
                                     yield 'finished', answer
                                     break
                                 else:
@@ -143,11 +144,12 @@ class Free_4(Platform):
                         buffer.clear()
                         if incomplete_line:
                             buffer.extend(incomplete_line.encode())
+                    if not is_finished:
+                        yield 'finished', answer
             else:
                 json_data = {
                     'stream': False,
                     'messages': new_messages,
-                    'max_tokens': 16000,
                     **kwargs
                 }
                 headers = {
@@ -172,7 +174,6 @@ class Free_4(Platform):
         json_data = {
             'stream': True,
             'messages': new_messages,
-            'max_tokens': 16000,
             'model': 'gpt-4o'
         }
         headers = {
@@ -180,8 +181,8 @@ class Free_4(Platform):
             'user-agent': ua.random,
             'authorization': self.openai_api_key
         }
+        session = aiohttp.ClientSession()
         try:
-            session = aiohttp.ClientSession()
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 completion = await response.text()
