@@ -366,9 +366,10 @@ async def handle_code_url(update: Update, code_id):
         flag = (is_code_block and (index % 2 == 0)) or (
             not is_code_block and (index % 2 != 0))
         if flag:
-            # 代码块
             language, code = code_util.compress_code(part)
-            content.append(f'```{language}\n{code}\n```')
+            # 代码块
+            content.append(
+                f'```{language}\n{code}\n```')
         else:
             # 非代码块
             content.append(f'{compress_question(part)}')
