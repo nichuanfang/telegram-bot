@@ -1,5 +1,6 @@
 # 平台接口
 import asyncio
+import aiohttp
 import orjson
 import os.path
 from abc import ABCMeta
@@ -89,7 +90,7 @@ class Platform(metaclass=ABCMeta):
         module = cls.__module__
         return os.path.basename(module.rsplit('.', 1)[1])
 
-    async def async_request(self, content='',  context=None, **kwargs):
+    async def async_request(self, content='',  context=None, session: aiohttp.ClientSession = None, **kwargs):
         """
         非流式响应的请求逻辑
         @param content: 请求的内容
@@ -101,13 +102,13 @@ class Platform(metaclass=ABCMeta):
         if kwargs.get('model') == "dall-e-3":
             messages = await messages_task
             # 需要生成图像
-            yield await self.generate_image(messages)
+            yield await self.generate_image(messages, session)
         else:
             messages = await messages_task
-            async for answer in self.completion(False, context, * messages, **kwargs):
+            async for answer in self.completion(False, context, session, * messages, **kwargs):
                 yield answer
 
-    async def async_stream_request(self, content='', context=None,  **kwargs):
+    async def async_stream_request(self, content='', context=None, session: aiohttp.ClientSession = None, **kwargs):
         """
         流式响应的请求逻辑
         @param content:  请求内容
@@ -116,13 +117,13 @@ class Platform(metaclass=ABCMeta):
         """
         messages = await self.prepare_messages(content)
         if kwargs.get('model') == "dall-e-3":
-            answer = await self.generate_image(messages)
+            answer = await self.generate_image(messages, session)
             yield 'finished', answer
         else:
-            async for status, answer in self.completion(True, context, * messages, **kwargs):
+            async for status, answer in self.completion(True, context, session, * messages, **kwargs):
                 yield status, answer
 
-    async def completion(self, stream: bool,  context, *messages, **kwargs):
+    async def completion(self, stream: bool,  context, session: aiohttp.ClientSession, *messages, **kwargs):
         # 默认的提问方法
         new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
         answer = ''
@@ -164,7 +165,7 @@ class Platform(metaclass=ABCMeta):
         # 如果类型是视频 这里需要对视频进行处理
         return [{"role": "user", "content": content}]
 
-    async def generate_image(self, messages: list):
+    async def generate_image(self, messages: list, session: aiohttp.ClientSession):
         # 生成图片
         generate_res = await self.chat.openai_client.images.generate(**{
             "prompt": messages[0]['content'],
