@@ -163,13 +163,13 @@
     "supported_models": [
       "gpt-4o",
       "gemini-1.5-pro-latest",
-      "llama3-70b-8192"
+      "Llama3-Chinese-8B-Instruct"
     ],
     "mask_model_mapping": {
       "special": [
         "gpt-4o",
         "gemini-1.5-pro-latest",
-        "llama3-70b-8192"
+        "Llama3-Chinese-8B-Instruct"
       ]
     }
   },
