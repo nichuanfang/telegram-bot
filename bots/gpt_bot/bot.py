@@ -18,7 +18,7 @@ from telegram.constants import ParseMode
 from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
 
 from bots.gpt_bot.gpt_platform import Platform
-from my_utils import my_logging, bot_util
+from my_utils import code_util, my_logging, bot_util, tiktoken_util
 from my_utils.bot_util import auth, instantiate_platform, migrate_platform
 from my_utils.document_util import DocumentHandler
 
@@ -354,7 +354,23 @@ async def handle_code_url(update: Update, code_id):
     if response.status_code != 200 or len(response.text) == 0:
         raise ValueError(
             f'Your question url is Invalid.')
-    return compress_question(response.text)
+    # 将代码文本内容划分开 代码部分和提问部分是不同的 按顺序的 分隔符是 ```
+    content = []
+    splits = list(filter(None, response.text.split('```\n')))
+    if not splits:
+        raise RuntimeError('内容为空!')
+    # 判断第一个非空元素是否为代码块 不用每次都判断 如果是 则奇数都是代码块; 否则偶数部分为代码块
+    is_code_block = code_util.is_code_block(splits[0])
+    for index, part in enumerate(splits):
+        flag = (is_code_block and (index % 2 == 0)) or (
+            not is_code_block and (index % 2 != 0))
+        if flag:
+            # 代码块
+            content.append(f'```\n{code_util.compress_code(part)}\n```')
+        else:
+            # 非代码块
+            content.append(compress_question(part))
+    return content
 
 
 async def handle_text(update):
@@ -486,21 +502,24 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
             with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
                 json_data: dict = orjson.loads(f.read())
                 if current_platform.name in json_data:
-                    json_data[current_platform.name].pop('openai_api_key')
+                    if 'openai_api_key' in json_data[current_platform.name]:
+                        json_data[current_platform.name].pop('openai_api_key')
             if json_data:
                 with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
                     f.write(orjson.dumps(
                         json_data,  option=orjson.OPT_INDENT_2).decode())
                     # 刷新token成功!
-            context.user_data['current_platform'] = instantiate_platform(
-                platform_key=current_platform.name)
+            init_message: Message = await init_message_task
             try:
-                init_message: Message = await init_message_task
+                context.user_data['current_platform'] = instantiate_platform(
+                    platform_key=current_platform.name)
                 # 更改初始化消息
                 await context.bot.edit_message_text('认证信息已刷新!请重新提问', init_message.chat_id, init_message.message_id)
                 return
             except:
-                raise Exception('平台认证失败!')
+                await bot_util.edit_message(
+                    update, context, init_message.message_id, True, '认证信息刷新失败!请稍后重试')
+                return
         else:
             init_text = ''
     else:

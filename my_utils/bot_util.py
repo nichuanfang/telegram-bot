@@ -385,6 +385,7 @@ def generate_authorization(platform: dict):
                     option=orjson.OPT_INDENT_2).decode())
         return platform
     else:
+        # 保持原认证信息不变
         raise Exception('刷新认证信息失败!')
 
 # =====================================消息相关====================================

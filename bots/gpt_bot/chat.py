@@ -1,9 +1,11 @@
 import asyncio
 import traceback
 from typing import List
+
 from my_utils import my_logging
 from telegram.ext import CallbackContext
 from openai import AsyncOpenAI
+
 # 生成摘要prompt提示
 SUMMARY_PROMPT = '生成一个摘要.如果包含代码,总结代码片段的主要目的和功能，包括所使用的任何特定算法或技术'
 # 生成摘要最大重试次数
@@ -73,11 +75,10 @@ class Temque:
             # [::-1]逆序输出
             for i in indexes[::-1]:
                 core.pop(i)
-            pass
         # 接下来进行历史消息处理流程
-        if not is_platform_migrate:
-            # 平台迁移不处理历史消息了 只裁剪
-            await self.process_history_message(core, context)
+        # if not is_platform_migrate:
+        #     # 平台迁移不处理历史消息了 只裁剪
+        #     await self.process_history_message(core, context)
 
     async def add_many(self, context: CallbackContext = None, *objs):
         for x in objs:
@@ -124,6 +125,9 @@ class Temque:
         for index, item in enumerate(core):
             if len(item['obj']['content']) < 1000:
                 continue
+
+            # todo  不进行摘要 改为压缩 (加快速度)
+
             # 每一个消息都需要重试
             asyncio.create_task(self.summary(
                 context, index, item['obj']))
@@ -246,8 +250,9 @@ class Chat:
             self._messages = new_queue
 
     async def append_messages(self, answer, context, *messages):
-        await self._messages.add_many(context,
-                                      *messages, {"role": "assistant", "content": answer})
+        if answer:
+            await self._messages.add_many(context,
+                                          *messages, {"role": "assistant", "content": answer})
 
     def combine_messages(self, *messages, **kwargs):
         return kwargs.pop('messages', []) + (self._messages.__add__(*messages)), kwargs
