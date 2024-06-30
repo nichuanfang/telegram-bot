@@ -11,7 +11,7 @@ import orjson
 
 from my_utils.my_logging import get_logger
 
-ua = UserAgent()
+ua = UserAgent(browsers="chrome")
 pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
 image_pattern = re.compile(r'\!\[Image\]\((.*?)\)')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
