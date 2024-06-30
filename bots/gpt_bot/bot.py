@@ -356,7 +356,8 @@ async def handle_code_url(update: Update, code_id):
             f'Your question url is Invalid.')
     # 将代码文本内容划分开 代码部分和提问部分是不同的 按顺序的 分隔符是 ```
     content = []
-    splits = list(filter(None, response.text.split('```\n')))
+    splits = list(filter(None, re.split(
+        r'^```\n', response.text, flags=re.MULTILINE)))
     if not splits:
         raise RuntimeError('内容为空!')
     # 判断第一个非空元素是否为代码块 不用每次都判断 如果是 则奇数都是代码块; 否则偶数部分为代码块
@@ -366,10 +367,11 @@ async def handle_code_url(update: Update, code_id):
             not is_code_block and (index % 2 != 0))
         if flag:
             # 代码块
-            content.append(f'```\n{code_util.compress_code(part)}\n```')
+            language, code = code_util.compress_code(part)
+            content.append(f'```{language}\n{code}\n```')
         else:
             # 非代码块
-            content.append(compress_question(part))
+            content.append(f'{compress_question(part)}')
     return content
 
 
