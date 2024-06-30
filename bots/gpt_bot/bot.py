@@ -2,6 +2,7 @@ import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
+import aiohttp
 import orjson
 import mimetypes
 import os
@@ -104,12 +105,11 @@ async def answer(update: Update, context: CallbackContext) -> None:
         curr_mask['openai_completion_options'].update({
             "model": context.user_data.get('current_model')
         })
-        if ENABLE_STREAM:
-            await handle_stream_response(update, context, content_task, is_image_generator, init_message_task,
-                                         **curr_mask['openai_completion_options'])
-        else:
-            await handle_response(update, context, content_task, is_image_generator,
-                                  **curr_mask['openai_completion_options'])
+        async with aiohttp.ClientSession() as session:
+            if ENABLE_STREAM:
+                await handle_stream_response(update, context, content_task, is_image_generator, init_message_task, session, **curr_mask['openai_completion_options'])
+            else:
+                await handle_response(update, context, content_task, is_image_generator, session, **curr_mask['openai_completion_options'])
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
 
@@ -376,7 +376,7 @@ def generate_additional_keyboard(infos):
 
 
 async def handle_stream_response(update: Update, context: CallbackContext, content_task, is_image_generator: bool,
-                                 init_message_task, **openai_completion_options):
+                                 init_message_task, session: aiohttp.ClientSession, **openai_completion_options):
     prev_answer = ''
     current_message_length = 0
     max_message_length = 3500
@@ -384,7 +384,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     need_notice = True
     gpt_platform: Platform = context.user_data['current_platform']
     init_message, content = await asyncio.gather(init_message_task, content_task)
-    async for status, curr_answer in gpt_platform.async_stream_request(content, context, **openai_completion_options):
+    async for status, curr_answer in gpt_platform.async_stream_request(content, context, session, **openai_completion_options):
         # 如果状态是additional 则追加内联按钮
         if status == 'additional' and need_notice:
             try:
@@ -439,11 +439,11 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                 await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
-async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, **openai_completion_options):
+async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, session: aiohttp.ClientSession, **openai_completion_options):
     await bot_util.send_typing(update)
     gpt_platform: Platform = context.user_data['current_platform']
     content = await content_task
-    async for res in gpt_platform.async_request(content, context, **openai_completion_options):
+    async for res in gpt_platform.async_request(content, context, session, **openai_completion_options):
         if res is None or len(res) == 0:
             continue
         if is_image_generator:

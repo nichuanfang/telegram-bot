@@ -37,7 +37,7 @@ class Free_4(Platform):
         """
         return '已使用 $0.0 , 订阅总额 $0.0'
 
-    async def generate_image(self, messages: list):
+    async def generate_image(self, messages: list, session: aiohttp.ClientSession):
         # 生成图片
         json_data = {
             'stream': True,
@@ -50,12 +50,61 @@ class Free_4(Platform):
             'authorization': self.openai_api_key
         }
         answer = ''
-        session = aiohttp.ClientSession()
-        try:
+        async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+            response.raise_for_status()  # 检查请求是否成功
+            answer_parts = []
+            buffer = bytearray()
+            incomplete_line = ''
+            async for item in response.content.iter_any():
+                # 将每个字节流写入缓冲区
+                buffer.extend(item)
+                try:
+                    content = buffer.decode()
+                except UnicodeDecodeError:
+                    continue
+                lines = content.splitlines()
+                for line in lines:
+                    if line:
+                        if '[DONE]' in line:
+                            break
+                        else:
+                            try:
+                                delta = orjson.loads(line[6:])[
+                                    'choices'][0]['delta']
+                                if delta:
+                                    answer_parts.append(
+                                        delta['content'])
+                                    # 在需要时进行拼接
+                                    answer = ''.join(answer_parts)
+                                incomplete_line = ''
+                            except:
+                                incomplete_line = line
+                # 清空缓冲区
+                buffer.clear()
+                if incomplete_line:
+                    buffer.extend(incomplete_line.encode())
+        return extract_image_url(answer)
+
+    async def completion(self, stream: bool, context: CallbackContext, session: aiohttp.ClientSession, *messages, **kwargs):
+        new_messages, kwargs = self.chat.combine_messages(
+            *messages, **kwargs)
+        answer = ''
+        if stream:
+            json_data = {
+                'stream': True,
+                'messages': new_messages,
+                **kwargs
+            }
+            headers = {
+                'origin': self.foreign_openai_base_url,
+                'user-agent': ua.random,
+                'authorization': self.openai_api_key
+            }
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 answer_parts = []
                 buffer = bytearray()
+                is_finished = False
                 incomplete_line = ''
                 async for item in response.content.iter_any():
                     # 将每个字节流写入缓冲区
@@ -68,6 +117,8 @@ class Free_4(Platform):
                     for line in lines:
                         if line:
                             if '[DONE]' in line:
+                                is_finished = True
+                                yield 'finished', answer
                                 break
                             else:
                                 try:
@@ -78,6 +129,7 @@ class Free_4(Platform):
                                             delta['content'])
                                         # 在需要时进行拼接
                                         answer = ''.join(answer_parts)
+                                        yield 'not_finished', answer
                                     incomplete_line = ''
                                 except:
                                     incomplete_line = line
@@ -85,87 +137,25 @@ class Free_4(Platform):
                     buffer.clear()
                     if incomplete_line:
                         buffer.extend(incomplete_line.encode())
-        finally:
-            if session:
-                await session.close()
-        return extract_image_url(answer)
-
-    async def completion(self, stream: bool, context: CallbackContext, *messages, **kwargs):
-        new_messages, kwargs = self.chat.combine_messages(
-            *messages, **kwargs)
-        answer = ''
-        session = aiohttp.ClientSession()
-        try:
-            if stream:
-                json_data = {
-                    'stream': True,
-                    'messages': new_messages,
-                    **kwargs
-                }
-                headers = {
-                    'origin': self.foreign_openai_base_url,
-                    'user-agent': ua.random,
-                    'authorization': self.openai_api_key
-                }
-                async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
-                    response.raise_for_status()  # 检查请求是否成功
-                    answer_parts = []
-                    buffer = bytearray()
-                    is_finished = False
-                    incomplete_line = ''
-                    async for item in response.content.iter_any():
-                        # 将每个字节流写入缓冲区
-                        buffer.extend(item)
-                        try:
-                            content = buffer.decode()
-                        except UnicodeDecodeError:
-                            continue
-                        lines = content.splitlines()
-                        for line in lines:
-                            if line:
-                                if '[DONE]' in line:
-                                    is_finished = True
-                                    yield 'finished', answer
-                                    break
-                                else:
-                                    try:
-                                        delta = orjson.loads(line[6:])[
-                                            'choices'][0]['delta']
-                                        if delta:
-                                            answer_parts.append(
-                                                delta['content'])
-                                            # 在需要时进行拼接
-                                            answer = ''.join(answer_parts)
-                                            yield 'not_finished', answer
-                                        incomplete_line = ''
-                                    except:
-                                        incomplete_line = line
-                        # 清空缓冲区
-                        buffer.clear()
-                        if incomplete_line:
-                            buffer.extend(incomplete_line.encode())
-                    if not is_finished:
-                        yield 'finished', answer
-            else:
-                json_data = {
-                    'stream': False,
-                    'messages': new_messages,
-                    **kwargs
-                }
-                headers = {
-                    'origin': self.foreign_openai_base_url,
-                    'user-agent': ua.random,
-                    'authorization': self.openai_api_key
-                }
-                async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
-                    response.raise_for_status()  # 检查请求是否成功
-                    completion = await response.json()
-                    answer = completion[
-                        'choices'][0]['message']['content']
-                    yield answer
-        finally:
-            if session:
-                await session.close()
+                if not is_finished:
+                    yield 'finished', answer
+        else:
+            json_data = {
+                'stream': False,
+                'messages': new_messages,
+                **kwargs
+            }
+            headers = {
+                'origin': self.foreign_openai_base_url,
+                'user-agent': ua.random,
+                'authorization': self.openai_api_key
+            }
+            async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
+                response.raise_for_status()  # 检查请求是否成功
+                completion = await response.json()
+                answer = completion[
+                    'choices'][0]['message']['content']
+                yield answer
         await self.chat.append_messages(
             answer, context, *messages)
 
@@ -181,8 +171,7 @@ class Free_4(Platform):
             'user-agent': ua.random,
             'authorization': self.openai_api_key
         }
-        session = aiohttp.ClientSession()
-        try:
+        async with aiohttp.ClientSession() as session:
             async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
                 response.raise_for_status()  # 检查请求是否成功
                 completion = await response.text()
@@ -197,6 +186,3 @@ class Free_4(Platform):
                         if delta:
                             result.append(delta['content'])
                 return ''.join(result)
-        finally:
-            if session:
-                await session.close()
