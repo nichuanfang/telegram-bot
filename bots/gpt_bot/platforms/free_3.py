@@ -106,9 +106,8 @@ class Free_3(Platform):
                             result.append(delta['content'])
                 answer = ''.join(result)
                 yield answer
-        if tiktoken_util.count_token(answer) > 1000:
-            asyncio.create_task(self.summary(
-                answer, self.SUMMARY_PROMPT, context, *messages))
+        await self.chat.append_messages(
+            answer, context, *messages)
 
     async def summary(self, content: str, prompt: str, context, *messages):
         new_messages = [{'role': 'system', 'content': prompt},
