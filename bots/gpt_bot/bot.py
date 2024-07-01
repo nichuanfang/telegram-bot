@@ -1,7 +1,11 @@
 import asyncio
+import atexit
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
+import platform
+import signal
+import sys
 import aiohttp
 import orjson
 import mimetypes
@@ -36,6 +40,37 @@ MASKS: dict = bot_util.masks
 PLATFORMS: dict = bot_util.platforms
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
+
+# 自定义 DNS 解析器
+
+
+# 创建全局 aiohttp.ClientSession 对象
+GLOBAL_SESSION = aiohttp.ClientSession(
+    trust_env=True,
+    raise_for_status=True,
+    timeout=aiohttp.ClientTimeout(total=300),
+    connector=aiohttp.TCPConnector(
+        limit=100,  # 最大连接数
+        limit_per_host=10,  # 每个主机的最大连接数
+        ttl_dns_cache=3600,  # DNS 缓存时间
+        keepalive_timeout=3600  # 空闲连接存活时间
+    )
+)
+
+
+async def close_session():
+    """ 关闭连接 """
+    await GLOBAL_SESSION.close()
+
+
+def atexit_handler():
+    """ 关闭处理器 """
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(close_session())
+
+
+# 注册关闭会话
+atexit.register(atexit_handler)
 
 
 async def start(update: Update, context: CallbackContext) -> None:
@@ -78,14 +113,9 @@ async def answer(update: Update, context: CallbackContext) -> None:
                 message_text, reply_to_message_id=update.message.message_id)
         )
     try:
-        session = aiohttp.ClientSession(**{
-            'trust_env': True,
-            'raise_for_status': True,
-            'timeout': aiohttp.ClientTimeout(total=600)
-        })
         if update.message.text:
             content_task = asyncio.create_task(
-                handle_code_or_url(update, session))
+                handle_code_or_url(update, GLOBAL_SESSION))
         elif update.message.photo or update.message.sticker:
             content_task = asyncio.create_task(
                 handle_photo(update, context))
@@ -107,16 +137,14 @@ async def answer(update: Update, context: CallbackContext) -> None:
         else:
             raise ValueError('不支持的输入类型!')
         if ENABLE_STREAM:
-            await handle_stream_response(update, context, content_task, is_image_generator, init_message_task, session)
+            await handle_stream_response(update, context, content_task, is_image_generator, init_message_task, GLOBAL_SESSION)
         else:
-            await handle_response(update, context, content_task, is_image_generator, session)
+            await handle_response(update, context, content_task, is_image_generator, GLOBAL_SESSION)
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
     finally:
         context.user_data.pop(
             f'{update.message.message_id}_curr_retries', None)
-        if session:
-            await session.close()
 
 
 async def handle_caption(update: Update, max_length):
