@@ -1,14 +1,14 @@
 # 免费的api平台 gpt-4
+import asyncio
 import platform
 import aiohttp
 import js2py
-from fake_useragent import FakeUserAgent
 from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
 import orjson
 
-ua = FakeUserAgent(browsers='chrome')
+from my_utils import bot_util, tiktoken_util
 
 DEEP_AI_TOKEN_JS = """
     function generateToken(agent) {
@@ -52,9 +52,10 @@ class Free_2(Platform):
         """
         return '已使用 $0.0 , 订阅总额 $0.0'
 
-    async def completion(self, stream: bool, context: CallbackContext,  session: aiohttp.ClientSession, *messages, **kwargs):
-        new_messages, kwargs = self.chat.combine_messages(
-            *messages, **kwargs)
+    async def completion(self, stream: bool, context: CallbackContext,  session: aiohttp.ClientSession, *messages):
+        openai_completion_options = context.user_data['current_mask']['openai_completion_options']
+        new_messages, openai_completion_options = self.chat.combine_messages(
+            *messages, **openai_completion_options)
         # 当前模型
         current_model = context.user_data['current_model']
         # answer = ''
@@ -74,8 +75,8 @@ class Free_2(Platform):
             #         yield status, item
             # await self.chat.append_messages(answer, context, *messages)
             # pass
-        await self.chat.append_messages(
-            answer, context, *messages)
+        if tiktoken_util.count_token(answer) > 1000:
+            asyncio.create_task(self.summary(answer, self.SUMMARY_PROMPT,context, *messages))
 
     # =========================================Gpt4o===========================================
 
@@ -167,18 +168,19 @@ class Free_2(Platform):
             "messages": new_messages,
             "stream": True
         }
-        agent = ua.random
+        agent = bot_util.ua.random
         headers = {
             "User-Agent": agent,
             "X-Deepinfra-Source": "web-page"
         }
         answer = ''
-        async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data, proxy=HTTP_PROXY) as response:
-            response.raise_for_status()  # 检查请求是否成功
+        async with session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data) as response:
             answer_parts = []
             buffer = bytearray()
-            incomplete_line = ''
+            is_finished = False
             async for item in response.content.iter_any():
+                # 是否追加不完整的json数据
+                flag = False
                 # 将每个字节流写入缓冲区
                 buffer.extend(item)
                 try:
@@ -189,6 +191,7 @@ class Free_2(Platform):
                 for line in lines:
                     if line:
                         if '[DONE]' in line:
+                            is_finished = True
                             yield 'finished', answer
                             break
                         else:
@@ -201,13 +204,14 @@ class Free_2(Platform):
                                     # 在需要时进行拼接
                                     answer = ''.join(answer_parts)
                                     yield 'not_finished', answer
-                                incomplete_line = ''
                             except:
-                                incomplete_line = line
+                                flag = True
                 # 清空缓冲区
                 buffer.clear()
-                if incomplete_line:
-                    buffer.extend(incomplete_line.encode())
+                if flag:
+                    buffer.extend(line.encode())
+            if not is_finished:
+                yield 'finished', answer
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list, session: aiohttp.ClientSession):
@@ -228,7 +232,7 @@ class Free_2(Platform):
             "chat_style": "chat",
             "online": "online",
             "chatHistory": orjson.dumps(new_messages, option=orjson.OPT_INDENT_2).decode()}
-        agent = ua.random
+        agent = bot_util.ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
         token = generateToken(agent)
         headers = {
@@ -236,8 +240,7 @@ class Free_2(Platform):
             "User-Agent": agent,
         }
         answer = ''
-        async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY) as response:
-            response.raise_for_status()  # 检查请求是否成功
+        async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload) as response:
             answer_parts = []
             other_parts = []
             is_finished = False
@@ -248,7 +251,7 @@ class Free_2(Platform):
                         other_parts.append(chunk)
                         continue
                     if chunk.find('')!=-1:
-                                # 分割内容 主体消息已结束
+                                  # 分割内容 主体消息已结束
                         splits = chunk.split('')   
                         # 属于主体内容
                         part_one = splits[0]
@@ -275,21 +278,24 @@ class Free_2(Platform):
     async def gemini_complete(self, stream: bool, *new_messages):
         yield
         
-    async def summary(self, content: dict, prompt: str):
-        """ 利用deepai生成摘要 """
-        new_messages = [{'role': 'system', 'content': prompt}, content]
+    async def summary(self, content: str, prompt: str,context, *messages):
+        new_messages = [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': content}]
         payload = {
             "chat_style": "chat",
             "chatHistory": orjson.dumps(new_messages).decode()}
-        agent = ua.random
+        agent = bot_util.ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
         token = generateToken(agent)
         headers = {
             "api-key": token,
             "User-Agent": agent,
         }
-        async with aiohttp.ClientSession() as session:
-            res = await session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload, proxy=HTTP_PROXY)
-            res = await res.text()
-            return res
+        try:
+            async with aiohttp.ClientSession(raise_for_status=True,trust_env=True, timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload) as res:
+                    answer = await res.text()
+        except:
+            answer =  content
+        await self.chat.append_messages(
+            answer, context, *messages)
 

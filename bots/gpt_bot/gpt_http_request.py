@@ -1,7 +1,7 @@
 # 定制化请求
 
-from fake_useragent import UserAgent
 import requests
+from fake_useragent import FakeUserAgent
 
 headers = {
     'accept': 'application/json',
@@ -14,8 +14,9 @@ headers = {
     'sec-fetch-mode': 'cors',
     'sec-fetch-site': 'cross-site'
 }
-# 创建一个 UserAgent 实例
-ua = UserAgent()
+
+# 随机ua
+ua = FakeUserAgent(browsers="chrome", os='windows', platforms='pc')
 
 
 class BotHttpRequest:

@@ -4,13 +4,12 @@ import aiohttp
 import orjson
 import os.path
 from abc import ABCMeta
-
 import openai
-
 import platform
 from bots.gpt_bot.chat import Chat
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
+from my_utils import tiktoken_util
 
 
 def gpt_platform(cls):
@@ -78,7 +77,7 @@ class Platform(metaclass=ABCMeta):
             "timeout": openai.DEFAULT_TIMEOUT,
             "max_message_count": max_message_count
         }
-
+        self.SUMMARY_PROMPT = '为以下内容生成一个摘要,如果包含代码,总结代码片段的主要目的和功能，包括所使用的任何特定算法或技术,结果无需说明这是摘要'
         self.chat = Chat(**chat_init_params)
 
     @classmethod
@@ -90,25 +89,23 @@ class Platform(metaclass=ABCMeta):
         module = cls.__module__
         return os.path.basename(module.rsplit('.', 1)[1])
 
-    async def async_request(self, content='',  context=None, session: aiohttp.ClientSession = None, **kwargs):
+    async def async_request(self, content='',  context=None, session: aiohttp.ClientSession = None):
         """
         非流式响应的请求逻辑
         @param content: 请求的内容
         @param kwargs: 其他字段
         """
-        if content is None:
-            content = []
         messages_task = asyncio.create_task(self.prepare_messages(content))
-        if kwargs.get('model') == "dall-e-3":
+        if context.user_data.get('current_model') == "dall-e-3":
             messages = await messages_task
             # 需要生成图像
             yield await self.generate_image(messages, session)
         else:
             messages = await messages_task
-            async for answer in self.completion(False, context, session, * messages, **kwargs):
+            async for answer in self.completion(False, context, session, * messages):
                 yield answer
 
-    async def async_stream_request(self, content='', context=None, session: aiohttp.ClientSession = None, **kwargs):
+    async def async_stream_request(self, content='', context=None, session: aiohttp.ClientSession = None):
         """
         流式响应的请求逻辑
         @param content:  请求内容
@@ -116,22 +113,25 @@ class Platform(metaclass=ABCMeta):
         @param kwargs: 其他字段
         """
         messages = await self.prepare_messages(content)
-        if kwargs.get('model') == "dall-e-3":
+        if context.user_data.get('current_model') == "dall-e-3":
             answer = await self.generate_image(messages, session)
             yield 'finished', answer
         else:
-            async for status, answer in self.completion(True, context, session, * messages, **kwargs):
+            async for status, answer in self.completion(True, context, session, *messages):
                 yield status, answer
 
-    async def completion(self, stream: bool,  context, session: aiohttp.ClientSession, *messages, **kwargs):
+    async def completion(self, stream: bool,  context, session: aiohttp.ClientSession, *messages):
         # 默认的提问方法
-        new_messages, kwargs = self.chat.combine_messages(*messages, **kwargs)
+        openai_completion_options = context.user_data['current_mask']['openai_completion_options']
+        new_messages, openai_completion_options = self.chat.combine_messages(
+            *messages, **openai_completion_options)
         answer = ''
         if stream:
             completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": True,
-                **kwargs
+                'model': context.user_data.get('current_model'),
+                **openai_completion_options
             })
             result = []
             async for chunk_iter in completion:
@@ -144,12 +144,14 @@ class Platform(metaclass=ABCMeta):
             completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": False,
-                **kwargs
+                'model': context.user_data.get('current_model'),
+                **openai_completion_options
             })
             answer = completion.choices[0].message.content
             yield answer
-        await self.chat.append_messages(
-            answer, context, *messages)
+        if tiktoken_util.count_token(answer) > 1000:
+            asyncio.create_task(self.summary(
+                answer, self.SUMMARY_PROMPT, context, *messages))
 
     async def prepare_messages(self, content) -> list[dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":
@@ -202,17 +204,20 @@ class Platform(metaclass=ABCMeta):
         used = orjson.loads(usage.text)['total_usage'] / 100
         return f'已使用 ${round(used, 2)} , 订阅总额 ${round(total, 2)}'
 
-    async def summary(self, content: dict, prompt: str):
+    async def summary(self, content: str, prompt: str, context, *messages):
         """ 提取摘要 """
         try:
             res = await self.chat.openai_client.chat.completions.create(**{
                 "messages": [
                     {'role': 'system', 'content': prompt},
-                    {'role': 'user', 'content': content['content']}
+                    {'role': 'user', 'content': content}
                 ],
-                "model": "gpt-3.5-turbo-16k",
-                "stream": False
+                "model": "gpt-3.5-turbo",
+                "stream": False,
+                "timeout": 30
             })
-            return res.choices[0].message.content
+            answer = res.choices[0].message.content
         except:
-            return content['content']
+            answer = content
+        await self.chat.append_messages(
+            answer, context, *messages)

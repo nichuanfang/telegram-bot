@@ -12,16 +12,15 @@ import requests
 from urllib.parse import urlparse
 import uuid
 
-from fake_useragent import UserAgent
-from telegram import Bot, Update
+from fake_useragent import FakeUserAgent
+from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
-from bots.gpt_bot.gpt_platform import Platform
 from my_utils import redis_util
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
-ua = UserAgent()
-
+# 随机ua
+ua = FakeUserAgent(browsers="chrome", os='windows', platforms='pc')
 logger = get_logger('bot_util')
 # 临时配置路径
 TEMP_CONFIG_PATH = os.path.join('temp', 'config.json')
@@ -119,7 +118,7 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
     return PLATFORMS_REGISTRY[platform_key](**platform_init_params)
 
 
-async def migrate_platform(from_platform: Platform, to_platform_key: str, context: CallbackContext, max_message_count: int):
+async def migrate_platform(from_platform, to_platform_key: str, context: CallbackContext, max_message_count: int):
     """
     迁移平台
     @param from_platform 原平台对象
@@ -153,7 +152,7 @@ async def migrate_platform(from_platform: Platform, to_platform_key: str, contex
     }
     logger.info(f'当前使用的openai代理平台为{to_platform["name"]}.')
     # 新平台
-    new_platform: Platform = PLATFORMS_REGISTRY[to_platform_key](
+    new_platform = PLATFORMS_REGISTRY[to_platform_key](
         **platform_init_params)
     # 恢复历史消息
     new_platform.chat._messages.core = from_platform.chat._messages.core
