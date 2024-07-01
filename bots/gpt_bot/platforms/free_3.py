@@ -8,7 +8,7 @@ from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from telegram.ext import CallbackContext
 import orjson
-from my_utils import bot_util, code_util, tiktoken_util
+from my_utils import bot_util, tiktoken_util
 from my_utils.my_logging import get_logger
 
 logger = get_logger('free_3')
@@ -107,7 +107,7 @@ class Free_3(Platform):
                 answer = ''.join(result)
                 yield answer
         await self.chat.append_messages(
-            code_util.compress_text(answer), context, *messages)
+            answer, context, *messages)
 
     async def summary(self, content: str, prompt: str, context, *messages):
         new_messages = [{'role': 'system', 'content': prompt},

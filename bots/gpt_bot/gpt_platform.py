@@ -150,7 +150,7 @@ class Platform(metaclass=ABCMeta):
             answer = completion.choices[0].message.content
             yield answer
         await self.chat.append_messages(
-            code_util.compress_text(answer), context, *messages)
+            answer, context, *messages)
 
     async def prepare_messages(self, content) -> list[dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":

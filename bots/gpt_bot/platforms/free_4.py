@@ -158,7 +158,7 @@ class Free_4(Platform):
                     'choices'][0]['message']['content']
                 yield answer
         await self.chat.append_messages(
-            code_util.compress_text(answer), context, *messages)
+            answer, context, *messages)
 
     async def summary(self, content: str, prompt: str, context, *messages):
         new_messages = [{'role': 'system', 'content': prompt},

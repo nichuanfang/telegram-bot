@@ -76,7 +76,7 @@ class Free_2(Platform):
             # await self.chat.append_messages(answer, context, *messages)
             # pass
         await self.chat.append_messages(
-            code_util.compress_text(answer), context, *messages)
+            answer, context, *messages)
 
     # =========================================Gpt4o===========================================
 
