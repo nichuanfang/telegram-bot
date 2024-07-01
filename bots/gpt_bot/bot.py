@@ -113,6 +113,8 @@ async def answer(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
     finally:
+        context.user_data.pop(
+            f'{update.message.message_id}_curr_retries', None)
         if session:
             await session.close()
 
@@ -520,17 +522,49 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
                     f.write(orjson.dumps(
                         json_data,  option=orjson.OPT_INDENT_2).decode())
                     # 刷新token成功!
-            init_message: Message = await init_message_task
             try:
-                context.user_data['current_platform'] = instantiate_platform(
+                current_platform = context.user_data['current_platform'] = instantiate_platform(
                     platform_key=current_platform.name)
-                # 更改初始化消息
-                await context.bot.edit_message_text('认证信息已刷新!请重新提问', init_message.chat_id, init_message.message_id)
-                return
+                current_platform.chat.clear_messages(context)
+                is_refreshed = True
             except:
-                await bot_util.edit_message(
-                    update, context, init_message.message_id, True, str(e))
-                return
+                is_refreshed = False
+            finally:
+                # 大于最大重试次数
+                init_message: Message = await init_message_task
+                if is_refreshed:
+                    message_curr_retries = f'{update.message.message_id}_curr_retries'
+                    # 刷新成功 再次请求 同时判断当前的重试次数是否超过2 没超过就重试 并+1;超过了就重置
+                    if message_curr_retries in context.user_data:
+                        # 当前重试次数
+                        curr_retries = context.user_data[message_curr_retries]
+                        if curr_retries > 2:
+                            # 记录认证信息是否刷新成功
+                            await bot_util.edit_message(
+                                update, context, init_message.message_id, True, str(e))
+                            context.user_data.pop(message_curr_retries)
+                            return
+                        else:
+                            await asyncio.sleep(3)
+                            await bot_util.edit_message(update, context, init_message.message_id, True, f'Error occurs: {str(e)}\n正在进行第{curr_retries+1}次重试...')
+                            context.user_data[message_curr_retries] = curr_retries+1
+                            await answer(update, context)
+                            return
+                    else:
+                        await asyncio.sleep(3)
+                        # 说明此消息没重试过
+                        await bot_util.edit_message(update, context, init_message.message_id, True, f'Error occurs: {str(e)}\n正在进行第1次重试...')
+                        context.user_data[message_curr_retries] = 1
+                        await answer(update, context)
+                        return
+                else:
+                    # 刷新失败 终止重试 直接向用户展示错误
+                    # 记录认证信息是否刷新成功
+                    await bot_util.edit_message(
+                        update, context, init_message.message_id, True, str(e))
+                    context.user_data.pop(
+                        f'{update.message.message_id}_curr_retries', None)
+                    return
         else:
             init_text = ''
     else:
