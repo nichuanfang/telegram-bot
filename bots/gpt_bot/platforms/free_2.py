@@ -8,7 +8,7 @@ from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
 import orjson
 
-from my_utils import bot_util, tiktoken_util
+from my_utils import bot_util, code_util, tiktoken_util
 
 DEEP_AI_TOKEN_JS = """
     function generateToken(agent) {
@@ -75,8 +75,8 @@ class Free_2(Platform):
             #         yield status, item
             # await self.chat.append_messages(answer, context, *messages)
             # pass
-        if tiktoken_util.count_token(answer) > 1000:
-            asyncio.create_task(self.summary(answer, self.SUMMARY_PROMPT,context, *messages))
+        await self.chat.append_messages(
+            code_util.compress_text(answer), context, *messages)
 
     # =========================================Gpt4o===========================================
 
@@ -251,7 +251,7 @@ class Free_2(Platform):
                         other_parts.append(chunk)
                         continue
                     if chunk.find('')!=-1:
-                                  # 分割内容 主体消息已结束
+                                    # 分割内容 主体消息已结束
                         splits = chunk.split('')   
                         # 属于主体内容
                         part_one = splits[0]
@@ -280,8 +280,9 @@ class Free_2(Platform):
         
     async def summary(self, content: str, prompt: str,context, *messages):
         new_messages = [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': content}]
-        payload = {
+        payload = { 
             "chat_style": "chat",
+                       
             "chatHistory": orjson.dumps(new_messages).decode()}
         agent = bot_util.ua.random
         generateToken = js2py.eval_js(DEEP_AI_TOKEN_JS)
@@ -293,7 +294,7 @@ class Free_2(Platform):
         try:
             async with aiohttp.ClientSession(raise_for_status=True,trust_env=True, timeout=aiohttp.ClientTimeout(total=30)) as session:
                 async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload) as res:
-                    answer = await res.text()
+                    answer = await res.text() 
         except:
             answer =  content
         await self.chat.append_messages(

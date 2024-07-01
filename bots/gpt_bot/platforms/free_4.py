@@ -6,7 +6,7 @@ import aiohttp
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from telegram.ext import CallbackContext
-from my_utils import bot_util, tiktoken_util
+from my_utils import bot_util, code_util, tiktoken_util
 import orjson
 
 
@@ -157,9 +157,8 @@ class Free_4(Platform):
                 answer = completion[
                     'choices'][0]['message']['content']
                 yield answer
-        if tiktoken_util.count_token(answer) > 1000:
-            asyncio.create_task(self.summary(
-                answer, self.SUMMARY_PROMPT, context, *messages))
+        await self.chat.append_messages(
+            code_util.compress_text(answer), context, *messages)
 
     async def summary(self, content: str, prompt: str, context, *messages):
         new_messages = [{'role': 'system', 'content': prompt},

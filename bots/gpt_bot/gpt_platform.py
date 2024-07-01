@@ -9,7 +9,7 @@ import platform
 from bots.gpt_bot.chat import Chat
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
-from my_utils import tiktoken_util
+from my_utils import code_util, tiktoken_util
 
 
 def gpt_platform(cls):
@@ -149,9 +149,8 @@ class Platform(metaclass=ABCMeta):
             })
             answer = completion.choices[0].message.content
             yield answer
-        if tiktoken_util.count_token(answer) > 1000:
-            asyncio.create_task(self.summary(
-                answer, self.SUMMARY_PROMPT, context, *messages))
+        await self.chat.append_messages(
+            code_util.compress_text(answer), context, *messages)
 
     async def prepare_messages(self, content) -> list[dict[str, str]]:
         if isinstance(content, dict) and content.get('type') == "audio":

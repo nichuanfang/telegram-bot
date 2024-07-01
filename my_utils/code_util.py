@@ -78,6 +78,19 @@ def detect_language(code):
     return 'text'  # 默认情况
 
 
+def compress_text(text):
+    # 删除多余的空白和换行符
+    text = re.sub(r'\s+', ' ', text)
+
+    # 去掉标点符号（如果需要保留上下文，可以选择性地保留一些标点）
+    text = re.sub(r'[^\w\s]', '', text)
+
+    # 删除多余的空格
+    text = re.sub(r'\s{2,}', ' ', text)
+
+    return text.strip()
+
+
 def compress_code(code, language: str = None):
     """ 压缩代码块 """
     if not language:
