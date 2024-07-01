@@ -1,4 +1,5 @@
 import asyncio
+from http.client import HTTPException
 import platform
 import re
 import aiohttp
@@ -14,6 +15,16 @@ from my_utils.my_logging import get_logger
 logger = get_logger('free_3')
 pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
+
+
+class HTTPException(Exception):
+    def __init__(self, code, message="HTTP Exception"):
+        self.code = code
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"HTTP {self.code}: {self.message}"
 
 
 @gpt_platform
