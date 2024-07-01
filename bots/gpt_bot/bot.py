@@ -16,7 +16,6 @@ import requests
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
 from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
-
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils import code_util, my_logging, bot_util, tiktoken_util
 from my_utils.bot_util import auth, instantiate_platform, migrate_platform
@@ -79,13 +78,20 @@ async def answer(update: Update, context: CallbackContext) -> None:
                 message_text, reply_to_message_id=update.message.message_id)
         )
     try:
+        session = aiohttp.ClientSession(**{
+            'trust_env': True,
+            'raise_for_status': True,
+            'timeout': aiohttp.ClientTimeout(total=600)
+        })
         if update.message.text:
-            content_task = asyncio.create_task(handle_code_or_url(update))
+            content_task = asyncio.create_task(
+                handle_code_or_url(update, session))
         elif update.message.photo or update.message.sticker:
             content_task = asyncio.create_task(
                 handle_photo(update, context))
         elif update.message.audio or update.message.voice:
-            content_task = asyncio.create_task(handle_audio(update, context))
+            content_task = asyncio.create_task(
+                handle_audio(update, context))
         elif update.message.document:
             # gif虽然会被转为mp4 但是会被归类为document
             if update.message.document.mime_type.startswith('video'):
@@ -100,18 +106,15 @@ async def answer(update: Update, context: CallbackContext) -> None:
                 handle_video(update, context))
         else:
             raise ValueError('不支持的输入类型!')
-        curr_mask = context.user_data.get(
-            'current_mask')
-        curr_mask['openai_completion_options'].update({
-            "model": context.user_data.get('current_model')
-        })
-        async with aiohttp.ClientSession() as session:
-            if ENABLE_STREAM:
-                await handle_stream_response(update, context, content_task, is_image_generator, init_message_task, session, **curr_mask['openai_completion_options'])
-            else:
-                await handle_response(update, context, content_task, is_image_generator, session, **curr_mask['openai_completion_options'])
+        if ENABLE_STREAM:
+            await handle_stream_response(update, context, content_task, is_image_generator, init_message_task, session)
+        else:
+            await handle_response(update, context, content_task, is_image_generator, session)
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
+    finally:
+        if session:
+            await session.close()
 
 
 async def handle_caption(update: Update, max_length):
@@ -340,24 +343,27 @@ def process_video(video_path):
     return key_frames
 
 
-async def handle_code_or_url(update: Update):
+async def handle_code_or_url(update: Update, session: aiohttp.ClientSession):
     # 使用re模块搜索第一个匹配的URL
     match = HASTE_SERVER_HOST_PATTERN.search(update.message.text)
     if match:
-        return await handle_code_url(update, match[1])
+        return await handle_code_url(update, match[1], session)
     else:
         return await handle_text(update)
 
 
-async def handle_code_url(update: Update, code_id):
-    response = requests.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
-    if response.status_code != 200 or len(response.text) == 0:
-        raise ValueError(
-            f'Your question url is Invalid.')
+async def handle_code_url(update: Update, code_id, session: aiohttp.ClientSession):
+    response = await session.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
+    if response.status == 200:
+        response_text = await response.text()
+        if not response_text:
+            raise ValueError(f'Your question url is Invalid.')
+    else:
+        raise RuntimeError('Your question url is Invalid.')
     # 将代码文本内容划分开 代码部分和提问部分是不同的 按顺序的 分隔符是 ```
     content = []
     splits = list(filter(None, re.split(
-        r'^```\n', response.text, flags=re.MULTILINE)))
+        r'^```\n', response_text, flags=re.MULTILINE)))
     if not splits:
         raise RuntimeError('内容为空!')
     # 判断第一个非空元素是否为代码块 不用每次都判断 如果是 则奇数都是代码块; 否则偶数部分为代码块
@@ -395,7 +401,7 @@ def generate_additional_keyboard(infos):
 
 
 async def handle_stream_response(update: Update, context: CallbackContext, content_task, is_image_generator: bool,
-                                 init_message_task, session: aiohttp.ClientSession, **openai_completion_options):
+                                 init_message_task, session: aiohttp.ClientSession):
     prev_answer = ''
     current_message_length = 0
     max_message_length = 3500
@@ -403,7 +409,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     need_notice = True
     gpt_platform: Platform = context.user_data['current_platform']
     init_message, content = await asyncio.gather(init_message_task, content_task)
-    async for status, curr_answer in gpt_platform.async_stream_request(content, context, session, **openai_completion_options):
+    async for status, curr_answer in gpt_platform.async_stream_request(content, context, session):
         # 如果状态是additional 则追加内联按钮
         if status == 'additional' and need_notice:
             try:
@@ -418,12 +424,12 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                 continue
             continue
         if is_image_generator:
-            img_response = requests.get(curr_answer)
+            img_response = await session.get(curr_answer)
             if img_response.content:
                 await asyncio.gather(
                     bot_util.edit_message(
                         update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
-                    update.message.reply_photo(photo=img_response.content,
+                    update.message.reply_photo(photo=await img_response.content.read(),
                                                reply_to_message_id=update.effective_message.message_id))
             continue
         if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
@@ -442,7 +448,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             current_message_length += new_content_length
 
         await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
-        # await asyncio.sleep(0.02)
+        await asyncio.sleep(0.01)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
@@ -453,23 +459,25 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             document_id = result.get('key')
             if document_id:
                 document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
-                await bot_util.edit_message(update, context, init_message.message_id, True, text=f'请访问：{document_url}')
+                await bot_util.edit_message(
+                    update, context, init_message.message_id, True, text=f'请访问：{document_url}')
             else:
-                await bot_util.edit_message(update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
+                await bot_util.edit_message(
+                    update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
-async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, session: aiohttp.ClientSession, **openai_completion_options):
+async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, session: aiohttp.ClientSession):
     await bot_util.send_typing(update)
     gpt_platform: Platform = context.user_data['current_platform']
     content = await content_task
-    async for res in gpt_platform.async_request(content, context, session, **openai_completion_options):
+    async for res in gpt_platform.async_request(content, context, session):
         if res is None or len(res) == 0:
             continue
         if is_image_generator:
             # 将res的url下载 返回一个图片
-            img_response = requests.get(res)
+            img_response = await session.get(res)
             if img_response.content:
-                await update.message.reply_photo(photo=img_response.content,
+                await update.message.reply_photo(photo=await img_response.content.read(),
                                                  reply_to_message_id=update.effective_message.message_id)
         else:
             if len(res.encode()) < 3500:
@@ -521,7 +529,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
                 return
             except:
                 await bot_util.edit_message(
-                    update, context, init_message.message_id, True, '认证信息刷新失败!请稍后重试')
+                    update, context, init_message.message_id, True, str(e))
                 return
         else:
             init_text = ''
