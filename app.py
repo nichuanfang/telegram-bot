@@ -1,14 +1,18 @@
-import telegram
+import atexit
+import datetime
+from re import L
+
+import httpx
 from my_utils import my_logging, validation_util
 import dotenv
-import aiocron
 import traceback
 import platform
 import os
 import multiprocessing
-import asyncio
-from telegram import Bot
 from telegram.ext import ApplicationBuilder, ContextTypes, BaseRateLimiter
+from pytz import timezone
+from my_utils.global_var import atexit_handler
+from httpx import AsyncClient, Limits
 
 # 日志
 logger = my_logging.get_logger('app')
@@ -32,7 +36,7 @@ def bootstrap(logger, bot_directories):
     # 动态加载每个机器人
     for bot_directory in bot_directories:
         try:
-            if bot_directory == '__pycache__' or bot_directory == 'dogyun_bot':
+            if bot_directory == '__pycache__':
                 continue
             bot_module = __import__(
                 f'bots.{bot_directory}.bot', fromlist=['handlers'])
@@ -41,37 +45,13 @@ def bootstrap(logger, bot_directories):
             token = os.getenv(f'{bot_directory.upper()}_TOKEN')
             if token is None or len(token) == 0:
                 logger.error(f'{bot_directory.upper()}_TOKEN未设置!')
-
-            if bot_directory == 'dogyun_bot':
-                # 创建一个单独的进程来运行调度器
-                p_scheduler = multiprocessing.Process(
-                    target=run_scheduler, args=(token,))
-                processes.append(p_scheduler)
-
             command_handlers = handlers()
             p_bot = multiprocessing.Process(target=start_bot, args=(
                 bot_directory, token, command_handlers))
             processes.append(p_bot)
-
         except ImportError as e:
             logger.error(f"Failed to import bot {bot_directory}: {e}")
     return processes
-
-
-async def add_scheduled_tasks(bot):
-    from bots.dogyun_bot.scheduled_task import get_traffic_packet as gtp, lucky_draw_notice, balance_lack_notice
-
-    @aiocron.crontab('0 0 7 * *')  # 每月7号
-    async def get_traffic_packet():
-        await gtp(bot)
-
-    @aiocron.crontab('0 9 * * *')  # 每天9点
-    async def lucky_draw_task():
-        await lucky_draw_notice(bot)
-
-    @aiocron.crontab('0 9 * * *')  # 每天9点
-    async def balance_lack_task():
-        await balance_lack_notice(bot)
 
 
 async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -87,25 +67,40 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def start_bot(bot_name, token, command_handlers=None):
+
     if token is None:
         logger.error("请先设置BOT TOKEN!")
         return
     application = ApplicationBuilder() \
         .token(token) \
-        .read_timeout(15) \
         .write_timeout(15) \
         .connect_timeout(10) \
         .concurrent_updates(True) \
-        .get_updates_read_timeout(120) \
-        .get_updates_write_timeout(120) \
-        .get_updates_connect_timeout(30) \
+        .get_updates_read_timeout(60) \
+        .get_updates_write_timeout(60) \
+        .get_updates_connect_timeout(15) \
         .build()
+
     if command_handlers:
         application.add_handlers(command_handlers)
+    # 特殊的机器人添加定时任务
+    # 获取 JobQueue
+    job_queue = application.job_queue
+    # 设置时区为中国时区
+    china_timezone = timezone('Asia/Shanghai')
+
+    if bot_name == 'dogyun_bot':
+        from bots.dogyun_bot.scheduled_task import get_traffic_packet, lucky_draw_notice, balance_lack_notice
+        execute_time = datetime.time(
+            hour=9, minute=0, second=0, tzinfo=china_timezone)
+        # 获取每月流量包
+        job_queue.run_monthly(get_traffic_packet, when=execute_time, day=7)
+        # 抽奖活动通知
+        job_queue.run_daily(lucky_draw_notice, time=execute_time)
+        # 余额不足提醒
+        job_queue.run_daily(balance_lack_notice, time=execute_time)
     application.add_error_handler(error_handler)
 
-    # logger.info(f"{bot_name} is started!!")
-    # application.run_polling(drop_pending_updates=True)
     if platform.system().lower() == 'windows':
         logger.info(f"{bot_name} is started!!")
         application.run_polling(drop_pending_updates=True)
@@ -126,22 +121,8 @@ def start_bot(bot_name, token, command_handlers=None):
         )
 
 
-async def start_scheduler(token):
-    bot = Bot(token=token)
-    await add_scheduled_tasks(bot)
-    logger.info("Scheduler started.")
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except (KeyboardInterrupt, SystemExit):
-        pass
-
-
-def run_scheduler(token):
-    asyncio.run(start_scheduler(token))
-
-
 if __name__ == '__main__':
+    atexit.register(atexit_handler)
     bot_directories = init()
     # Bootstrap!
     processes = bootstrap(logger, bot_directories)

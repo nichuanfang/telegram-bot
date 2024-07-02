@@ -16,7 +16,7 @@ from fake_useragent import FakeUserAgent
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
-from my_utils import redis_util
+from my_utils import global_var, redis_util
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 # 随机ua
@@ -168,20 +168,14 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip()
                              for user_id in values[0].split(',')]
 
 
-# Redis连接池用于存储每日访问计数和过期时间
-REDIS_POOL: ConnectionPool = redis_util.create_redis_pool()
-# 注册关闭连接池
-atexit.register(lambda: asyncio.run(redis_util.close_redis_pool(REDIS_POOL)))
-
-
 def check_visitor_quota(user_id):
     today_date = datetime.date.today()
     redis_key = f"visitor_quota:{user_id}:{today_date}"
 
-    if REDIS_POOL is None:
+    if global_var.REDIS_POOL is None:
         raise RuntimeError("Redis pool is not initialized.")
 
-    with redis_util.get_redis_client(REDIS_POOL) as redis_client:
+    with redis_util.get_redis_client(global_var.REDIS_POOL) as redis_client:
         # 获取当前用户今天的访问次数
         count = redis_util.get(redis_client, redis_key)
         if count is None:

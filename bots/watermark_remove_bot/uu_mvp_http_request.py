@@ -1,22 +1,15 @@
 # 定制化请求
 
-from fake_useragent import UserAgent
-import requests
-
+from fake_useragent import FakeUserAgent
+from my_utils.global_var import GLOBAL_SESSION as session
 from my_utils.validation_util import validate
 
-headers = {
-    'Accept-Encoding': 'gzip,compress,br,deflate',
-    'Content-Type': 'application/json',
-    'Connection': 'keep-alive',
-    'Referer': 'https://servicewechat.com/wxd5fef542870462a7/3/page-frame.html',
-    'Host': 'uu.yyymvp.com',
-}
+
 requires = validate('UU_MVP_BASE_URL')
 UU_MVP_BASE_URL = requires[0]
 
 # 创建一个 UserAgent 实例
-ua = UserAgent()
+ua = FakeUserAgent(browsers='chrome', os='windows', platforms='pc')
 
 
 class UuMvpHttpRequest:
@@ -30,8 +23,10 @@ class UuMvpHttpRequest:
         Returns: 分析结果
 
         """
-        headers['User-Agent'] = ua.random
-        response = requests.get(
+        headers = {
+            'User-Agent': ua.random
+        }
+        response = await session.get(
             f'{UU_MVP_BASE_URL}/query',
             headers=headers,
             params={
@@ -39,4 +34,4 @@ class UuMvpHttpRequest:
                 'user_id': 5
             }
         )
-        return response.json()
+        return await response.json()
