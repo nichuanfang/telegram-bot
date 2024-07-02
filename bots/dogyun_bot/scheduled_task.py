@@ -79,10 +79,10 @@ async def lucky_draw_notice(context: CallbackContext):
                 # tg通知dogyun cookie已过期
                 await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
                 return
+            soup = BeautifulSoup(await response.text(), 'lxml')
     except Exception as e:
         logger.error(e)
         return
-    soup = BeautifulSoup(await response.text(), 'lxml')
     try:
         result = soup.find("strong")
         if result is not None:
@@ -114,10 +114,10 @@ async def balance_lack_notice(context: CallbackContext):
                 # tg通知dogyun cookie已过期
                 await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
                 return
+            soup = BeautifulSoup(await response.text(), 'lxml')
     except Exception as e:
         logger.error(e)
         return
-    soup = BeautifulSoup(await response.text(), 'lxml')
     try:
         result = soup.find('span', class_='h5 font-weight-normal').text
         # 根据正则表达式提取数字

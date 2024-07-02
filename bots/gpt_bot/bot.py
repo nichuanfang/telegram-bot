@@ -449,18 +449,17 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
-        response = requests.post(
-            f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8'))
-        if response.status_code == 200:
-            result = response.json()
-            document_id = result.get('key')
-            if document_id:
-                document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
-                await bot_util.edit_message(
-                    update, context, init_message.message_id, True, text=f'请访问：{document_url}')
-            else:
-                await bot_util.edit_message(
-                    update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
+        async with session.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8')) as response:
+            if response.status == 200:
+                result = await response.json()
+                document_id = result.get('key')
+                if document_id:
+                    document_url = f'{bot_util.HASTE_SERVER_HOST}/raw/{document_id}.md'
+                    await bot_util.edit_message(
+                        update, context, init_message.message_id, True, text=f'请访问：{document_url}')
+                else:
+                    await bot_util.edit_message(
+                        update, context, init_message.message_id, True, '保存到在线分享平台失败，请稍后重试。')
 
 
 async def handle_response(update: Update, context: CallbackContext, content_task, is_image_generator, session: aiohttp.ClientSession):

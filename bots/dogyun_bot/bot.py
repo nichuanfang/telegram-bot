@@ -3,7 +3,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, ContextTypes
-
+from my_utils.bot_util import ua
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth
 from my_utils.validation_util import validate
@@ -33,6 +33,7 @@ async def get_server_status(update: Update, context: CallbackContext):
         'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
         'Origin': 'https://vm.dogyun.com',
         'Referer': 'https://vm.dogyun.com',
+        'User-Agent': ua.random,
         'Cookie': DOGYUN_BOT_COOKIE
     }
     try:
@@ -42,7 +43,7 @@ async def get_server_status(update: Update, context: CallbackContext):
                 await update.message.reply_text(
                     'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
                 return
-        soup = BeautifulSoup(await response.text(), 'lxml')
+            soup = BeautifulSoup(await response.text(), 'lxml')
         # cpu
         cpu = soup.find_all(
             'div', class_='d-flex justify-content-between')[0].contents[1].contents[0]
@@ -77,6 +78,7 @@ async def draw_lottery(update: Update, context: CallbackContext):
         'X-Csrf-Token': DOGYUN_BOT_CSRF_TOKEN,
         'Origin': 'https://cvm.dogyun.com',
         'Referer': 'https://console.dogyun.com/turntable',
+        'User-Agent': ua.random,
         'Cookie': DOGYUN_BOT_COOKIE
     }
     # 发送put请求
