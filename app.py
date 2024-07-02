@@ -1,3 +1,4 @@
+import httpx
 from telegram import Update
 from telegram._utils.types import ODVInput
 from telegram.request import BaseRequest, RequestData
@@ -61,6 +62,8 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handles errors in the telegram-python-bot library.
     """
+    if isinstance(context.error, httpx.RemoteProtocolError):
+        return
     logger.error(
         f"==================================================ERROR START==================================================================")
     logger.error(f'Exception while handling an update: {context.error}')
