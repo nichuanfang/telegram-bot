@@ -104,24 +104,26 @@ def start_bot(bot_name, token, command_handlers=None):
         application.add_handlers(command_handlers)
     application.add_error_handler(error_handler)
 
-    if platform.system().lower() == 'windows':
-        logger.info(f"{bot_name} is started!!")
-        application.run_polling(drop_pending_updates=True)
-    else:
-        validate_res = validation_util.validate(
-            f'{bot_name.upper()}_WEBHOOK_URL', f'{bot_name.upper()}_WEBHOOK_PORT')
-        webhook_url = validate_res[0]
-        webhook_port = validate_res[1]
-        logger.info(
-            f"{bot_name} is started at http://127.0.0.1:{webhook_port}!! remote webhook url: {webhook_url}")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=webhook_port,
-            webhook_url=webhook_url,
-            url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
-            allowed_updates=['message', 'edited_message'],
-            drop_pending_updates=True
-        )
+    logger.info(f"{bot_name} is started!!")
+    application.run_polling(drop_pending_updates=True)
+    # if platform.system().lower() == 'windows':
+    #     logger.info(f"{bot_name} is started!!")
+    #     application.run_polling(drop_pending_updates=True)
+    # else:
+    #     validate_res = validation_util.validate(
+    #         f'{bot_name.upper()}_WEBHOOK_URL', f'{bot_name.upper()}_WEBHOOK_PORT')
+    #     webhook_url = validate_res[0]
+    #     webhook_port = validate_res[1]
+    #     logger.info(
+    #         f"{bot_name} is started at http://127.0.0.1:{webhook_port}!! remote webhook url: {webhook_url}")
+    #     application.run_webhook(
+    #         listen="0.0.0.0",
+    #         port=webhook_port,
+    #         webhook_url=webhook_url,
+    #         url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
+    #         allowed_updates=['message', 'edited_message'],
+    #         drop_pending_updates=True
+    #     )
 
 
 async def start_scheduler(token):
