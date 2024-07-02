@@ -13,3 +13,6 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.4.4

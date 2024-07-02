@@ -1,3 +1,4 @@
+import telegram
 from my_utils import my_logging, validation_util
 import dotenv
 import aiocron
@@ -7,7 +8,7 @@ import os
 import multiprocessing
 import asyncio
 from telegram import Bot
-from telegram.ext import ApplicationBuilder, ContextTypes
+from telegram.ext import ApplicationBuilder, ContextTypes, BaseRateLimiter
 
 # 日志
 logger = my_logging.get_logger('app')
@@ -95,9 +96,9 @@ def start_bot(bot_name, token, command_handlers=None):
         .write_timeout(15) \
         .connect_timeout(10) \
         .concurrent_updates(True) \
-        .get_updates_read_timeout(60) \
-        .get_updates_write_timeout(60) \
-        .get_updates_connect_timeout(10) \
+        .get_updates_read_timeout(120) \
+        .get_updates_write_timeout(120) \
+        .get_updates_connect_timeout(30) \
         .build()
     if command_handlers:
         application.add_handlers(command_handlers)
