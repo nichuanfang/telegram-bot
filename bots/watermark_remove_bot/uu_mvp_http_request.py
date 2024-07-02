@@ -26,12 +26,12 @@ class UuMvpHttpRequest:
         headers = {
             'User-Agent': ua.random
         }
-        response = await session.get(
+        async with session.get(
             f'{UU_MVP_BASE_URL}/query',
             headers=headers,
             params={
                 'url': url,
                 'user_id': 5
             }
-        )
-        return await response.json()
+        ) as response:
+            return await response.json()

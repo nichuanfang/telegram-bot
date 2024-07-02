@@ -33,12 +33,12 @@ async def get_traffic_packet(context: CallbackContext):
 
     try:
         # 发送post请求
-        response = await session.post(url=url, headers=headers)
-        if response.url.name == 'login':
-            # tg通知dogyun cookie已过期
-            await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
-            return
-        data = await response.json()
+        async with session.post(url=url, headers=headers) as response:
+            if response.url.name == 'login':
+                # tg通知dogyun cookie已过期
+                await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
+                return
+            data = await response.json()
     except Exception as e:
         logger.error(e)
         return
@@ -74,11 +74,11 @@ async def lucky_draw_notice(context: CallbackContext):
     }
     try:
         # 发起get请求
-        response = await session.get(url, headers=headers)
-        if response.url.name == 'login':
-            # tg通知dogyun cookie已过期
-            await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
-            return
+        async with session.get(url, headers=headers) as response:
+            if response.url.name == 'login':
+                # tg通知dogyun cookie已过期
+                await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
+                return
     except Exception as e:
         logger.error(e)
         return
@@ -109,11 +109,11 @@ async def balance_lack_notice(context: CallbackContext):
     }
     try:
         # 发起get请求
-        response = await session.get(url, headers=headers)
-        if response.url.name == 'login':
-            # tg通知dogyun cookie已过期
-            await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
-            return
+        async with session.get(url, headers=headers) as response:
+            if response.url.name == 'login':
+                # tg通知dogyun cookie已过期
+                await context.bot.send_message(DOGYUN_BOT_CHAT_ID, 'dogyun cookie已过期,请更新cookie!')
+                return
     except Exception as e:
         logger.error(e)
         return

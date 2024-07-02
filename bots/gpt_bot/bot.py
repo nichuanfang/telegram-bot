@@ -16,7 +16,7 @@ import regex
 import requests
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
-from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters,ContextTypes
+from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters, ContextTypes
 from bots.gpt_bot.gpt_platform import Platform
 
 from my_utils import code_util, my_logging, bot_util, tiktoken_util
@@ -350,33 +350,33 @@ async def handle_code_or_url(update: Update, session: aiohttp.ClientSession):
 
 
 async def handle_code_url(update: Update, code_id, session: aiohttp.ClientSession):
-    response = await session.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}')
-    if response.status == 200:
-        response_text = await response.text()
-        if not response_text:
-            raise ValueError(f'Your question url is Invalid.')
-    else:
-        raise RuntimeError('Your question url is Invalid.')
-    # 将代码文本内容划分开 代码部分和提问部分是不同的 按顺序的 分隔符是 ```
-    content = []
-    splits = list(filter(None, re.split(
-        r'^```\n', response_text, flags=re.MULTILINE)))
-    if not splits:
-        raise RuntimeError('内容为空!')
-    # 判断第一个非空元素是否为代码块 不用每次都判断 如果是 则奇数都是代码块; 否则偶数部分为代码块
-    is_code_block = code_util.is_code_block(splits[0])
-    for index, part in enumerate(splits):
-        flag = (is_code_block and (index % 2 == 0)) or (
-            not is_code_block and (index % 2 != 0))
-        if flag:
-            language, code = code_util.compress_code(part)
-            # 代码块
-            content.append(
-                f'```{language}\n{code}\n```')
+    async with session.get(f'{bot_util.HASTE_SERVER_HOST}/raw/{code_id}') as response:
+        if response.status == 200:
+            response_text = await response.text()
+            if not response_text:
+                raise ValueError(f'Your question url is Invalid.')
         else:
-            # 非代码块
-            content.append(f'{compress_question(part)}')
-    return content
+            raise RuntimeError('Your question url is Invalid.')
+        # 将代码文本内容划分开 代码部分和提问部分是不同的 按顺序的 分隔符是 ```
+        content = []
+        splits = list(filter(None, re.split(
+            r'^```\n', response_text, flags=re.MULTILINE)))
+        if not splits:
+            raise RuntimeError('内容为空!')
+        # 判断第一个非空元素是否为代码块 不用每次都判断 如果是 则奇数都是代码块; 否则偶数部分为代码块
+        is_code_block = code_util.is_code_block(splits[0])
+        for index, part in enumerate(splits):
+            flag = (is_code_block and (index % 2 == 0)) or (
+                not is_code_block and (index % 2 != 0))
+            if flag:
+                language, code = code_util.compress_code(part)
+                # 代码块
+                content.append(
+                    f'```{language}\n{code}\n```')
+            else:
+                # 非代码块
+                content.append(f'{compress_question(part)}')
+        return content
 
 
 async def handle_text(update):
@@ -421,13 +421,13 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                 continue
             continue
         if is_image_generator:
-            img_response = await session.get(curr_answer)
-            if img_response.content:
-                await asyncio.gather(
-                    bot_util.edit_message(
-                        update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
-                    update.message.reply_photo(photo=await img_response.content.read(),
-                                               reply_to_message_id=update.effective_message.message_id))
+            async with session.get(curr_answer) as img_response:
+                if img_response.content:
+                    await asyncio.gather(
+                        bot_util.edit_message(
+                            update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
+                        update.message.reply_photo(photo=await img_response.content.read(),
+                                                   reply_to_message_id=update.effective_message.message_id))
             continue
         if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
             continue
@@ -472,10 +472,10 @@ async def handle_response(update: Update, context: CallbackContext, content_task
             continue
         if is_image_generator:
             # 将res的url下载 返回一个图片
-            img_response = await session.get(res)
-            if img_response.content:
-                await update.message.reply_photo(photo=await img_response.content.read(),
-                                                 reply_to_message_id=update.effective_message.message_id)
+            async with session.get(res) as img_response:
+                if img_response.content:
+                    await update.message.reply_photo(photo=await img_response.content.read(),
+                                                     reply_to_message_id=update.effective_message.message_id)
         else:
             if len(res.encode()) < 3500:
                 await bot_util.send_message(update, res)

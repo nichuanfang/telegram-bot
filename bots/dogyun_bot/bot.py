@@ -36,12 +36,12 @@ async def get_server_status(update: Update, context: CallbackContext):
         'Cookie': DOGYUN_BOT_COOKIE
     }
     try:
-        response = await session.get(url=url, headers=headers)
-        if response.url.name == 'login':
-            # tg通知dogyun cookie已过期
-            await update.message.reply_text(
-                'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
-            return
+        async with session.get(url=url, headers=headers) as response:
+            if response.url.name == 'login':
+                # tg通知dogyun cookie已过期
+                await update.message.reply_text(
+                    'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
+                return
         soup = BeautifulSoup(await response.text(), 'lxml')
         # cpu
         cpu = soup.find_all(
@@ -81,13 +81,13 @@ async def draw_lottery(update: Update, context: CallbackContext):
     }
     # 发送put请求
     try:
-        response = await session.put(url=url, headers=headers)
-        if response.url.name == 'login':
-            # tg通知dogyun cookie已过期
-            await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
-                                            reply_to_message_id=update.message.message_id)
-            return
-        data = await response.json()
+        async with session.put(url=url, headers=headers) as response:
+            if response.url.name == 'login':
+                # tg通知dogyun cookie已过期
+                await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
+                                                reply_to_message_id=update.message.message_id)
+                return
+            data = await response.json()
     except Exception as e:
         await update.message.reply_text(f'目前没有抽奖活动: {str(e)}', reply_to_message_id=update.message.message_id)
         return
@@ -114,11 +114,14 @@ async def draw_lottery(update: Update, context: CallbackContext):
                       "search": {"value": "", "regex": False}}
         # post请求
         try:
-            prize_response = await session.post(**{
+            async with session.post(**{
                 'url': prize_url,
                 'json': prize_body,
                 'headers': headers
-            })
+            }) as prize_response:
+                if prize_response.status != 200:
+                    await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
+                                                    reply_to_message_id=update.message.message_id)
         except Exception as e:
             await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
                                             reply_to_message_id=update.message.message_id)

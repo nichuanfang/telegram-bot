@@ -174,44 +174,44 @@ class Free_2(Platform):
             "X-Deepinfra-Source": "web-page"
         }
         answer = ''
-        response = await session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data)
-        answer_parts = []
-        buffer = bytearray()
-        is_finished = False
-        async for item in response.content.iter_any():
-            # 是否追加不完整的json数据
-            flag = False
-            # 将每个字节流写入缓冲区
-            buffer.extend(item)
-            try:
-                content = buffer.decode()
-            except UnicodeDecodeError:
-                continue
-            lines = content.splitlines()
-            for line in lines:
-                if line:
-                    if '[DONE]' in line:
-                        is_finished = True
-                        yield 'finished', answer
-                        break
-                    else:
-                        try:
-                            delta = orjson.loads(line[6:])[
-                                'choices'][0]['delta']
-                            if delta:
-                                answer_parts.append(
-                                    delta['content'])
-                                # 在需要时进行拼接
-                                answer = ''.join(answer_parts)
-                                yield 'not_finished', answer
-                        except:
-                            flag = True
-            # 清空缓冲区
-            buffer.clear()
-            if flag:
-                buffer.extend(line.encode())
-        if not is_finished:
-            yield 'finished', answer
+        async with  session.post("https://api.deepinfra.com/v1/openai/chat/completions", headers=headers, json=json_data) as response:
+            answer_parts = []
+            buffer = bytearray()
+            is_finished = False
+            async for item in response.content.iter_any():
+                # 是否追加不完整的json数据
+                flag = False
+                # 将每个字节流写入缓冲区
+                buffer.extend(item)
+                try:
+                    content = buffer.decode()
+                except UnicodeDecodeError:
+                    continue
+                lines = content.splitlines()
+                for line in lines:
+                    if line:
+                        if '[DONE]' in line:
+                            is_finished = True
+                            yield 'finished', answer
+                            break
+                        else:
+                            try:
+                                delta = orjson.loads(line[6:])[
+                                    'choices'][0]['delta']
+                                if delta:
+                                    answer_parts.append(
+                                        delta['content'])
+                                    # 在需要时进行拼接
+                                    answer = ''.join(answer_parts)
+                                    yield 'not_finished', answer
+                            except:
+                                flag = True
+                # 清空缓冲区
+                buffer.clear()
+                if flag:
+                    buffer.extend(line.encode())
+            if not is_finished:
+                yield 'finished', answer
     # =========================================LLaMA-Deepai===========================================
 
     async def deepai(self, stream: bool, new_messages: list, session: aiohttp.ClientSession):
@@ -240,39 +240,39 @@ class Free_2(Platform):
             "User-Agent": agent,
         }
         answer = ''
-        response = await session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload)
-        answer_parts = []
-        other_parts = []
-        is_finished = False
-        async for item in response.content.iter_any():
-            try:
-                chunk = item.decode()
-                if is_finished:
-                    other_parts.append(chunk)
+        async with session.post("https://api.deepai.org/hacking_is_a_serious_crime", headers=headers, data=payload) as response:
+            answer_parts = []
+            other_parts = []
+            is_finished = False
+            async for item in response.content.iter_any():
+                try:
+                    chunk = item.decode()
+                    if is_finished:
+                        other_parts.append(chunk)
+                        continue
+                    if chunk.find('')!=-1:
+                                    # 分割内容 主体消息已结束
+                        splits = chunk.split('')   
+                        # 属于主体内容
+                        part_one = splits[0]
+                        answer_parts.append(part_one)
+                        answer = ''.join(answer_parts)
+                        is_finished = True
+                        yield 'finished', answer
+                        # 属于附加内容 
+                        part_two = splits[1]
+                        other_parts.append(part_two)
+                    else:
+                        answer_parts.append(chunk)
+                        answer = ''.join(answer_parts)
+                        yield 'not_finished', answer
+                except:
+                    # 解码失败
                     continue
-                if chunk.find('')!=-1:
-                                # 分割内容 主体消息已结束
-                    splits = chunk.split('')   
-                    # 属于主体内容
-                    part_one = splits[0]
-                    answer_parts.append(part_one)
-                    answer = ''.join(answer_parts)
-                    is_finished = True
-                    yield 'finished', answer
-                    # 属于附加内容 
-                    part_two = splits[1]
-                    other_parts.append(part_two)
-                else:
-                    answer_parts.append(chunk)
-                    answer = ''.join(answer_parts)
-                    yield 'not_finished', answer
-            except:
-                # 解码失败
-                continue
-        if not is_finished:
-            yield 'finished', answer
-        else:
-            yield 'additional', ''.join(other_parts)
+            if not is_finished:
+                yield 'finished', answer
+            else:
+                yield 'additional', ''.join(other_parts)
     # =========================================gemini-1.5-flash-latest===========================================
 
     async def gemini_complete(self, stream: bool, *new_messages):

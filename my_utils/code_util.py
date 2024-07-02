@@ -2,10 +2,6 @@
 
 import re
 
-# 跟代码相关的工具类
-
-import re
-
 # 增加更多语言和配置文件特征以提高检测准确率
 language_patterns = {
     'python': [r'\bdef\b', r'\bimport\b', r'\bprint\b', r'\bself\b'],

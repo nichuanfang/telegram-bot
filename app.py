@@ -62,14 +62,23 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handles errors in the telegram-python-bot library.
     """
-    if isinstance(context.error, httpx.RemoteProtocolError):
+    need_log = True if platform.system().lower() == 'windows' else False
+    if need_log:
+        logger.error(
+            f"==================================================ERROR START==================================================================")
+        if isinstance(context.error, aiohttp.ClientConnectorError):
+            logger.error(f"Connection error: {context.error}")
+        elif isinstance(context.error, aiohttp.ServerConnectionError):
+            logger.error(f"Server disconnected: {context.error}")
+        elif isinstance(context.error, aiohttp.ClientError):
+            logger.error(f"Client error: {context.error}")
+        else:
+            logger.error(
+                f'Exception while handling an update: {context.error}')
+        logger.error(
+            f"==================================================ERROR END====================================================================")
+    else:
         return
-    logger.error(
-        f"==================================================ERROR START==================================================================")
-    logger.error(f'Exception while handling an update: {context.error}')
-    traceback.print_exc()
-    logger.error(
-        f"==================================================ERROR END====================================================================")
 
 
 class AiohttpRequest(BaseRequest):
@@ -95,14 +104,14 @@ class AiohttpRequest(BaseRequest):
         connect_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
         pool_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
     ) -> Tuple[int, bytes]:
-        response = await self.session.request(
+        async with self.session.request(
             method,
             url,
             data=request_data.json_parameters if request_data else None,
-        )
-        status = response.status
-        payload = await response.read()
-        return status, payload
+        ) as response:
+            status = response.status
+            payload = await response.read()
+            return status, payload
 
 
 COMMON_REQUEST = AiohttpRequest(session=GLOBAL_SESSION)
