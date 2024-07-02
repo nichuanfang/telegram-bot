@@ -131,13 +131,6 @@ COMMON_REQUEST = AiohttpRequest(
     connect_timeout=10,
     pool_timeout=10,
 )
-UPDATE_REQUEST = AiohttpRequest(
-    session=GLOBAL_SESSION,
-    read_timeout=10,
-    write_timeout=10,
-    connect_timeout=10,
-    pool_timeout=10,
-)
 
 # 支持的更新类型
 ALLOWED_UPDATES = [Update.MESSAGE, Update.EDITED_MESSAGE,
@@ -153,7 +146,6 @@ def start_bot(bot_name, token, command_handlers=None):
     application = ApplicationBuilder() \
         .token(token) \
         .request(COMMON_REQUEST) \
-        .get_updates_request(UPDATE_REQUEST) \
         .build()
 
     if command_handlers:
