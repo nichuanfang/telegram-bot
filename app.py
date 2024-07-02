@@ -145,9 +145,9 @@ def start_bot(bot_name, token, command_handlers=None):
 
     application = ApplicationBuilder() \
         .token(token) \
-        .read_timeout(15) \
-        .write_timeout(15) \
-        .connect_timeout(10) \
+        .read_timeout(120) \
+        .write_timeout(120) \
+        .connect_timeout(30) \
         .concurrent_updates(True) \
         .get_updates_read_timeout(120) \
         .get_updates_write_timeout(120) \
