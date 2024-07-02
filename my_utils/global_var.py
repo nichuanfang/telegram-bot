@@ -15,12 +15,14 @@ if sys.platform == 'win32':
 
 
 class CustomResolver(aiohttp.abc.AbstractResolver):
-    """ 自定义dns解析器 """
+    """自定义 DNS 解析器"""
 
     def __init__(self, dns_map: Dict[str, Tuple[str, int]], default_dns: str, default_family=socket.AF_INET6):
         self.dns_map = dns_map
         self.default_dns = default_dns
         self.default_family = default_family
+        self.resolver = aiodns.DNSResolver(
+            nameservers=[self.default_dns])  # 设置默认的 DNS 服务器
 
     def find_dns_config(self, host: str):
         # 查找完整匹配或泛域名匹配的 DNS 配置
@@ -31,9 +33,9 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
                 return self.dns_map[domain]
         return self.default_dns, self.default_family
 
-    async def _query(self, resolver, host, record_type, family, port):
+    async def _query(self, host, record_type, family, port):
         try:
-            answers = await resolver.query(host, record_type)
+            answers = await self.resolver.query(host, record_type, family=family)
             return [
                 {
                     'hostname': host,
@@ -55,24 +57,44 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
         # 如果没有指定优先级，则使用请求时的 family，默认为 IPv6
         family = priority_family if family == socket.AF_UNSPEC else family
 
-        resolver = aiodns.DNSResolver(nameservers=[dns])
+        # 更新 resolver 的 nameservers，确保使用正确的 DNS 服务器
+        self.resolver.nameservers = [dns]
 
         # 尝试按照优先级进行查询
         record_types = [
             'AAAA', 'A'] if family == socket.AF_INET6 else ['A', 'AAAA']
-        families = [socket.AF_INET6, socket.AF_INET] if family == socket.AF_INET6 else [
-            socket.AF_INET, socket.AF_INET6]
+        results_ipv4 = []
+        results_ipv6 = []
 
-        results = []
-        for record_type, family in zip(record_types, families):
-            results = await self._query(resolver, host, record_type, family, port)
-            if results:
-                return results
+        # 并行查询 IPv4 和 IPv6 结果
+        tasks = []
+        for record_type, fam in zip(record_types, [socket.AF_INET, socket.AF_INET6]):
+            tasks.append(self._query(host, record_type, fam, port))
 
-        return []
+        # 并行执行任务
+        results = await asyncio.gather(*tasks)
+
+        # 整理结果，按照优先级返回
+        for result in results:
+            if result:
+                if result[0]['family'] == socket.AF_INET:
+                    results_ipv4.extend(result)
+                elif result[0]['family'] == socket.AF_INET6:
+                    results_ipv6.extend(result)
+
+        # 如果两种结果都为空，则返回空列表
+        if not results_ipv4 and not results_ipv6:
+            return []
+
+        # 按照优先级返回结果
+        if family == socket.AF_INET6:
+            return results_ipv6 or results_ipv4
+        else:
+            return results_ipv4 or results_ipv6
 
     async def close(self):
-        pass
+        # 关闭 resolver 连接
+        await self.resolver.nameserver.close()
 
 
 # dns_map 配置：域名 -> (DNS服务器, 优先级)，支持泛域名
