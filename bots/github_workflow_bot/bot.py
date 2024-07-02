@@ -24,7 +24,7 @@ async def scrape_metadata(update: Update, context: CallbackContext):
         await trigger_github_workflow(session, 'movie-tvshow-spider',
                                       'crawl movies and shows')
     except Exception as e:
-        await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
+        await update.message.reply_text(str(e), reply_to_message_id=update.message.message_id)
         return
     logger.info('Scraped!')
     await update.message.reply_text(
