@@ -45,44 +45,44 @@ class Free_3(Platform):
                 'user-agent': bot_util.ua.random,
                 'authorization': self.openai_api_key,
             }
-            response = await session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data)
-            answer_parts = []
-            buffer = bytearray()
-            is_finished = False
-            async for item in response.content.iter_any():
-                # 是否追加不完整的json数据
-                flag = False
-                # 将每个字节流写入缓冲区
-                buffer.extend(item)
-                try:
-                    content = buffer.decode()
-                except UnicodeDecodeError:
-                    continue
-                lines = content.splitlines()
-                for line in lines:
-                    if line:
-                        if '[DONE]' in line:
-                            is_finished = True
-                            yield 'finished', answer
-                            break
-                        else:
-                            try:
-                                delta = orjson.loads(line[6:])[
-                                    'choices'][0]['delta']
-                                if delta:
-                                    answer_parts.append(
-                                        delta['content'])
-                                    # 在需要时进行拼接
-                                    answer = ''.join(answer_parts)
-                                    yield 'not_finished', answer
-                            except:
-                                flag = True
-                # 清空缓冲区
-                buffer.clear()
-                if flag:
-                    buffer.extend(line.encode())
-            if not is_finished:
-                yield 'finished', answer
+            async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data) as response:
+                answer_parts = []
+                buffer = bytearray()
+                is_finished = False
+                async for item in response.content.iter_any():
+                    # 是否追加不完整的json数据
+                    flag = False
+                    # 将每个字节流写入缓冲区
+                    buffer.extend(item)
+                    try:
+                        content = buffer.decode()
+                    except UnicodeDecodeError:
+                        continue
+                    lines = content.splitlines()
+                    for line in lines:
+                        if line:
+                            if '[DONE]' in line:
+                                is_finished = True
+                                yield 'finished', answer
+                                break
+                            else:
+                                try:
+                                    delta = orjson.loads(line[6:])[
+                                        'choices'][0]['delta']
+                                    if delta:
+                                        answer_parts.append(
+                                            delta['content'])
+                                        # 在需要时进行拼接
+                                        answer = ''.join(answer_parts)
+                                        yield 'not_finished', answer
+                                except:
+                                    flag = True
+                    # 清空缓冲区
+                    buffer.clear()
+                    if flag:
+                        buffer.extend(line.encode())
+                if not is_finished:
+                    yield 'finished', answer
         else:
             json_data = {
                 'stream': False,
@@ -96,17 +96,17 @@ class Free_3(Platform):
                 'user-agent': bot_util.ua.random,
                 'authorization': self.openai_api_key
             }
-            response = await session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data)
-            completion = await response.text()
-            result = []
-            for line in completion.splitlines():
-                if line or line != 'data: [DONE]':
-                    delta = orjson.loads(line[6:])[
-                        'choices'][0]['delta']
-                    if delta:
-                        result.append(delta['content'])
-            answer = ''.join(result)
-            yield answer
+            async with session.post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data) as response:
+                completion = await response.text()
+                result = []
+                for line in completion.splitlines():
+                    if line or line != 'data: [DONE]':
+                        delta = orjson.loads(line[6:])[
+                            'choices'][0]['delta']
+                        if delta:
+                            result.append(delta['content'])
+                answer = ''.join(result)
+                yield answer
         await self.chat.append_messages(
             answer, context, *messages)
 

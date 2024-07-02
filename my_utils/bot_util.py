@@ -262,8 +262,8 @@ async def generate_code(platform: dict):
         'user-agent': ua.random,
         'Authorization': f'Basic {base64.b64encode(( platform["username"] + ":" + platform["password"]).encode()).decode()}'
     }
-    response = await global_var.GLOBAL_SESSION.get(platform['index_url'], headers=headers)
-    content = await response.content.read()
+    async with global_var.GLOBAL_SESSION.get(platform['index_url'], headers=headers) as response:
+        content = await response.content.read()
     html_content = content.decode('utf-8')
     # 定义正则表达式模式
     pattern = r"密码：\s*(\d+)"
@@ -354,33 +354,33 @@ async def generate_authorization(platform: dict):
         'user-agent': ua.random,
         'content-type': 'application/json'
     }
-    response = await global_var.GLOBAL_SESSION.post(f'{url}/api/v1/auths/signin', json={
+    async with global_var.GLOBAL_SESSION.post(f'{url}/api/v1/auths/signin', json={
         'email': email,
         'password': password,
-    }, headers=headers, timeout=20)
-    if response.status == 200:
-        json_data = orjson.loads(await response.text())
-        token = json_data['token']
-        token_type = json_data['token_type']
-        platform['openai_api_key'] = f'{token_type} {token}'
+    }, headers=headers, timeout=20) as response:
+        if response.status == 200:
+            json_data = orjson.loads(await response.text())
+            token = json_data['token']
+            token_type = json_data['token_type']
+            platform['openai_api_key'] = f'{token_type} {token}'
 
-        if os.path.exists(TEMP_CONFIG_PATH):
-            with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                old_json_data: dict = orjson.loads(f.read())
+            if os.path.exists(TEMP_CONFIG_PATH):
+                with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
+                    old_json_data: dict = orjson.loads(f.read())
+            else:
+                old_json_data = {}
+
+            # 刷新临时配置文件
+            with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
+                old_json_data.update({
+                    platform['platform_key']:  platform
+                })
+                f.write(orjson.dumps(old_json_data,
+                        option=orjson.OPT_INDENT_2).decode())
+            return platform
         else:
-            old_json_data = {}
-
-        # 刷新临时配置文件
-        with open(TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-            old_json_data.update({
-                platform['platform_key']:  platform
-            })
-            f.write(orjson.dumps(old_json_data,
-                    option=orjson.OPT_INDENT_2).decode())
-        return platform
-    else:
-        # 保持原认证信息不变
-        raise Exception('刷新认证信息失败!')
+            # 保持原认证信息不变
+            raise Exception('刷新认证信息失败!')
 
 # =====================================消息相关====================================
 

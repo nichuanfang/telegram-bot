@@ -104,14 +104,14 @@ class AiohttpRequest(BaseRequest):
         connect_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
         pool_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
     ) -> Tuple[int, bytes]:
-        response = await self.session.request(
+        async with self.session.request(
             method,
             url,
             data=request_data.json_parameters if request_data else None,
-        )
-        status = response.status
-        payload = await response.read()
-        return status, payload
+        ) as response:
+            status = response.status
+            payload = await response.read()
+            return status, payload
 
 
 COMMON_REQUEST = AiohttpRequest(session=GLOBAL_SESSION)

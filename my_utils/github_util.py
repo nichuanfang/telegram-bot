@@ -22,4 +22,6 @@ async def trigger_github_workflow(session: aiohttp.ClientSession, repo: str, eve
     }
     data = json.dumps({"event_type": f"{event_type}",
                        "client_payload": client_payload})
-    return await session.post(f'https://api.github.com/repos/nichuanfang/{repo}/dispatches', data=data, headers=header)
+    async with session.post(f'https://api.github.com/repos/nichuanfang/{repo}/dispatches', data=data, headers=header) as response:
+        if response.status == 200:
+            return await response.text()
