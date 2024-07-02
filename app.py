@@ -145,6 +145,8 @@ def start_bot(bot_name, token, command_handlers=None):
 
     application = ApplicationBuilder() \
         .token(token) \
+        .concurrent_updates(True) \
+        .pool_timeout(3600) \
         .build()
 
     if command_handlers:
