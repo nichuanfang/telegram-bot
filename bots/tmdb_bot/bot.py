@@ -5,7 +5,6 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, CallbackContext, MessageHandler, filters
 from tmdbv3api import TMDb, Search, Movie, TV
-
 from my_utils import my_logging, bot_util
 # 获取日志
 logger = my_logging.get_logger('tmdb_bot')
@@ -18,6 +17,13 @@ movie = Movie()
 tv = TV()
 
 
+async def search_by_type(type: str, query: str):
+    if type == 'movie':
+        return search.movies(query)
+    elif type == 'tv':
+        return search.tv_shows(query)
+
+
 async def default_search(update: Update, context: CallbackContext):
     """
     默认搜索
@@ -28,10 +34,10 @@ async def default_search(update: Update, context: CallbackContext):
     await bot_util.send_typing(update)
     query = update.message.text
     try:
-        responses = await asyncio.gather(bot_util.async_func(search.movies, query),
-                                         bot_util.async_func(search.tv_shows, query))
+        responses = await asyncio.gather(search_by_type('movie', query),
+                                         search_by_type('tv', query))
     except Exception as e:
-        await update.message.reply_text(e)
+        await update.message.reply_text(str(e))
         return
     movie_text = '*电影结果:*\n'
     movie_search = responses[0]
@@ -84,13 +90,13 @@ async def movie_popular(update: Update, context: CallbackContext):
     """
     await bot_util.send_typing(update)
     try:
-        res = await asyncio.gather(bot_util.async_func(movie.popular))
+        res = movie.popular()
     except Exception as e:
-        await update.message.reply_text(e)
+        await update.message.reply_text(str(e))
         return
 
     movie_text = '*电影推荐:*\n'
-    for movie_res in res[0].results:
+    for movie_res in res.results:
         try:
             if movie_res["release_date"] == None or movie_res["release_date"] == '':
                 release_date = ''
@@ -104,7 +110,7 @@ async def movie_popular(update: Update, context: CallbackContext):
         movie_text = movie_text + \
             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
     await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                    reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+                                    reply_to_message_id=update.message.message_id, disable_web_page_preview=False)
 
 
 async def tv_popular(update: Update, context: CallbackContext):
@@ -116,12 +122,12 @@ async def tv_popular(update: Update, context: CallbackContext):
     """
     await bot_util.send_typing(update)
     try:
-        res = await asyncio.gather(bot_util.async_func(tv.popular))
+        res = tv.popular()
     except Exception as e:
-        await update.message.reply_text(e)
+        await update.message.reply_text(str(e))
         return
     tv_text = '*剧集推荐:*\n'
-    for tv_res in res[0].results:
+    for tv_res in res.results:
         try:
             if tv_res["first_air_date"] == None or tv_res["first_air_date"] == '':
                 first_air_date = ''
@@ -134,7 +140,7 @@ async def tv_popular(update: Update, context: CallbackContext):
         tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
         tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
     await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                    reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+                                    reply_to_message_id=update.message.message_id, disable_web_page_preview=False)
 
 
 async def search_movie(update: Update, context: CallbackContext):
@@ -150,12 +156,11 @@ async def search_movie(update: Update, context: CallbackContext):
         return
     movie_text = '*电影结果:*\n'
     try:
-        res = await asyncio.gather(bot_util.async_func(search.movies, message_text[14:]))
+        res = search.movies(message_text[14:])
     except Exception as e:
         await update.message.reply_text(e)
         return
-    movie_search = res[0]
-    for movie_res in movie_search.results:
+    for movie_res in res.results:
         try:
             if movie_res["release_date"] == None or movie_res["release_date"] == '':
                 release_date = ''
@@ -168,9 +173,9 @@ async def search_movie(update: Update, context: CallbackContext):
         movie_tmdb_url = f'https://www.themoviedb.org/movie/{movie_res.id}?language=zh-CN'
         movie_text = movie_text + \
             f'•  `{movie_name}`      [🔗]({movie_tmdb_url})\n'
-    if len(movie_search.results) != 0:
+    if res.results:
         await update.message.reply_text(movie_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                        reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+                                        reply_to_message_id=update.message.message_id, disable_web_page_preview=False)
     else:
         return None
 
@@ -202,12 +207,11 @@ async def search_tv(update: Update, context: CallbackContext):
         return
     tv_text = '*剧集结果:*\n'
     try:
-        res = await asyncio.gather(bot_util.async_func(search.tv_shows, message_text[11:]))
+        res = search.tv_shows(message_text[11:])
     except Exception as e:
-        await update.message.reply_text(e)
+        await update.message.reply_text(str(e))
         return
-    tv_search = res[0]
-    for tv_res in tv_search.results:
+    for tv_res in res.results:
         try:
             if tv_res["first_air_date"] == None or tv_res["first_air_date"] == '':
                 first_air_date = ''
@@ -219,9 +223,9 @@ async def search_tv(update: Update, context: CallbackContext):
         tv_name = f'{tv_res.name} {first_air_date}'
         tv_tmdb_url = f'https://www.themoviedb.org/tv/{tv_res.id}?language=zh-CN'
         tv_text = tv_text + f'•  `{tv_name}`      [🔗]({tv_tmdb_url})\n'
-    if len(tv_search.results) != 0:
+    if len(res.results) != 0:
         await update.message.reply_text(tv_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                        reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+                                        reply_to_message_id=update.message.message_id, disable_web_page_preview=False)
     else:
         return None
 

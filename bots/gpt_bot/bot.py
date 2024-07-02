@@ -3,9 +3,6 @@ import atexit
 import base64
 from concurrent.futures import ThreadPoolExecutor
 import heapq
-import platform
-import signal
-import sys
 import aiohttp
 import orjson
 import mimetypes
@@ -19,12 +16,13 @@ import regex
 import requests
 from telegram import File, Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode
-from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters
+from telegram.ext import MessageHandler,  CallbackContext, CommandHandler, CallbackQueryHandler, filters,ContextTypes
 from bots.gpt_bot.gpt_platform import Platform
+
 from my_utils import code_util, my_logging, bot_util, tiktoken_util
 from my_utils.bot_util import auth, instantiate_platform, migrate_platform
 from my_utils.document_util import DocumentHandler
-
+from my_utils.global_var import GLOBAL_SESSION
 # 获取日志
 logger = my_logging.get_logger('gpt_bot')
 # 正则
@@ -40,37 +38,6 @@ MASKS: dict = bot_util.masks
 PLATFORMS: dict = bot_util.platforms
 # 是否启用流式传输 默认不采用
 ENABLE_STREAM = int(os.getenv('ENABLE_STREAM', False))
-
-# 自定义 DNS 解析器
-
-
-# 创建全局 aiohttp.ClientSession 对象
-GLOBAL_SESSION = aiohttp.ClientSession(
-    trust_env=True,
-    raise_for_status=True,
-    timeout=aiohttp.ClientTimeout(total=300),
-    connector=aiohttp.TCPConnector(
-        limit=100,  # 最大连接数
-        limit_per_host=10,  # 每个主机的最大连接数
-        ttl_dns_cache=3600,  # DNS 缓存时间
-        keepalive_timeout=3600  # 空闲连接存活时间
-    )
-)
-
-
-async def close_session():
-    """ 关闭连接 """
-    await GLOBAL_SESSION.close()
-
-
-def atexit_handler():
-    """ 关闭处理器 """
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(close_session())
-
-
-# 注册关闭会话
-atexit.register(atexit_handler)
 
 
 async def start(update: Update, context: CallbackContext) -> None:
@@ -551,7 +518,7 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
                         json_data,  option=orjson.OPT_INDENT_2).decode())
                     # 刷新token成功!
             try:
-                current_platform = context.user_data['current_platform'] = instantiate_platform(
+                current_platform = context.user_data['current_platform'] = await instantiate_platform(
                     platform_key=current_platform.name)
                 current_platform.chat.clear_messages(context)
                 is_refreshed = True

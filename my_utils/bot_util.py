@@ -16,7 +16,7 @@ from fake_useragent import FakeUserAgent
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
-from my_utils import redis_util
+from my_utils import global_var, redis_util
 from my_utils.my_logging import get_logger
 from my_utils.validation_util import validate
 # 随机ua
@@ -81,7 +81,7 @@ def platform_default_model():
     return mask_model_mapping[supported_masks[0]][0]
 
 
-def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: bool = False):
+async def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: bool = False):
     """
     初始化平台
     @param platform_name: 平台名称(英文)
@@ -94,7 +94,7 @@ def instantiate_platform(platform_key: str = DEFAULT_PLATFORM_KEY, need_logger: 
     # 如果没配置openai_api_key 说明是free_3/4 需要爬虫抓取授权码
     if 'openai_api_key' not in platform:
         # 反序列化平台信息
-        platform: dict = generate_api_key(platform)
+        platform: dict = await generate_api_key(platform)
         openai_api_key = platform['openai_api_key']
     else:
         openai_api_key = platform['openai_api_key']
@@ -132,7 +132,7 @@ async def migrate_platform(from_platform, to_platform_key: str, context: Callbac
 
     # 如果没配置openai_api_key 说明是free_3/4
     if 'openai_api_key' not in to_platform:
-        to_platform: dict = generate_api_key(to_platform)
+        to_platform: dict = await generate_api_key(to_platform)
         openai_api_key = to_platform['openai_api_key']
     else:
         openai_api_key = to_platform['openai_api_key']
@@ -168,20 +168,14 @@ ALLOWED_TELEGRAM_USER_IDS = [user_id.strip()
                              for user_id in values[0].split(',')]
 
 
-# Redis连接池用于存储每日访问计数和过期时间
-REDIS_POOL: ConnectionPool = redis_util.create_redis_pool()
-# 注册关闭连接池
-atexit.register(lambda: asyncio.run(redis_util.close_redis_pool(REDIS_POOL)))
-
-
 def check_visitor_quota(user_id):
     today_date = datetime.date.today()
     redis_key = f"visitor_quota:{user_id}:{today_date}"
 
-    if REDIS_POOL is None:
+    if global_var.REDIS_POOL is None:
         raise RuntimeError("Redis pool is not initialized.")
 
-    with redis_util.get_redis_client(REDIS_POOL) as redis_client:
+    with redis_util.get_redis_client(global_var.REDIS_POOL) as redis_client:
         # 获取当前用户今天的访问次数
         count = redis_util.get(redis_client, redis_key)
         if count is None:
@@ -220,9 +214,9 @@ def auth(func):
                 context.user_data['identity'] = 'user'
 
             if context.bot.first_name == 'GPTBot':
-                context.user_data['current_platform'] = instantiate_platform(
+                context.user_data['current_platform'] = await instantiate_platform(
                     need_logger=True)
-                context.user_data['candidate_platform'] = instantiate_platform(
+                context.user_data['candidate_platform'] = await instantiate_platform(
                     platform_key='free_1', need_logger=False)
                 context.user_data['current_mask'] = platform_default_mask()
                 context.user_data['current_model'] = platform_default_model()
@@ -238,7 +232,7 @@ def auth(func):
     return wrapper
 
 
-def generate_api_key(platform: dict):
+async def generate_api_key(platform: dict):
     # 尝试先从临时配置文件获取
     if os.path.exists(TEMP_CONFIG_PATH):
         with open(TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
@@ -248,14 +242,14 @@ def generate_api_key(platform: dict):
                 return temp_config_data[platform['platform_key']]
     # 扩展性配置  免费节点的特殊操作
     if platform['platform_key'] == 'free_3':
-        return generate_authorization(platform)
+        return await generate_authorization(platform)
     elif platform['platform_key'] == 'free_4':
-        return generate_authorization(platform)
+        return await generate_authorization(platform)
     # elif platform['platform_key'] == 'free_1':
     #     return generate_code(platform)
 
 
-def generate_code(platform: dict):
+async def generate_code(platform: dict):
     """
     生成授权码  (用户名密码获取地址   https://free01.xyz)
     @param platform: 平台
@@ -268,8 +262,9 @@ def generate_code(platform: dict):
         'user-agent': ua.random,
         'Authorization': f'Basic {base64.b64encode(( platform["username"] + ":" + platform["password"]).encode()).decode()}'
     }
-    response = requests.get(platform['index_url'], headers=headers)
-    html_content = response.content.decode('utf-8')
+    response = await global_var.GLOBAL_SESSION.get(platform['index_url'], headers=headers)
+    content = await response.content.read()
+    html_content = content.decode('utf-8')
     # 定义正则表达式模式
     pattern = r"密码：\s*(\d+)"
     url_pattern = r'href="(https?://[^"]+)"'
@@ -344,7 +339,7 @@ def generate_code(platform: dict):
 #         raise RuntimeError('生成free_3的token失败!')
 
 
-def generate_authorization(platform: dict):
+async def generate_authorization(platform: dict):
     """生成认证头
 
     Args:
@@ -359,12 +354,12 @@ def generate_authorization(platform: dict):
         'user-agent': ua.random,
         'content-type': 'application/json'
     }
-    response = requests.post(f'{url}/api/v1/auths/signin', json={
+    response = await global_var.GLOBAL_SESSION.post(f'{url}/api/v1/auths/signin', json={
         'email': email,
         'password': password,
-    }, headers=headers)
-    if response.status_code == 200:
-        json_data = orjson.loads(response.text)
+    }, headers=headers, timeout=20)
+    if response.status == 200:
+        json_data = orjson.loads(await response.text())
         token = json_data['token']
         token_type = json_data['token_type']
         platform['openai_api_key'] = f'{token_type} {token}'

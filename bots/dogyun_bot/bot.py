@@ -1,14 +1,13 @@
-import asyncio
 import subprocess
 from datetime import date
 from bs4 import BeautifulSoup
-import requests
-from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, ContextTypes
 
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth
 from my_utils.validation_util import validate
+from my_utils.global_var import GLOBAL_SESSION as session
 
 # 获取日志
 logger = my_logging.get_logger('dogyun_bot')
@@ -37,16 +36,13 @@ async def get_server_status(update: Update, context: CallbackContext):
         'Cookie': DOGYUN_BOT_COOKIE
     }
     try:
-        res = await asyncio.gather(
-            bot_util.async_func(requests.get, **{'url': url, 'headers': headers, 'verify': True}))
-        # 发送post请求
-        response = res[0]
-        if response.url == 'https://account.dogyun.com/login':
+        response = await session.get(url=url, headers=headers)
+        if response.url.name == 'login':
             # tg通知dogyun cookie已过期
             await update.message.reply_text(
                 'dogyun cookie已过期,请更新cookie!', reply_to_message_id=update.message.message_id)
             return
-        soup = BeautifulSoup(response.text, 'lxml')
+        soup = BeautifulSoup(await response.text(), 'lxml')
         # cpu
         cpu = soup.find_all(
             'div', class_='d-flex justify-content-between')[0].contents[1].contents[0]
@@ -85,17 +81,15 @@ async def draw_lottery(update: Update, context: CallbackContext):
     }
     # 发送put请求
     try:
-        res = await asyncio.gather(
-            bot_util.async_func(requests.put, **{'url': url, 'headers': headers, 'verify': True}))
-        response = res[0]
-        if response.url == 'https://account.dogyun.com/login':
+        response = await session.put(url=url, headers=headers)
+        if response.url.name == 'login':
             # tg通知dogyun cookie已过期
             await update.message.reply_text('dogyun cookie已过期,请更新cookie!',
                                             reply_to_message_id=update.message.message_id)
             return
-        data = response.json()
+        data = await response.json()
     except Exception as e:
-        await update.message.reply_text(e, reply_to_message_id=update.message.message_id)
+        await update.message.reply_text(f'目前没有抽奖活动: {str(e)}', reply_to_message_id=update.message.message_id)
         return
     # 获取抽奖结果
     try:
@@ -120,20 +114,18 @@ async def draw_lottery(update: Update, context: CallbackContext):
                       "search": {"value": "", "regex": False}}
         # post请求
         try:
-            prize_res = await asyncio.gather(bot_util.async_func(requests.post, **{
+            prize_response = await session.post(**{
                 'url': prize_url,
                 'json': prize_body,
-                'headers': headers,
-                'verify': True
-            }))
-            prize_response = prize_res[0]
+                'headers': headers
+            })
         except Exception as e:
             await update.message.reply_text(f'查看奖品失败: {e.args[0]}',
                                             reply_to_message_id=update.message.message_id)
             return
         # 获取返回的json数据
         try:
-            prize_data = prize_response.json()
+            prize_data = await prize_response.json()
         except:
             # tg通知dogyun cookie已过期
             await update.message.reply_text('dogyun cookie已过期,请更新cookie',
@@ -165,12 +157,11 @@ async def bitwarden_backup(update: Update, context: CallbackContext):
     #     return
     await bot_util.send_typing(update)
     try:
-        await asyncio.gather(
-            bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
-    except:
-        await update.message.reply_text('执行脚本报错', reply_to_message_id=update.message.message_id)
-        return
-    await update.message.reply_text('备份bitwarden成功', reply_to_message_id=update.message.message_id)
+        output = subprocess.check_output(
+            f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
+        await update.message.reply_text(f'备份bitwarden成功', reply_to_message_id=update.message.message_id)
+    except Exception as e:
+        await update.message.reply_text(f'执行脚本报错: {str(e)}', reply_to_message_id=update.message.message_id)
 
 
 @auth
@@ -188,18 +179,13 @@ async def exec_cmd(update: Update, context: CallbackContext):
     if script in ['systemctl stop telegram-bot', 'systemctl restart telegram-bot', 'reboot']:
         await update.message.reply_text('禁止执行该命令', reply_to_message_id=update.message.message_id)
         return
-    # try:
-    #     ssd_fd = ssh_connect(vps_config["VPS_HOST"], vps_config["VPS_PORT"],
-    #                          vps_config["VPS_USER"], vps_config["VPS_PASS"])
-    # except:
-    #     return
     try:
-        await asyncio.gather(
-            bot_util.async_func(subprocess.call, f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', **{'shell': True}))
-    except:
-        await update.message.reply_text('执行命令报错', reply_to_message_id=update.message.message_id)
+        output = subprocess.check_output(
+            f'nsenter -m -u -i -n -p -t 1 bash -c "{script}"', shell=True)
+        await update.message.reply_text(output.decode(), reply_to_message_id=update.message.message_id)
+    except Exception as e:
+        await update.message.reply_text(f'执行命令报错: {str(e)}', reply_to_message_id=update.message.message_id)
         return
-    await update.message.reply_text('执行命令成功', reply_to_message_id=update.message.message_id)
 
 
 def handlers():
