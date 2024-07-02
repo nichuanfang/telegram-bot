@@ -1,18 +1,21 @@
+from telegram import Update
+from telegram._utils.types import ODVInput
+from telegram.request import BaseRequest, RequestData
+from typing import Optional, Tuple, Union
+import aiohttp
 import atexit
 import datetime
-from re import L
 
-import httpx
 from my_utils import my_logging, validation_util
 import dotenv
 import traceback
 import platform
 import os
 import multiprocessing
-from telegram.ext import ApplicationBuilder, ContextTypes, BaseRateLimiter
+from telegram.ext import ApplicationBuilder, ContextTypes
 from pytz import timezone
-from my_utils.global_var import atexit_handler
-from httpx import AsyncClient, Limits
+from my_utils.global_var import GLOBAL_SESSION, atexit_handler
+from telegram.request import BaseRequest
 
 # 日志
 logger = my_logging.get_logger('app')
@@ -66,6 +69,77 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"==================================================ERROR END====================================================================")
 
 
+class AiohttpRequest(BaseRequest):
+    def __init__(
+        self,
+        *,
+        read_timeout: Optional[float] = None,
+        write_timeout: Optional[float] = None,
+        connect_timeout: Optional[float] = None,
+        pool_timeout: Optional[float] = None,
+        session: Optional[aiohttp.ClientSession] = None,
+    ):
+        self._read_timeout = read_timeout
+        self._write_timeout = write_timeout
+        self._connect_timeout = connect_timeout
+        self._pool_timeout = pool_timeout
+        self.session = session or aiohttp.ClientSession()
+
+    @property
+    def read_timeout(self) -> Optional[float]:
+        return self._read_timeout
+
+    async def initialize(self) -> None:
+        if self.session.closed:
+            self.session = aiohttp.ClientSession()
+
+    async def shutdown(self) -> None:
+        await self.session.close()
+
+    async def do_request(
+        self,
+        url: str,
+        method: str,
+        request_data: Optional[RequestData] = None,
+        read_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
+        write_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
+        connect_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
+        pool_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
+    ) -> Tuple[int, bytes]:
+        timeout = aiohttp.ClientTimeout(
+            total=None,
+            connect=connect_timeout if connect_timeout is not BaseRequest.DEFAULT_NONE else self._connect_timeout,
+            sock_read=read_timeout if read_timeout is not BaseRequest.DEFAULT_NONE else self._read_timeout,
+            sock_connect=write_timeout if write_timeout is not BaseRequest.DEFAULT_NONE else self._write_timeout,
+        )
+
+        async with self.session.request(
+            method,
+            url,
+            data=request_data.json_parameters if request_data else None,
+            timeout=timeout
+        ) as response:
+            status = response.status
+            payload = await response.read()
+            return status, payload
+
+
+COMMON_REQUEST = AiohttpRequest(
+    session=GLOBAL_SESSION,
+    read_timeout=10,
+    write_timeout=10,
+    connect_timeout=10,
+    pool_timeout=10,
+)
+UPDATE_REQUEST = AiohttpRequest(
+    session=GLOBAL_SESSION,
+    read_timeout=10,
+    write_timeout=10,
+    connect_timeout=10,
+    pool_timeout=10,
+)
+
+
 def start_bot(bot_name, token, command_handlers=None):
 
     if token is None:
@@ -73,16 +147,13 @@ def start_bot(bot_name, token, command_handlers=None):
         return
     application = ApplicationBuilder() \
         .token(token) \
-        .write_timeout(15) \
-        .connect_timeout(10) \
-        .concurrent_updates(True) \
-        .get_updates_read_timeout(60) \
-        .get_updates_write_timeout(60) \
-        .get_updates_connect_timeout(15) \
+        .request(COMMON_REQUEST) \
+        .get_updates_request(UPDATE_REQUEST) \
         .build()
 
     if command_handlers:
         application.add_handlers(command_handlers)
+    application.add_error_handler(error_handler)
     # 特殊的机器人添加定时任务
     # 获取 JobQueue
     job_queue = application.job_queue
@@ -99,11 +170,11 @@ def start_bot(bot_name, token, command_handlers=None):
         job_queue.run_daily(lucky_draw_notice, time=execute_time)
         # 余额不足提醒
         job_queue.run_daily(balance_lack_notice, time=execute_time)
-    application.add_error_handler(error_handler)
 
     if platform.system().lower() == 'windows':
         logger.info(f"{bot_name} is started!!")
-        application.run_polling(drop_pending_updates=True)
+        application.run_polling(drop_pending_updates=True,
+                                allowed_updates=Update.ALL_TYPES)
     else:
         validate_res = validation_util.validate(
             f'{bot_name.upper()}_WEBHOOK_URL', f'{bot_name.upper()}_WEBHOOK_PORT')
@@ -116,8 +187,8 @@ def start_bot(bot_name, token, command_handlers=None):
             port=webhook_port,
             webhook_url=webhook_url,
             url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
-            allowed_updates=['message', 'edited_message'],
-            drop_pending_updates=True
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
         )
 
 

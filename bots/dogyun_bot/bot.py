@@ -1,8 +1,8 @@
 import subprocess
 from datetime import date
 from bs4 import BeautifulSoup
-from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, ContextTypes
 
 from my_utils import my_logging, bot_util
 from my_utils.bot_util import auth
