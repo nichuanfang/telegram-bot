@@ -17,7 +17,7 @@ if sys.platform == 'win32':
 class CustomResolver(aiohttp.abc.AbstractResolver):
     """ 自定义dns解析器 """
 
-    def __init__(self, dns_map: Dict[str, Tuple[str, int]], default_dns: str, default_family=socket.AF_INET6, *args, **kwargs):
+    def __init__(self, dns_map: Dict[str, Tuple[str, int]], default_dns: str, default_family=socket.AF_INET6):
         self.dns_map = dns_map
         self.default_dns = default_dns
         self.default_family = default_family
@@ -31,14 +31,7 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
                 return self.dns_map[domain]
         return self.default_dns, self.default_family
 
-    async def resolve(self, host, port=0, family=socket.AF_UNSPEC):
-        # 获取对应域名的 DNS 配置和优先级
-        dns, priority_family = self.find_dns_config(host)
-
-        # 如果没有指定优先级，则使用请求时的 family，默认为 IPv4
-        family = priority_family if family == socket.AF_UNSPEC else family
-        record_type = 'A' if family == socket.AF_INET else 'AAAA'
-        resolver = aiodns.DNSResolver(nameservers=[dns])
+    async def _query(self, resolver, host, record_type, family, port):
         try:
             answers = await resolver.query(host, record_type)
             return [
@@ -53,21 +46,30 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
                 for answer in answers
             ]
         except aiodns.error.DNSError:
-            # 如果指定类型的解析失败，尝试另一种类型
-            record_type = 'AAAA' if record_type == 'A' else 'A'
-            family = socket.AF_INET6 if family == socket.AF_INET else socket.AF_INET
-            answers = await resolver.query(host, record_type)
-            return [
-                {
-                    'hostname': host,
-                    'host': answer.host,
-                    'port': port,
-                    'family': family,
-                    'proto': 0,
-                    'flags': 0,
-                }
-                for answer in answers
-            ]
+            return []
+
+    async def resolve(self, host, port=0, family=socket.AF_UNSPEC):
+        # 获取对应域名的 DNS 配置和优先级
+        dns, priority_family = self.find_dns_config(host)
+
+        # 如果没有指定优先级，则使用请求时的 family，默认为 IPv6
+        family = priority_family if family == socket.AF_UNSPEC else family
+
+        resolver = aiodns.DNSResolver(nameservers=[dns])
+
+        # 尝试按照优先级进行查询
+        record_types = [
+            'AAAA', 'A'] if family == socket.AF_INET6 else ['A', 'AAAA']
+        families = [socket.AF_INET6, socket.AF_INET] if family == socket.AF_INET6 else [
+            socket.AF_INET, socket.AF_INET6]
+
+        results = []
+        for record_type, family in zip(record_types, families):
+            results = await self._query(resolver, host, record_type, family, port)
+            if results:
+                return results
+
+        return []
 
     async def close(self):
         pass

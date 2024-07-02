@@ -139,12 +139,17 @@ UPDATE_REQUEST = AiohttpRequest(
     pool_timeout=10,
 )
 
+# 支持的更新类型
+ALLOWED_UPDATES = [Update.MESSAGE, Update.EDITED_MESSAGE,
+                   Update.CALLBACK_QUERY, Update.INLINE_QUERY]
+
 
 def start_bot(bot_name, token, command_handlers=None):
 
     if token is None:
         logger.error("请先设置BOT TOKEN!")
         return
+
     application = ApplicationBuilder() \
         .token(token) \
         .request(COMMON_REQUEST) \
@@ -174,7 +179,7 @@ def start_bot(bot_name, token, command_handlers=None):
     if platform.system().lower() == 'windows':
         logger.info(f"{bot_name} is started!!")
         application.run_polling(drop_pending_updates=True,
-                                allowed_updates=Update.ALL_TYPES)
+                                allowed_updates=ALLOWED_UPDATES)
     else:
         validate_res = validation_util.validate(
             f'{bot_name.upper()}_WEBHOOK_URL', f'{bot_name.upper()}_WEBHOOK_PORT')
@@ -188,7 +193,7 @@ def start_bot(bot_name, token, command_handlers=None):
             webhook_url=webhook_url,
             url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
             drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
+            allowed_updates=ALLOWED_UPDATES
         )
 
 
