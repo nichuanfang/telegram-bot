@@ -72,29 +72,15 @@ async def error_handler(_: object, context: ContextTypes.DEFAULT_TYPE) -> None:
 class AiohttpRequest(BaseRequest):
     def __init__(
         self,
-        *,
-        read_timeout: Optional[float] = None,
-        write_timeout: Optional[float] = None,
-        connect_timeout: Optional[float] = None,
-        pool_timeout: Optional[float] = None,
         session: Optional[aiohttp.ClientSession] = None,
     ):
-        self._read_timeout = read_timeout
-        self._write_timeout = write_timeout
-        self._connect_timeout = connect_timeout
-        self._pool_timeout = pool_timeout
         self.session = session or aiohttp.ClientSession()
 
-    @property
-    def read_timeout(self) -> Optional[float]:
-        return self._read_timeout
-
     async def initialize(self) -> None:
-        if self.session.closed:
-            self.session = aiohttp.ClientSession()
+        pass
 
     async def shutdown(self) -> None:
-        await self.session.close()
+        pass
 
     async def do_request(
         self,
@@ -106,31 +92,17 @@ class AiohttpRequest(BaseRequest):
         connect_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
         pool_timeout: ODVInput[float] = BaseRequest.DEFAULT_NONE,
     ) -> Tuple[int, bytes]:
-        timeout = aiohttp.ClientTimeout(
-            total=None,
-            connect=connect_timeout if connect_timeout is not BaseRequest.DEFAULT_NONE else self._connect_timeout,
-            sock_read=read_timeout if read_timeout is not BaseRequest.DEFAULT_NONE else self._read_timeout,
-            sock_connect=write_timeout if write_timeout is not BaseRequest.DEFAULT_NONE else self._write_timeout,
-        )
-
-        async with self.session.request(
+        response = await self.session.request(
             method,
             url,
             data=request_data.json_parameters if request_data else None,
-            timeout=timeout
-        ) as response:
-            status = response.status
-            payload = await response.read()
-            return status, payload
+        )
+        status = response.status
+        payload = await response.read()
+        return status, payload
 
 
-COMMON_REQUEST = AiohttpRequest(
-    session=GLOBAL_SESSION,
-    read_timeout=10,
-    write_timeout=10,
-    connect_timeout=10,
-    pool_timeout=10,
-)
+COMMON_REQUEST = AiohttpRequest(session=GLOBAL_SESSION)
 
 # 支持的更新类型
 ALLOWED_UPDATES = [Update.MESSAGE, Update.EDITED_MESSAGE,
@@ -146,7 +118,8 @@ def start_bot(bot_name, token, command_handlers=None):
     application = ApplicationBuilder() \
         .token(token) \
         .concurrent_updates(True) \
-        .pool_timeout(3600) \
+        .request(COMMON_REQUEST) \
+        .get_updates_request(COMMON_REQUEST) \
         .build()
 
     if command_handlers:

@@ -80,7 +80,8 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
 
 
 dns_map = {
-    'dogyun.com': ('223.5.5.5', socket.AF_INET)
+    'dogyun.com': ('223.5.5.5', socket.AF_INET),
+    'api.telegram.org': ('1.1.1.1', socket.AF_INET)
 }
 default_dns = '1.1.1.1'
 default_family = socket.AF_INET6
