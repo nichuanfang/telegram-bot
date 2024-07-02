@@ -115,9 +115,10 @@ def start_bot(bot_name, token, command_handlers=None):
         logger.info(
             f"{bot_name} is started at http://127.0.0.1:{webhook_port}!! remote webhook url: {webhook_url}")
         application.run_webhook(
-            listen='127.0.0.1',
+            listen="0.0.0.0",
             port=webhook_port,
             webhook_url=webhook_url,
+            url_path=f'webhook/{webhook_url.rsplit("/", 1)[-1]}',
             allowed_updates=['message', 'edited_message'],
             drop_pending_updates=True
         )
