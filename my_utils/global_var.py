@@ -17,7 +17,7 @@ if sys.platform == 'win32':
 class CustomResolver(aiohttp.abc.AbstractResolver):
     """ 自定义dns解析器 """
 
-    def __init__(self, dns_map: Dict[str, Tuple[str, int]], default_dns: str, default_family=socket.AF_INET6):
+    def __init__(self, dns_map: Dict[str, Tuple[str, int]], default_dns: str, default_family=socket.AF_INET):
         self.dns_map = dns_map
         self.default_dns = default_dns
         self.default_family = default_family
@@ -58,7 +58,14 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
             elif ipv6_res and not isinstance(ipv6_res, BaseException):
                 return self.generate_result(host, ipv6_res, port, socket.AF_INET6)
             else:
-                return []
+                return [{
+                    'hostname': host,
+                    'host': None,
+                    'port': port,
+                    'family': family,
+                    'proto': 0,
+                    'flags': 0,
+                }]
         else:
             if ipv6_res and not isinstance(ipv6_res, BaseException):
                 return self.generate_result(host, ipv6_res, port, socket.AF_INET6)
@@ -81,11 +88,10 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
 
 dns_map = {
     'dogyun.com': ('223.5.5.5', socket.AF_INET),
-    'ffa.chat': ('223.5.5.5', socket.AF_INET),
-    'api.telegram.org': ('1.1.1.1', socket.AF_INET)
+    'ffa.chat': ('223.5.5.5', socket.AF_INET)
 }
 default_dns = '1.1.1.1'
-default_family = socket.AF_INET6
+default_family = socket.AF_INET
 # 创建自定义解析器实例
 custom_resolver = CustomResolver(dns_map, default_dns, default_family)
 

@@ -8,8 +8,11 @@ import openai
 import platform
 from bots.gpt_bot.chat import Chat
 
+
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
-from my_utils import code_util, tiktoken_util
+from bots.gpt_bot.core import SSE_DECODER, SSEDecoder
+from fake_useragent import FakeUserAgent
+ua = FakeUserAgent(browsers="chrome", os='windows', platforms='pc')
 
 
 def gpt_platform(cls):
@@ -108,8 +111,7 @@ class Platform(metaclass=ABCMeta):
     async def async_stream_request(self, content='', context=None, session: aiohttp.ClientSession = None):
         """
         流式响应的请求逻辑
-        @param content:  请求内容
-        @param is_free:  是否为免费key
+        @param content:  请求内容        @param is_free:  是否为免费key
         @param kwargs: 其他字段
         """
         messages = await self.prepare_messages(content)
@@ -126,21 +128,32 @@ class Platform(metaclass=ABCMeta):
         new_messages, openai_completion_options = self.chat.combine_messages(
             *messages, **openai_completion_options)
         answer = ''
+        headers = {
+            'origin': self.foreign_openai_base_url,
+            'user-agent': ua.random,
+            'authorization': self.openai_api_key,
+        }
         if stream:
-            completion = await self.chat.openai_client.chat.completions.create(**{
+            json_data = {
                 "messages": new_messages,
                 "stream": True,
                 'model': context.user_data.get('current_model'),
                 **openai_completion_options
-            })
-            result = []
-            async for chunk_iter in completion:
-                if chunk_iter.choices and (chunk := chunk_iter.choices[0].delta.content):
-                    result.append(chunk)
-                    answer = ''.join(result)
+            }
+            async with session.post(f'{self.openai_base_url}/chat/completions', json=json_data, headers=headers) as resp:
+                sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
+                answer_parts = []
+                async for sse in sse_iter:
+                    answer_parts.append(sse.data)
                     yield 'not_finished', answer
-            yield 'finished', answer
+                yield 'finished', answer
         else:
+            json_data = {
+                "messages": new_messages,
+                "stream": False,
+                'model': context.user_data.get('current_model'),
+                **openai_completion_options
+            }
             completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": False,
