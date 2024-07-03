@@ -132,13 +132,10 @@ class SSEDecoder:
         if value.startswith(" "):
             value = value[1:]
 
-        if fieldname == "event":
+        if fieldname == "data":
             self._event = value
-        elif fieldname == "data":
-            if value == '[DONE]':
-                self._event = value
-            else:
-                self._data.append(value)
+        elif fieldname == "event":
+            self._data.append(value)
         elif fieldname == "id":
             if "\0" in value:
                 pass
