@@ -51,6 +51,7 @@ class Free_3(Platform):
                 answer_parts = []
                 async for sse in sse_iter:
                     answer_parts.append(sse.data)
+                    answer = ''.join(answer_parts)
                     yield 'not_finished', answer
                 yield 'finished', answer
         else:
