@@ -40,7 +40,7 @@ class ServerSentEvent:
             return self.json()['choices'][0]['delta'].get('content', '')
 
     def json(self) -> Any:
-        return orjson.loads(self.data)
+        return orjson.loads(self._data)
 
     def __repr__(self) -> str:
         return f"ServerSentEvent(event={self.event}, data={self.data}, id={self.id}, retry={self.retry})"
@@ -132,7 +132,7 @@ class SSEDecoder:
         if value.startswith(" "):
             value = value[1:]
 
-        if fieldname == "data":
+        if fieldname == "event":
             self._event = value
         elif fieldname == "event":
             self._data.append(value)
