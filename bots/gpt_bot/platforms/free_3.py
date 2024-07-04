@@ -1,5 +1,3 @@
-import asyncio
-from http.client import HTTPException
 import platform
 import re
 import aiohttp
@@ -7,7 +5,6 @@ from bots.gpt_bot.core.session import SessionWithRetry
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from telegram.ext import CallbackContext
-import orjson
 from my_utils import bot_util, tiktoken_util
 from my_utils.my_logging import get_logger
 
@@ -42,14 +39,10 @@ class Free_3(Platform):
             'user-agent': bot_util.ua.random,
             'authorization': self.openai_api_key
         }
-        if stream:
-            async for status, answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, stream=True):
-                yield status, answer
-        else:
-            async for answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data):
-                yield answer
+        async for result in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, stream=stream):
+            yield result
         await self.chat.append_messages(
-            answer, context, *messages)
+            result[1] if isinstance(result, tuple) else result, context, *messages)
 
     async def summary(self, content: str, prompt: str, context, *messages):
         new_messages = [{'role': 'system', 'content': prompt},

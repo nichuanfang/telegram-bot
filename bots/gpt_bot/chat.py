@@ -250,9 +250,7 @@ class Chat:
             self._messages = new_queue
 
     async def append_messages(self, answer, context, *messages):
-        if answer:
-            await self._messages.add_many(context,
-                                          *messages, {"role": "assistant", "content": answer})
+        await self._messages.add_many(context, *messages, {"role": "assistant", "content": answer})
 
     def combine_messages(self, *messages, **openai_completion_options):
         return openai_completion_options.pop('messages', []) + (self._messages.__add__(*messages)), openai_completion_options

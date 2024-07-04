@@ -22,7 +22,6 @@ class Free_1(Platform):
         openai_completion_options = context.user_data['current_mask']['openai_completion_options']
         new_messages, openai_completion_options = self.chat.combine_messages(
             *messages, **openai_completion_options)
-        answer = ''
         headers = {
             'origin': self.foreign_openai_base_url,
             'user-agent': ua.random,
@@ -34,11 +33,7 @@ class Free_1(Platform):
             'model': context.user_data.get('current_model'),
             **openai_completion_options
         }
-        if stream:
-            async for status, answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/chat/completions', headers=headers, json=json_data, stream=True):
-                yield status, answer
-        else:
-            async for answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/chat/completions', headers=headers, json=json_data):
-                yield answer
+        async for result in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/chat/completions', headers=headers, json=json_data, stream=stream):
+            yield result
         await self.chat.append_messages(
-            answer, context, *messages)
+            result[1] if isinstance(result, tuple) else result, context, *messages)

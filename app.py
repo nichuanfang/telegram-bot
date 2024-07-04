@@ -9,7 +9,6 @@ import datetime
 
 from my_utils import my_logging, validation_util
 import dotenv
-import traceback
 import platform
 import os
 import multiprocessing
