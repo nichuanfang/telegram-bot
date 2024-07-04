@@ -1,8 +1,6 @@
-from types import coroutine
 from typing import Any, Callable, Coroutine, Dict, Generator, Literal, LiteralString
 import aiohttp
 import asyncio
-from aiohttp import hdrs
 from aiohttp import ClientResponse
 from aiohttp.client import _RequestContextManager
 import orjson
@@ -115,10 +113,13 @@ class SessionWithRetry:
                         result = []
                         for line in completion.splitlines():
                             if line or line != 'data: [DONE]':
-                                delta = orjson.loads(line[6:])[
-                                    'choices'][0]['delta']
-                                if delta:
-                                    result.append(delta['content'])
+                                try:
+                                    delta = orjson.loads(line[6:])[
+                                        'choices'][0]['delta']
+                                    if delta:
+                                        result.append(delta['content'])
+                                except:
+                                    continue
                         answer = ''.join(result)
                         if not answer:
                             await asyncio.sleep(self.retry_interval)

@@ -403,21 +403,8 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
     need_notice = True
     gpt_platform: Platform = context.user_data['current_platform']
     init_message, content = await asyncio.gather(init_message_task, content_task)
-    async for status, curr_answer in gpt_platform.async_stream_request(content, context, session):
-        # 如果状态是additional 则追加内联按钮
-        if status == 'additional' and need_notice:
-            try:
-                if curr_answer:
-                    if curr_answer.startswith('\x1c'):
-                        json_data = orjson.loads(curr_answer[1:])
-                    else:
-                        json_data = orjson.loads(curr_answer)
-                    infos = json_data[:min(3, len(json_data))]
-                    await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id, message_id=init_message.message_id, reply_markup=generate_additional_keyboard(infos))
-            except:
-                continue
-            continue
-        if is_image_generator:
+    if is_image_generator:
+        async for _, curr_answer in gpt_platform.async_stream_request_img(content, context, session):
             async with session.get(curr_answer) as img_response:
                 if img_response.content:
                     await asyncio.gather(
@@ -425,25 +412,59 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
                             update, context, init_message.message_id, True, '图片生成成功! 正在发送...'),
                         update.message.reply_photo(photo=await img_response.content.read(),
                                                    reply_to_message_id=update.effective_message.message_id))
-            continue
-        if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
-            continue
-        new_content = curr_answer[len(prev_answer):]
-        new_content_length = len(new_content)
-        if current_message_length + new_content_length > max_message_length:
-            if need_notice:
-                need_notice = False
-                await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
-            current_message_length += new_content_length
-            prev_answer = curr_answer
-            continue
-        if new_content:
-            message_content += new_content
-            current_message_length += new_content_length
+    elif gpt_platform.name == 'free_2':
+        async for status, curr_answer in gpt_platform.async_stream_request(content, context, session):
+            # 如果状态是additional 则追加内联按钮
+            if status == 'additional' and need_notice:
+                try:
+                    if curr_answer:
+                        if curr_answer.startswith('\x1c'):
+                            json_data = orjson.loads(curr_answer[1:])
+                        else:
+                            json_data = orjson.loads(curr_answer)
+                        infos = json_data[:min(3, len(json_data))]
+                        await context.bot.edit_message_reply_markup(chat_id=update.message.chat_id, message_id=init_message.message_id, reply_markup=generate_additional_keyboard(infos))
+                except:
+                    continue
+                continue
+            if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
+                continue
+            new_content = curr_answer[len(prev_answer):]
+            new_content_length = len(new_content)
+            if current_message_length + new_content_length > max_message_length:
+                if need_notice:
+                    need_notice = False
+                    await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
+                current_message_length += new_content_length
+                prev_answer = curr_answer
+                continue
+            if new_content:
+                message_content += new_content
+                current_message_length += new_content_length
 
-        await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
-        # await asyncio.sleep(0.01)
-        prev_answer = curr_answer
+            await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
+            # await asyncio.sleep(0.01)
+            prev_answer = curr_answer
+    else:
+        async for status, curr_answer in gpt_platform.async_stream_request(content, context, session):
+            if abs(len(curr_answer) - len(prev_answer)) < 100 and status != 'finished':
+                continue
+            new_content = curr_answer[len(prev_answer):]
+            new_content_length = len(new_content)
+            if current_message_length + new_content_length > max_message_length:
+                if need_notice:
+                    need_notice = False
+                    await bot_util.edit_message(update, context, init_message.message_id, stream_ended=True, text="消息过长，内容正发往在线分享平台...")
+                current_message_length += new_content_length
+                prev_answer = curr_answer
+                continue
+            if new_content:
+                message_content += new_content
+                current_message_length += new_content_length
+            await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
+            # await asyncio.sleep(0.01)
+            prev_answer = curr_answer
+
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
         async with session.post(f'{bot_util.HASTE_SERVER_HOST}/documents', data=prev_answer.encode('utf-8')) as response:

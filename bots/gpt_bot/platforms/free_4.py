@@ -14,7 +14,8 @@ import orjson
 
 from my_utils.my_logging import get_logger
 pattern = re.compile(r'(?<=data: )(.*?)(?=\r?\n)')
-image_pattern = re.compile(r'\!\[Image\]\((.*?)\)')
+image_pattern = re.compile(
+    r'(https?://[^\s]+?\.(?:jpg|jpeg|gif|png|bmp|webp))')
 HTTP_PROXY = 'http://127.0.0.1:10809' if platform.system().lower() == 'windows' else None
 logger = get_logger('free_4')
 

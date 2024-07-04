@@ -112,16 +112,24 @@ class Platform(metaclass=ABCMeta):
     async def async_stream_request(self, content='', context=None, session: aiohttp.ClientSession = None):
         """
         流式响应的请求逻辑
-        @param content:  请求内容        @param is_free:  是否为免费key
+        @param content:  请求内容        
+        @param is_free:  是否为免费key
         @param kwargs: 其他字段
         """
         messages = await self.prepare_messages(content)
-        if context.user_data.get('current_model') == "dall-e-3":
-            answer = await self.generate_image(messages, session)
-            yield 'finished', answer
-        else:
-            async for status, answer in self.completion(True, context, session, *messages):
-                yield status, answer
+        async for result in self.completion(True, context, session, *messages):
+            yield result
+
+    async def async_stream_request_img(self, content='', context=None, session: aiohttp.ClientSession = None):
+        """
+        流式响应的请求逻辑(图片生成)
+        @param content:  请求内容        
+        @param is_free:  是否为免费key
+        @param kwargs: 其他字段
+        """
+        messages = await self.prepare_messages(content)
+        answer = await self.generate_image(messages, context, session)
+        yield 'finished', answer
 
     async def completion(self, stream: bool,  context, session: aiohttp.ClientSession, *messages):
         # 默认的提问方法
