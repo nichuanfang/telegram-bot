@@ -137,33 +137,22 @@ class Platform(metaclass=ABCMeta):
         new_messages, openai_completion_options = self.chat.combine_messages(
             *messages, **openai_completion_options)
         answer = ''
-        headers = {
-            'origin': self.foreign_openai_base_url,
-            'user-agent': ua.random,
-            'authorization': self.openai_api_key,
-        }
         if stream:
-            json_data = {
+            completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": True,
                 'model': context.user_data.get('current_model'),
                 **openai_completion_options
-            }
-            async with session.post(f'{self.openai_base_url}/chat/completions', json=json_data, headers=headers) as resp:
-                sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
-                answer_parts = []
-                async for sse in sse_iter:
-                    answer_parts.append(sse.data)
+            })
+            answer_parts = []
+            async for item in completion:
+                delta_content = item.choices[0].delta.content
+                if delta_content:
+                    answer_parts.append(delta_content)
                     answer = ''.join(answer_parts)
                     yield 'not_finished', answer
-                yield 'finished', answer
+            yield 'finished', answer
         else:
-            json_data = {
-                "messages": new_messages,
-                "stream": False,
-                'model': context.user_data.get('current_model'),
-                **openai_completion_options
-            }
             completion = await self.chat.openai_client.chat.completions.create(**{
                 "messages": new_messages,
                 "stream": False,

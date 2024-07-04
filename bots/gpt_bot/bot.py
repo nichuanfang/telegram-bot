@@ -156,22 +156,22 @@ async def handle_photo(update: Update, context: CallbackContext):
     caption_result = handle_result[0]
     image_base64 = handle_result[1]
 
-    if current_platform.name == 'free_4':
-        if caption_result:
-            content.append(caption_result)
-        if image_base64:
-            content.append(f'data:image/jpeg;base64,{image_base64}')
-    else:
-        if caption_result:
-            content.append({'type': 'text', 'text': caption_result})
+    # if current_platform.name == 'free_4':
+    #     if caption_result:
+    #         content.append(caption_result)
+    #     if image_base64:
+    #         content.append(f'data:image/jpeg;base64,{image_base64}')
+    # else:
+    if caption_result:
+        content.append({'type': 'text', 'text': caption_result})
 
-        if image_base64:
-            content.append({
-                'type': 'image_url',
-                'image_url': {
-                    'url': f'data:image/jpeg;base64,{image_base64}'
-                }
-            })
+    if image_base64:
+        content.append({
+            'type': 'image_url',
+            'image_url': {
+                'url': f'data:image/jpeg;base64,{image_base64}'
+            }
+        })
     return content
 
 
@@ -219,14 +219,14 @@ async def analyse_video(update: Update, context: CallbackContext):
         raise ValueError(f'当前模型: {current_model}不支持视频解析!')
     platform: Platform = context.user_data['current_platform']
     platform.chat.clear_messages(context)
-    is_free_4 = (platform.name == 'free_4')
-    if is_free_4:
-        content.append('视频关键帧开始')
-    else:
-        content.append({
-            'type': 'text',
-            'text': '视频关键帧开始'
-        })
+    # is_free_4 = (platform.name == 'free_4')
+    # if is_free_4:
+    #     content.append('视频关键帧开始')
+    # else:
+    content.append({
+        'type': 'text',
+        'text': '视频关键帧开始'
+    })
     try:
         video_file = await context.bot.get_file(update.message.effective_attachment.file_id)
     except:
@@ -239,28 +239,28 @@ async def analyse_video(update: Update, context: CallbackContext):
     for _, frame in key_frames:
         _, buffer = cv2.imencode('.jpg', frame)
         image_base64 = base64.b64encode(buffer).decode("utf-8")
-        if is_free_4:
-            content.append(f'data:image/jpeg;base64,{image_base64}')
-        else:
-            content.append({
-                'type': 'image_url',
-                'image_url': {
-                    'url': f'data:image/jpeg;base64,{image_base64}'
-                }
-            })
+        # if is_free_4:
+        #     content.append(f'data:image/jpeg;base64,{image_base64}')
+        # else:
+        content.append({
+            'type': 'image_url',
+            'image_url': {
+                'url': f'data:image/jpeg;base64,{image_base64}'
+            }
+        })
     # Clean up
     os.remove(video_path)
-    if is_free_4:
-        content.append('视频关键帧结束,请根据以上视频关键帧提供整个视频的综合分析')
-    else:
-        content.append({
-            'type': 'text',
-            'text': '视频关键帧结束'
-        })
-        content.append({
-            'type': 'text',
-            'text': '请根据以上视频关键帧提供整个视频的综合分析'
-        })
+    # if is_free_4:
+    #     content.append('视频关键帧结束,请根据以上视频关键帧提供整个视频的综合分析')
+    # else:
+    content.append({
+        'type': 'text',
+        'text': '视频关键帧结束'
+    })
+    content.append({
+        'type': 'text',
+        'text': '请根据以上视频关键帧提供整个视频的综合分析'
+    })
     return content
 
 
@@ -271,13 +271,13 @@ async def handle_video(update: Update, context: CallbackContext):
     handle_caption_result = handled_result[1]
     if handle_caption_result:
         current_platform: Platform = context.user_data['current_platform']
-        if current_platform.name == 'free_4':
-            analyse_video_result.append(handle_caption_result)
-        else:
-            analyse_video_result.append({
-                'type': 'text',
-                'text': handle_caption_result
-            })
+        # if current_platform.name == 'free_4':
+        #     analyse_video_result.append(handle_caption_result)
+        # else:
+        analyse_video_result.append({
+            'type': 'text',
+            'text': handle_caption_result
+        })
     return analyse_video_result
 
 
