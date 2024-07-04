@@ -44,7 +44,7 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
                 domain = '.'.join(parts[i:])
                 if domain in self.dns_map:
                     return self.dns_map[domain]
-        self.default_dns, self.default_family
+        return self.default_dns, self.default_family
 
     async def _query(self, host: str, family: int, port: int) -> list:
         """ 进行 DNS 查询 """
