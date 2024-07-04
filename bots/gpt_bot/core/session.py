@@ -52,6 +52,13 @@ async def handle_service_unavailable(e: Exception, context: CallbackContext, **k
     pass
 
 
+async def handle_method_not_allowed(e: Exception, context: CallbackContext, **kwargs):
+    """ 处理方法不可用 """
+    # 当前平台
+    # current_platform: Platform = context.user_data['current_platform']
+    pass
+
+
 async def handle_server_internal_error(e: Exception, context: CallbackContext, **kwargs):
     """ 处理服务器内部错误 """
     # 当前平台
@@ -78,12 +85,14 @@ class SessionWithRetry:
         # 条件处理器映射 注册几个默认的  不要配置重复条件 因为只会后面的条件可能得不到执行机会!
         self.conditions_handlers = conditions_handlers or {
             lambda e: hasattr(e, 'status') and e.status == 403: handle_unauthorized_error,
+            lambda e: hasattr(e, 'status') and e.status == 405: handle_method_not_allowed,
             lambda e: hasattr(e, 'status') and e.status == 500: handle_server_internal_error,
             lambda e: hasattr(e, 'status') and e.status == 503: handle_service_unavailable,
         }
 
     async def fetch_with_retry(self, method: str, url: str, stream: bool = False, **kwargs):
         attempt = 0
+        exception = None
         while attempt < self.retry_attempts:
             try:
                 async with getattr(self.session, method)(url, allow_redirects=True, **kwargs) as resp:
@@ -123,6 +132,8 @@ class SessionWithRetry:
                 for condition, handler in self.conditions_handlers.items():
                     if condition(e):
                         try:
+                            # 记录改异常 日志会用到
+                            exception = e
                             # 尝试处理器
                             await handler(e, self.context, **kwargs)
                             should_retry = True
@@ -140,7 +151,7 @@ class SessionWithRetry:
 
         # 如果尝试次数已用尽，抛出异常
         raise Exception(
-            f"Failed to fetch {url} after {self.retry_attempts} attempts")
+            f"Error still occurs after {self.retry_attempts} attempts:\n\n{str(exception)}")
 
     async def post(self, url: str, stream: bool = False, **kwargs):
         """ 增强post方法 """
