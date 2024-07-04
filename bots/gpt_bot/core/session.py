@@ -77,9 +77,9 @@ class SessionWithRetry:
         self.retry_interval = retry_interval
         # 条件处理器映射 注册几个默认的  不要配置重复条件 因为只会后面的条件可能得不到执行机会!
         self.conditions_handlers = conditions_handlers or {
-            lambda e: e.status == 403: handle_unauthorized_error,
-            lambda e: e.status == 500: handle_server_internal_error,
-            lambda e: e.status == 503: handle_service_unavailable,
+            lambda e: hasattr(e, 'status') and e.status == 403: handle_unauthorized_error,
+            lambda e: hasattr(e, 'status') and e.status == 500: handle_server_internal_error,
+            lambda e: hasattr(e, 'status') and e.status == 503: handle_service_unavailable,
         }
 
     async def fetch_with_retry(self, method: str, url: str, stream: bool = False, **kwargs):
@@ -144,18 +144,10 @@ class SessionWithRetry:
 
     async def post(self, url: str, stream: bool = False, **kwargs):
         """ 增强post方法 """
-        if stream:
-            async for status, answer in self.fetch_with_retry(method='post', url=url, stream=True, **kwargs):
-                yield status, answer
-        else:
-            async for answer in self.fetch_with_retry(method='post', url=url, stream=False, **kwargs):
-                yield answer
+        async for result in self.fetch_with_retry(method='post', url=url, stream=stream, **kwargs):
+            yield result
 
     async def get(self, url: str, stream: bool = False, **kwargs):
         """ 增强get方法 """
-        if stream:
-            async for status, answer in self.fetch_with_retry(method='get', url=url, stream=stream, **kwargs):
-                yield status, answer
-        else:
-            async for answer in self.fetch_with_retry(method='get', url=url, stream=False, **kwargs):
-                yield answer
+        async for result in self.fetch_with_retry(method='get', url=url, stream=stream, **kwargs):
+            yield result
