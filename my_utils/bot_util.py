@@ -132,7 +132,9 @@ async def migrate_platform(from_platform, to_platform_key: str, context: Callbac
 
     # 如果没配置openai_api_key 说明是free_3/4
     if 'openai_api_key' not in to_platform:
+        logger.info('准备生成api-key...')
         to_platform: dict = await generate_api_key(to_platform)
+        logger.info('api-key已生成!')
         openai_api_key = to_platform['openai_api_key']
     else:
         openai_api_key = to_platform['openai_api_key']
