@@ -3,7 +3,8 @@ import io
 import platform
 import re
 import aiohttp
-from bots.gpt_bot.core import SSE_DECODER
+from bots.gpt_bot.core.session import SessionWithRetry
+from bots.gpt_bot.core.streaming import SSE_DECODER
 from bots.gpt_bot.gpt_platform import gpt_platform
 from bots.gpt_bot.gpt_platform import Platform
 from telegram.ext import CallbackContext
@@ -102,7 +103,7 @@ class Free_4(Platform):
                 'user-agent': bot_util.ua.random,
                 'authorization': self.openai_api_key
             }
-            async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as resp:
+            async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as resp:
                 sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
                 answer_parts = []
                 async for sse in sse_iter:
@@ -123,7 +124,7 @@ class Free_4(Platform):
                 'user-agent': bot_util.ua.random,
                 'authorization': self.openai_api_key
             }
-            async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
+            async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
                 completion = await response.json()
                 answer = completion[
                     'choices'][0]['message']['content']
@@ -146,7 +147,7 @@ class Free_4(Platform):
         }
         try:
             async with aiohttp.ClientSession(raise_for_status=True, trust_env=True, timeout=aiohttp.ClientTimeout(total=30)) as session:
-                async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
+                async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
                     completion = await response.text()
                     result = []
                     for line in completion.splitlines():

@@ -109,9 +109,6 @@ async def answer(update: Update, context: CallbackContext) -> None:
             await handle_response(update, context, content_task, is_image_generator, GLOBAL_SESSION)
     except Exception as e:
         await handle_exception(update, context, e, init_message_task)
-    finally:
-        context.user_data.pop(
-            f'{update.message.message_id}_curr_retries', None)
 
 
 async def handle_caption(update: Update, max_length):
@@ -496,75 +493,10 @@ async def handle_exception(update: Update, context: CallbackContext, e, init_mes
     logger.error(
         f"==================================================ERROR START==================================================================")
     # 记录异常信息
-    logger.error(f"Exception occurred: {e}")
     traceback.print_exc()
     logger.error(
         f"==================================================ERROR END====================================================================")
-    if hasattr(e, 'code') and getattr(e, 'code') in [403, 500, 502]:
-        current_platform: Platform = context.user_data['current_platform']
-        if current_platform.name.startswith('free'):
-            # free_3/4    可能授权码/认证信息失效了
-            # 移除临时配置文件中的相关key
-            json_data = None
-            with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
-                json_data: dict = orjson.loads(f.read())
-                if current_platform.name in json_data:
-                    if 'openai_api_key' in json_data[current_platform.name]:
-                        json_data[current_platform.name].pop('openai_api_key')
-            if json_data:
-                with open(bot_util.TEMP_CONFIG_PATH, mode='w+', encoding='utf-8') as f:
-                    f.write(orjson.dumps(
-                        json_data,  option=orjson.OPT_INDENT_2).decode())
-                    # 刷新token成功!
-            try:
-                current_platform = context.user_data['current_platform'] = await instantiate_platform(
-                    platform_key=current_platform.name)
-                current_platform.chat.clear_messages(context)
-                is_refreshed = True
-            except:
-                is_refreshed = False
-            finally:
-                # 大于最大重试次数
-                init_message: Message = await init_message_task
-                if is_refreshed:
-                    message_curr_retries = f'{update.message.message_id}_curr_retries'
-                    # 刷新成功 再次请求 同时判断当前的重试次数是否超过2 没超过就重试 并+1;超过了就重置
-                    if message_curr_retries in context.user_data:
-                        # 当前重试次数
-                        curr_retries = context.user_data[message_curr_retries]
-                        if curr_retries > 2:
-                            # 记录认证信息是否刷新成功
-                            await bot_util.edit_message(
-                                update, context, init_message.message_id, True, str(e))
-                            context.user_data.pop(message_curr_retries)
-                            return
-                        else:
-                            await asyncio.sleep(3)
-                            await bot_util.edit_message(update, context, init_message.message_id, True, f'Error occurs: {str(e)}\n正在进行第{curr_retries+1}次重试...')
-                            context.user_data[message_curr_retries] = curr_retries+1
-                            await answer(update, context)
-                            return
-                    else:
-                        await asyncio.sleep(3)
-                        # 说明此消息没重试过
-                        await bot_util.edit_message(update, context, init_message.message_id, True, f'Error occurs: {str(e)}\n正在进行第1次重试...')
-                        context.user_data[message_curr_retries] = 1
-                        await answer(update, context)
-                        return
-                else:
-                    # 刷新失败 终止重试 直接向用户展示错误
-                    # 记录认证信息是否刷新成功
-                    await bot_util.edit_message(
-                        update, context, init_message.message_id, True, str(e))
-                    context.user_data.pop(
-                        f'{update.message.message_id}_curr_retries', None)
-                    return
-        else:
-            init_text = ''
-    else:
-        init_text = ''
-    text = init_text + str(e)
-    await exception_message_handler(update, context, init_message_task, text)
+    await exception_message_handler(update, context, init_message_task, str(e))
 
 
 async def exception_message_handler(update, context, init_message_task, text):
@@ -610,8 +542,8 @@ async def clear_handler(update: Update, context: CallbackContext):
 async def restore_context_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(text="上下文已恢复")
     await context.user_data['current_platform'].chat.recover_messages(context)
+    await query.edit_message_text(text="上下文已恢复")
 
 
 def generate_mask_keyboard(masks, current_mask_key):
@@ -668,8 +600,6 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的面具 mask_key:{mask_key}
     selected_mask_key = query.data[9:]
-    await query.edit_message_text(text=bot_util.escape_markdown_v2(
-        MASKS[selected_mask_key]['introduction'], False), parse_mode=ParseMode.MARKDOWN_V2)
     # 当前平台
     current_platform: Platform = context.user_data['current_platform']
     # 面具实体 应用选择的面具
@@ -687,6 +617,8 @@ async def mask_selection_handler(update: Update, context: CallbackContext):
         selected_mask['max_message_count'])
     # 切换面具后清除上下文
     current_platform.chat.clear_messages(context)
+    await query.edit_message_text(text=bot_util.escape_markdown_v2(
+        MASKS[selected_mask_key]['introduction'], False), parse_mode=ParseMode.MARKDOWN_V2)
 
 
 # 生成模型选择键盘
@@ -747,15 +679,15 @@ async def model_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的模型  model_key:
     selected_model = query.data[10:]
-    await query.edit_message_text(
-        text=f'模型已切换至*{bot_util.escape_markdown_v2(selected_model,False)}*',
-        parse_mode=ParseMode.MARKDOWN_V2
-    )
     # 应用选择的面具
     context.user_data['current_model'] = selected_model
     # 根据选择的模型进行相应的处理
     # 切换模型后清除上下文
     context.user_data['current_platform'].chat.clear_messages(context)
+    await query.edit_message_text(
+        text=f'模型已切换至*{bot_util.escape_markdown_v2(selected_model,False)}*',
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
 
 
 @auth
@@ -846,10 +778,6 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     await query.answer()
     # 获取用户选择的平台 platform_key:
     selected_platform_key = query.data[13:]
-    await query.edit_message_text(
-        text=f'平台已切换至[{bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["name"])}]({bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["index_url"])}) ',
-        parse_mode=ParseMode.MARKDOWN_V2,
-    )
     current_platform: Platform = context.user_data['current_platform']
     # 当前的平台key
     current_platform_key = current_platform.name
@@ -879,6 +807,10 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
     context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
                                                                    context=context, max_message_count=current_mask['max_message_count'])
+    await query.edit_message_text(
+        text=f'平台已切换至[{bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["name"])}]({bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["index_url"])}) ',
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
 
 
 @auth
