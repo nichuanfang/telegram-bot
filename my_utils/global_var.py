@@ -38,12 +38,13 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
 
     def find_dns_config(self, host: str) -> Tuple[str, int]:
         """ 查找完整匹配或泛域名匹配的 DNS 配置 """
-        parts = host.split('.')
-        for i in range(len(parts)):
-            domain = '.'.join(parts[i:])
-            if domain in self.dns_map:
-                return self.dns_map[domain]
-        return self.default_dns, self.default_family
+        if self.dns_map:
+            parts = host.split('.')
+            for i in range(len(parts)):
+                domain = '.'.join(parts[i:])
+                if domain in self.dns_map:
+                    return self.dns_map[domain]
+        self.default_dns, self.default_family
 
     async def _query(self, host: str, family: int, port: int) -> list:
         """ 进行 DNS 查询 """
