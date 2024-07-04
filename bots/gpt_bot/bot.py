@@ -804,8 +804,10 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     if current_model not in mask_supported_models:
         context.user_data['current_model'] = mask_supported_models[0]
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
+    logger.info(f'开始迁移平台...')
     context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
                                                                    context=context, max_message_count=current_mask['max_message_count'])
+    logger.info(f'平台迁移成功!')
     await query.edit_message_text(
         text=f'平台已切换至[{bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["name"])}]({bot_util.escape_markdown_v2(PLATFORMS[selected_platform_key]["index_url"])}) ',
         parse_mode=ParseMode.MARKDOWN_V2,
