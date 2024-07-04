@@ -5,6 +5,7 @@ import orjson
 import os.path
 from abc import ABCMeta
 import openai
+from telegram.ext import CallbackContext
 import platform
 from bots.gpt_bot.chat import Chat
 
@@ -102,7 +103,7 @@ class Platform(metaclass=ABCMeta):
         if context.user_data.get('current_model') == "dall-e-3":
             messages = await messages_task
             # 需要生成图像
-            yield await self.generate_image(messages, session)
+            yield await self.generate_image(messages, context, session)
         else:
             messages = await messages_task
             async for answer in self.completion(False, context, session, * messages):
@@ -180,7 +181,7 @@ class Platform(metaclass=ABCMeta):
         # 如果类型是视频 这里需要对视频进行处理
         return [{"role": "user", "content": content}]
 
-    async def generate_image(self, messages: list, session: aiohttp.ClientSession):
+    async def generate_image(self, messages: list, context: CallbackContext, session: aiohttp.ClientSession):
         # 生成图片
         generate_res = await self.chat.openai_client.images.generate(**{
             "prompt": messages[0]['content'],

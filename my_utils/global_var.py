@@ -105,7 +105,7 @@ default_family = socket.AF_INET
 GLOBAL_SESSION = aiohttp.ClientSession(
     trust_env=True,  # 是否使用代理
     raise_for_status=True,  # 自动抛异常
-    timeout=aiohttp.ClientTimeout(total=300),  # 总超时
+    timeout=aiohttp.ClientTimeout(total=300),
     connector_owner=True,  # 拥有连接池控制权
     connector=aiohttp.TCPConnector(
         limit=100,  # 最大连接数

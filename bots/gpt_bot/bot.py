@@ -442,7 +442,7 @@ async def handle_stream_response(update: Update, context: CallbackContext, conte
             current_message_length += new_content_length
 
         await bot_util.edit_message(update, context, init_message.message_id, status == 'finished', message_content)
-        await asyncio.sleep(0.01)
+        # await asyncio.sleep(0.01)
         prev_answer = curr_answer
     if not need_notice:
         # 将剩余数据保存到在线代码分享平台
@@ -803,7 +803,6 @@ async def platform_selection_handler(update: Update, context: CallbackContext):
     # todo 如果模型不支持 就设置为第一个模型
     if current_model not in mask_supported_models:
         context.user_data['current_model'] = mask_supported_models[0]
-
     # 切换平台 需要转移平台的状态(api-key更改 历史消息迁移)
     context.user_data['current_platform'] = await migrate_platform(from_platform=current_platform, to_platform_key=selected_platform_key,
                                                                    context=context, max_message_count=current_mask['max_message_count'])
