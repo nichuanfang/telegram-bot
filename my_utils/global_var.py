@@ -93,13 +93,15 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
         pass
 
 
-dns_map = {}
+dns_map = {
+    # 'example.com': ('223.5.5.5', socket.AF_INET)
+}
 # 配合smartdns查询
 default_dns = '127.0.0.1'
 # 优先返回ipv4记录
 default_family = socket.AF_INET
 # 创建自定义解析器实例
-# custom_resolver = CustomResolver(dns_map, default_dns, default_family)
+custom_resolver = CustomResolver(dns_map, default_dns, default_family)
 
 # 全局会话
 GLOBAL_SESSION = aiohttp.ClientSession(
@@ -110,7 +112,7 @@ GLOBAL_SESSION = aiohttp.ClientSession(
     connector=aiohttp.TCPConnector(
         limit=100,  # 最大连接数
         limit_per_host=10,  # 每个主机的最大连接数
-        # resolver=custom_resolver,  # 配置dns解析器
+        resolver=custom_resolver,  # 配置dns解析器
         use_dns_cache=True,  # 是否使用dns缓存
         ttl_dns_cache=3600,  # dns缓存时间
         keepalive_timeout=3600  # 空闲连接存活时间
