@@ -3,7 +3,7 @@ import asyncio
 import platform
 import aiohttp
 import js2py
-from bots.gpt_bot.core import SSE_DECODER
+from bots.gpt_bot.core.streaming import SSE_DECODER
 from bots.gpt_bot.gpt_platform import Platform
 from bots.gpt_bot.gpt_platform import gpt_platform
 from telegram.ext import CallbackContext
