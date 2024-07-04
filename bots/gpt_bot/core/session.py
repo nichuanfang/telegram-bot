@@ -151,7 +151,7 @@ class SessionWithRetry:
 
         # 如果尝试次数已用尽，抛出异常
         raise Exception(
-            f"Error still eccurs after {self.retry_attempts} attempts:\n\n{str(exception)}")
+            f"Error still occurs after {self.retry_attempts} attempts:\n\n{str(exception)}")
 
     async def post(self, url: str, stream: bool = False, **kwargs):
         """ 增强post方法 """
