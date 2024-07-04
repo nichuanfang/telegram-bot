@@ -1,4 +1,5 @@
 # 创建全局 aiohttp.ClientSession 对象
+from functools import lru_cache
 import sys
 from typing import Dict, Tuple
 import asyncio
@@ -23,6 +24,25 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
         self.default_family = default_family
         self.resolver = aiodns.DNSResolver(nameservers=[default_dns])
 
+    @lru_cache(maxsize=None)
+    def find_dns_config(self, host: str) -> Tuple[str, int]:
+        """ 查找完整匹配或泛域名匹配的 DNS 配置 """
+        if self.dns_map:
+            parts = host.split('.')
+            for i in range(len(parts)):
+                domain = '.'.join(parts[i:])
+                if domain in self.dns_map:
+                    return self.dns_map[domain]
+        return self.default_dns, self.default_family
+
+    async def perform_query(self, host: str):
+        """ 执行并发查询 """
+        return await asyncio.gather(
+            self.resolver.query(host, 'A'),
+            self.resolver.query(host, 'AAAA'),
+            return_exceptions=True
+        )
+
     def generate_result(self, host, answers, port, family):
         return [
             {
@@ -36,55 +56,40 @@ class CustomResolver(aiohttp.abc.AbstractResolver):
             for answer in answers
         ]
 
-    def find_dns_config(self, host: str) -> Tuple[str, int]:
-        """ 查找完整匹配或泛域名匹配的 DNS 配置 """
-        if self.dns_map:
-            parts = host.split('.')
-            for i in range(len(parts)):
-                domain = '.'.join(parts[i:])
-                if domain in self.dns_map:
-                    return self.dns_map[domain]
-        return self.default_dns, self.default_family
+    def generate_default_result(self, host, port, family):
+        """ 生成默认结果 """
+        return [{
+            'hostname': host,
+            'host': None,
+            'port': port,
+            'family': family,
+            'proto': 0,
+            'flags': 0,
+        }]
 
     async def _query(self, host: str, family: int, port: int) -> list:
         """ 进行 DNS 查询 """
-        ipv4_res, ipv6_res = await asyncio.gather(
-            self.resolver.query(host, 'A'),
-            self.resolver.query(host, 'AAAA'),
-            return_exceptions=True
-        )
+
+        # 并发查询ipv4和v6 如果ipv4结果为空就取ipv6的
+        ipv4_res, ipv6_res = await self.perform_query(host)
+        ipv4_valid = ipv4_res and not isinstance(ipv4_res, BaseException)
+        ipv6_valid = ipv6_res and not isinstance(ipv6_res, BaseException)
+
         if family == socket.AF_INET:
-            if ipv4_res and not isinstance(ipv4_res, BaseException):
-                return self.generate_result(host, ipv4_res, port, socket.AF_INET)
-            elif ipv6_res and not isinstance(ipv6_res, BaseException):
-                return self.generate_result(host, ipv6_res, port, socket.AF_INET6)
-            else:
-                return [{
-                    'hostname': host,
-                    'host': None,
-                    'port': port,
-                    'family': family,
-                    'proto': 0,
-                    'flags': 0,
-                }]
+            return self.generate_result(host, ipv4_res, port, socket.AF_INET) if ipv4_valid else (
+                self.generate_result(
+                    host, ipv6_res, port, socket.AF_INET6) if ipv6_valid else self.generate_default_result(host, port, family)
+            )
         else:
-            if ipv6_res and not isinstance(ipv6_res, BaseException):
-                return self.generate_result(host, ipv6_res, port, socket.AF_INET6)
-            elif ipv4_res and not isinstance(ipv4_res, BaseException):
-                return self.generate_result(host, ipv4_res, port, socket.AF_INET)
-            else:
-                return [{
-                    'hostname': host,
-                    'host': None,
-                    'port': port,
-                    'family': family,
-                    'proto': 0,
-                    'flags': 0,
-                }]
+            return self.generate_result(host, ipv6_res, port, socket.AF_INET6) if ipv6_valid else (
+                self.generate_result(
+                    host, ipv4_res, port, socket.AF_INET) if ipv4_valid else self.generate_default_result(host, port, family)
+            )
 
     async def resolve(self, host: str, port=0, family=socket.AF_UNSPEC) -> list:
         """ 解析给定主机名的地址 """
         dns, priority_family = self.find_dns_config(host)
+        # 自定义的优先级不能覆盖系统的family
         family = priority_family if family == socket.AF_UNSPEC else family
         self.resolver.nameservers = [dns]
         return await self._query(host, family, port)
