@@ -1,11 +1,12 @@
 from types import coroutine
-from typing import Callable, Coroutine, Dict
+from typing import Any, Callable, Coroutine, Dict, Generator, Literal, LiteralString
 import aiohttp
 import asyncio
 from aiohttp import hdrs
 from aiohttp import ClientResponse
 from aiohttp.client import _RequestContextManager
 import orjson
+from bots.gpt_bot.core.streaming import SSE_DECODER
 from bots.gpt_bot.gpt_platform import Platform
 from my_utils.my_logging import get_logger
 from telegram.ext import CallbackContext
@@ -81,11 +82,42 @@ class SessionWithRetry:
             lambda e: e.status == 503: handle_service_unavailable,
         }
 
-    async def fetch_with_retry(self, method: str, url: str, **kwargs) -> ClientResponse:
+    async def fetch_with_retry(self, method: str, url: str, stream: bool = False, **kwargs):
         attempt = 0
         while attempt < self.retry_attempts:
             try:
-                return await getattr(self.session, '_request')(method, url, allow_redirects=True, **kwargs)
+                async with getattr(self.session, method)(url, allow_redirects=True, **kwargs) as resp:
+                    if stream:
+                        sse_iter = SSE_DECODER.aiter_bytes(
+                            resp.content.iter_any())
+                        answer = ''
+                        answer_parts = []
+                        async for sse in sse_iter:
+                            answer_parts.append(sse.data)
+                            answer = ''.join(answer_parts)
+                            yield 'not_finished', answer
+                        if not answer:
+                            await asyncio.sleep(self.retry_interval)
+                            attempt += 1
+                            continue
+                        yield 'finished', answer
+                    else:
+                        completion = await resp.text()
+                        result = []
+                        for line in completion.splitlines():
+                            if line or line != 'data: [DONE]':
+                                delta = orjson.loads(line[6:])[
+                                    'choices'][0]['delta']
+                                if delta:
+                                    result.append(delta['content'])
+                        answer = ''.join(result)
+                        if not answer:
+                            await asyncio.sleep(self.retry_interval)
+                            attempt += 1
+                            continue
+                        yield answer
+                    return
+
             except Exception as e:
                 should_retry = False
                 for condition, handler in self.conditions_handlers.items():
@@ -110,8 +142,20 @@ class SessionWithRetry:
         raise Exception(
             f"Failed to fetch {url} after {self.retry_attempts} attempts")
 
-    def post(self, url: str, **kwargs):
-        return _RequestContextManager(self.fetch_with_retry(hdrs.METH_POST, url, **kwargs))
+    async def post(self, url: str, stream: bool = False, **kwargs):
+        """ 增强post方法 """
+        if stream:
+            async for status, answer in self.fetch_with_retry(method='post', url=url, stream=True, **kwargs):
+                yield status, answer
+        else:
+            async for answer in self.fetch_with_retry(method='post', url=url, stream=False, **kwargs):
+                yield answer
 
-    def get(self, url: str, **kwargs):
-        return _RequestContextManager(self.fetch_with_retry(hdrs.METH_GET, url, **kwargs))
+    async def get(self, url: str, stream: bool = False, **kwargs):
+        """ 增强get方法 """
+        if stream:
+            async for status, answer in self.fetch_with_retry(method='get', url=url, stream=stream, **kwargs):
+                yield status, answer
+        else:
+            async for answer in self.fetch_with_retry(method='get', url=url, stream=False, **kwargs):
+                yield answer

@@ -38,7 +38,7 @@ class Free_4(Platform):
         """
         return '已使用 $0.0 , 订阅总额 $0.0'
 
-    async def generate_image(self, messages: list, session: aiohttp.ClientSession):
+    async def generate_image(self, messages: list, context: CallbackContext, session: aiohttp.ClientSession):
         # 生成图片
         json_data = {
             'stream': True,
@@ -51,83 +51,31 @@ class Free_4(Platform):
             'authorization': self.openai_api_key
         }
         answer = ''
-        async with session.post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
-            answer_parts = []
-            buffer = bytearray()
-            async for item in response.content.iter_any():
-                # 是否追加不完整的json数据
-                flag = False
-                # 将每个字节流写入缓冲区
-                buffer.extend(item)
-                try:
-                    content = buffer.decode()
-                except UnicodeDecodeError:
-                    continue
-                lines = content.splitlines()
-                for line in lines:
-                    if line:
-                        if '[DONE]' in line:
-                            break
-                        else:
-                            try:
-                                delta = orjson.loads(line[6:])[
-                                    'choices'][0]['delta']
-                                if delta:
-                                    answer_parts.append(
-                                        delta['content'])
-                                    # 在需要时进行拼接
-                                    answer = ''.join(answer_parts)
-                            except:
-                                flag = True
-                # 清空缓冲区
-                buffer.clear()
-                if flag:
-                    buffer.extend(line.encode())
-        return extract_image_url(answer)
+        async for answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data):
+            return extract_image_url(answer)
 
     async def completion(self, stream: bool, context: CallbackContext, session: aiohttp.ClientSession, *messages):
         openai_completion_options = context.user_data['current_mask']['openai_completion_options']
         new_messages, openai_completion_options = self.chat.combine_messages(
             *messages, **openai_completion_options)
+        json_data = {
+            'stream': stream,
+            'messages': new_messages,
+            'model': context.user_data['current_model'],
+            'temperature': openai_completion_options['temperature'],
+            'top_p': openai_completion_options['top_p']
+        }
+        headers = {
+            'origin': self.foreign_openai_base_url,
+            'user-agent': bot_util.ua.random,
+            'authorization': self.openai_api_key
+        }
         answer = ''
         if stream:
-            json_data = {
-                'stream': True,
-                'messages': new_messages,
-                'model': context.user_data['current_model'],
-                'temperature': openai_completion_options['temperature'],
-                'top_p': openai_completion_options['top_p']
-            }
-            headers = {
-                'origin': self.foreign_openai_base_url,
-                'user-agent': bot_util.ua.random,
-                'authorization': self.openai_api_key
-            }
-            async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as resp:
-                sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
-                answer_parts = []
-                async for sse in sse_iter:
-                    answer_parts.append(sse.data)
-                    answer = ''.join(answer_parts)
-                    yield 'not_finished', answer
-                yield 'finished', answer
+            async for status, answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data, stream=True):
+                yield status, answer
         else:
-            json_data = {
-                'stream': False,
-                'messages': new_messages,
-                'model': context.user_data['current_model'],
-                'temperature': openai_completion_options['temperature'],
-                'top_p': openai_completion_options['top_p']
-            }
-            headers = {
-                'origin': self.foreign_openai_base_url,
-                'user-agent': bot_util.ua.random,
-                'authorization': self.openai_api_key
-            }
-            async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
-                completion = await response.json()
-                answer = completion[
-                    'choices'][0]['message']['content']
+            async for answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/api/chat/completions', headers=headers, json=json_data):
                 yield answer
         await self.chat.append_messages(
             answer, context, *messages)
@@ -147,19 +95,8 @@ class Free_4(Platform):
         }
         try:
             async with aiohttp.ClientSession(raise_for_status=True, trust_env=True, timeout=aiohttp.ClientTimeout(total=30)) as session:
-                async with SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data) as response:
-                    completion = await response.text()
-                    result = []
-                    for line in completion.splitlines():
-                        if line or line != 'data: [DONE]':
-                            try:
-                                delta = orjson.loads(line[6:])[
-                                    'choices'][0]['delta']
-                            except:
-                                continue
-                            if delta:
-                                result.append(delta['content'])
-                    answer = ''.join(result)
+                async for summary in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/openai/chat/completions', headers=headers, json=json_data):
+                    answer = summary
         except:
             answer = content
 

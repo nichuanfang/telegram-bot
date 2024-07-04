@@ -28,35 +28,17 @@ class Free_1(Platform):
             'user-agent': ua.random,
             'authorization': self.openai_api_key,
         }
+        json_data = {
+            "messages": new_messages,
+            "stream": stream,
+            'model': context.user_data.get('current_model'),
+            **openai_completion_options
+        }
         if stream:
-            json_data = {
-                "messages": new_messages,
-                "stream": True,
-                'model': context.user_data.get('current_model'),
-                **openai_completion_options
-            }
-            async with SessionWithRetry(session, context).post(f'{self.openai_base_url}/chat/completions', json=json_data, headers=headers) as resp:
-                sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
-                answer_parts = []
-                async for sse in sse_iter:
-                    answer_parts.append(sse.data)
-                    answer = ''.join(answer_parts)
-                    yield 'not_finished', answer
-                yield 'finished', answer
+            async for status, answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/chat/completions', headers=headers, json=json_data, stream=True):
+                yield status, answer
         else:
-            json_data = {
-                "messages": new_messages,
-                "stream": False,
-                'model': context.user_data.get('current_model'),
-                **openai_completion_options
-            }
-            completion = await self.chat.openai_client.chat.completions.create(**{
-                "messages": new_messages,
-                "stream": False,
-                'model': context.user_data.get('current_model'),
-                **openai_completion_options
-            })
-            answer = completion.choices[0].message.content
-            yield answer
+            async for answer in SessionWithRetry(session, context).post(f'{self.foreign_openai_base_url}/chat/completions', headers=headers, json=json_data):
+                yield answer
         await self.chat.append_messages(
             answer, context, *messages)
