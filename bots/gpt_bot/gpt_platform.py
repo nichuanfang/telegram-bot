@@ -7,7 +7,6 @@ from abc import ABCMeta
 import openai
 import platform
 from bots.gpt_bot.chat import Chat
-from bots.gpt_bot.core.session import SessionWithRetry
 
 
 from bots.gpt_bot.gpt_http_request import BotHttpRequest
@@ -141,7 +140,7 @@ class Platform(metaclass=ABCMeta):
                 'model': context.user_data.get('current_model'),
                 **openai_completion_options
             }
-            async with SessionWithRetry(session, context).post(f'{self.openai_base_url}/chat/completions', json=json_data, headers=headers) as resp:
+            async with session.post(f'{self.openai_base_url}/chat/completions', json=json_data, headers=headers) as resp:
                 sse_iter = SSE_DECODER.aiter_bytes(resp.content.iter_any())
                 answer_parts = []
                 async for sse in sse_iter:

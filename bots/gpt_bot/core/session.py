@@ -7,7 +7,6 @@ from aiohttp import ClientResponse
 from aiohttp.client import _RequestContextManager
 import orjson
 from bots.gpt_bot.gpt_platform import Platform
-from my_utils import bot_util
 from my_utils.my_logging import get_logger
 from telegram.ext import CallbackContext
 
@@ -16,6 +15,7 @@ logger = get_logger('gpt-session')
 
 
 async def reauth(current_platform: Platform, context: CallbackContext):
+    from my_utils import bot_util
     """ 重新认证 """
     json_data = None
     with open(bot_util.TEMP_CONFIG_PATH, mode='r', encoding='utf-8') as f:
