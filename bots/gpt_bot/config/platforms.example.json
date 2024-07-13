@@ -52,6 +52,53 @@
       ]
     }
   },
+  "swt": {
+    "name": "Swt",
+    "platform_key": "swt",
+    "domestic_openai_base_url": "https://api.swt-ai.com/v1",
+    "foreign_openai_base_url": "https://api.swt-ai.com/v1",
+    "index_url": "https://api.swt-ai.com/",
+    "payment_url": "https://welfare.swt-ai.com/?cid=0&tid=5",
+    "openai_api_key": "",
+    "supported_masks": [
+      "common",
+      "compressed",
+      "github_copilot",
+      "song_recommender",
+      "movie_expert",
+      "travel_guide",
+      "doctor"
+    ],
+    "supported_models": [
+      "gpt-3.5-turbo",
+      "gpt-4o"
+    ],
+    "mask_model_mapping": {
+      "common": [
+        "gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "compressed": [
+        "gpt-3.5-turbo",
+        "gpt-4o"
+      ],
+      "github_copilot": [
+        "gpt-4o"
+      ],
+      "song_recommender": [
+        "gpt-4o"
+      ],
+      "movie_expert": [
+        "gpt-4o"
+      ],
+      "travel_guide": [
+        "gpt-4o"
+      ],
+      "doctor": [
+        "gpt-4o"
+      ]
+    }
+  },
   "free_1": {
     "name": "免费_1",
     "platform_key": "free_1",
