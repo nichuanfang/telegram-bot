@@ -12,5 +12,4 @@ class Swt(Platform):
         查询余额
         @return: 
         """
-        response = await BotHttpRequest.query_balance(self.openai_api_key, self.openai_base_url)
-        return f'已使用 ${round(response["balanceUsed"], 2)} , 订阅总额 ${round(response["balanceTotal"], 2)}'
+        return '已使用 $0.0 , 订阅总额 $0.0'
