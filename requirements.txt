@@ -1,4 +1,4 @@
-python-telegram-bot[webhooks,job-queue]==21.3
+python-telegram-bot[webhooks,job-queue]==21.4
 fake-useragent==1.5.1
 orjson==3.10.5
 python-dotenv==1.0.1
